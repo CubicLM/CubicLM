@@ -7,6 +7,8 @@
 <img src="assets/icons/CubicLM.png" alt="CubicLM" width="190" />
 
 ## CubicLM
+Computational Universe for Building Intelligent Learning Machines
+
 
 ### The Cross-Platform AI Chat Powerhouse
 
