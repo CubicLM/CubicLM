@@ -12,6 +12,14 @@ class BrowserVisit {
       : at = at ?? DateTime.now();
 }
 
+/// A recently-closed tab snapshot for "reopen closed tab".
+class ClosedTab {
+  final String url;
+  final String title;
+
+  ClosedTab({required this.url, required this.title});
+}
+
 class WebTab {
   final String id;
   final RxString url = ''.obs;
@@ -76,11 +84,17 @@ class BrowserController extends GetxController {
   /// Session history cap (in-memory only, never persisted).
   static const int maxVisits = 100;
 
+  /// Recently closed tabs cap.
+  static const int maxClosedTabs = 15;
+
   final tabs = <WebTab>[].obs;
   final currentTabIndex = 0.obs;
 
   /// Session-only visits, newest first. Never persisted.
   final visits = <BrowserVisit>[].obs;
+
+  /// Recently closed tabs (newest first). Session-only.
+  final closedTabs = <ClosedTab>[].obs;
 
   WebTab? get currentTab =>
       tabs.isNotEmpty ? tabs[currentTabIndex.value] : null;
@@ -119,10 +133,27 @@ class BrowserController extends GetxController {
       return;
     }
 
+    // Save to recently closed before removing
+    final tab = tabs[index];
+    final url = tab.url.value;
+    if (url.isNotEmpty && url != 'about:blank') {
+      closedTabs.insert(0, ClosedTab(url: url, title: tab.title.value));
+      while (closedTabs.length > maxClosedTabs) {
+        closedTabs.removeLast();
+      }
+    }
+
     tabs.removeAt(index);
     if (currentTabIndex.value >= tabs.length) {
       currentTabIndex.value = tabs.length - 1;
     }
+  }
+
+  /// Reopen the most recently closed tab. Returns false if none available.
+  bool reopenClosedTab() {
+    if (closedTabs.isEmpty) return false;
+    final closed = closedTabs.removeAt(0);
+    return addTab(url: closed.url);
   }
 
   void switchTab(int index) {

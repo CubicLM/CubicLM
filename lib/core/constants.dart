@@ -77,6 +77,10 @@ class AppConstants {
   static const String keyBrowserForcedDark = 'browser_forced_dark';
   static const String keyBrowserAllowlist = 'browser_allowlist';
   static const String keyBrowserBookmarks = 'browser_bookmarks';
+  static const String keyBrowserHttpsOnly = 'browser_https_only';
+  static const String keyBrowserDntEnabled = 'browser_dnt_enabled';
+  static const String keyBrowserBlockThirdPartyCookies =
+      'browser_block_third_party_cookies';
   static const String keyComposerUpsellDismissed =
       'composer_upsell_dismissed';
   static const String keyLocalModelPath = 'local_model_path';

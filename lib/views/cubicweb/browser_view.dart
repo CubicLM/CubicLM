@@ -115,13 +115,24 @@ class _BrowserViewState extends State<BrowserView> {
   Future<void> _go(String input) async {
     final raw = input.trim();
     if (raw.isEmpty) return;
-    final url = BrowserView.looksLikeSearch(raw)
+    var url = BrowserView.looksLikeSearch(raw)
         ? BrowserSearchEngines.searchUrl(
             _settings.browserSearchEngine.value, raw)
         : _normalize(raw);
 
+    // HTTPS-only mode: upgrade HTTP to HTTPS
+    if (_settings.browserHttpsOnly.value && url.startsWith('http://')) {
+      url = url.replaceFirst('http://', 'https://');
+    }
+
     final tab = _browser.currentTab;
     if (tab == null) return;
+
+    // HTTPS-only mode: block plain HTTP navigation
+    if (_settings.browserHttpsOnly.value && url.startsWith('http://')) {
+      _toast('HTTPS-only', 'This site does not support HTTPS.');
+      return;
+    }
 
     Get.focusScope?.unfocus();
     tab.blockedCount.value = 0;
@@ -134,8 +145,16 @@ class _BrowserViewState extends State<BrowserView> {
     tab.url.value = url;
     if (_browser.currentTab == tab) _urlCtrl.text = url;
     try {
-      await tab.webController
-          ?.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
+      final headers = <String, String>{};
+      if (_settings.browserDntEnabled.value) {
+        headers['DNT'] = '1';
+        headers['Sec-GPC'] = '1';
+      }
+      final req = URLRequest(
+        url: WebUri(url),
+        headers: headers.isNotEmpty ? headers : null,
+      );
+      await tab.webController?.loadUrl(urlRequest: req);
     } catch (_) {}
   }
 
@@ -404,6 +423,29 @@ class _BrowserViewState extends State<BrowserView> {
     _toast('Browsing data', 'Cookies and cache cleared.');
   }
 
+  // ── Screenshot ──────────────────────────────────────────────────────
+
+  Future<void> _takeScreenshot(WebTab tab) async {
+    try {
+      final controller = tab.webController;
+      if (controller == null) return;
+      final screenshot = await controller.takeScreenshot();
+      if (screenshot == null || screenshot.isEmpty) {
+        _toast('Screenshot', 'Could not capture the page.');
+        return;
+      }
+      await ExportFile.quickExport(
+        bytes: screenshot,
+        fileName: 'screenshot-${DateTime.now().millisecondsSinceEpoch}.png',
+        mimeType: 'image/png',
+        shareText: 'Screenshot',
+      );
+      _toast('Screenshot', 'Saved.');
+    } catch (e) {
+      _toast('Screenshot', 'Failed: $e');
+    }
+  }
+
   // ── Build ─────────────────────────────────────────────────────────
 
   @override
@@ -637,7 +679,7 @@ class _BrowserViewState extends State<BrowserView> {
             domStorageEnabled: true,
             supportZoom: true,
             transparentBackground: false,
-            allowsBackForwardNavigationGestures: false,
+            allowsBackForwardNavigationGestures: true,
             useOnDownloadStart: true,
             userAgent:
                 tab.desktopMode.value ? kDesktopUserAgent : null,
@@ -1082,6 +1124,43 @@ class _BrowserViewState extends State<BrowserView> {
                       onChanged: (_) => _toggleDarkMode(tab),
                     ),
                   )),
+              const Divider(height: 8),
+              ListTile(
+                leading: const Icon(LucideIcons.camera),
+                title: const Text('Screenshot'),
+                enabled: hasPage,
+                onTap: () {
+                  Get.back();
+                  _takeScreenshot(tab);
+                },
+              ),
+              Obx(() => ListTile(
+                    leading: const Icon(LucideIcons.lock),
+                    title: const Text('HTTPS-only mode'),
+                    subtitle: const Text('Block plain HTTP sites'),
+                    trailing: Switch(
+                      value: _settings.browserHttpsOnly.value,
+                      onChanged: (v) => _settings.setBrowserHttpsOnly(v),
+                    ),
+                  )),
+              Obx(() => ListTile(
+                    leading: const Icon(LucideIcons.eyeOff),
+                    title: const Text('Do Not Track'),
+                    subtitle: const Text('Send DNT + GPC headers'),
+                    trailing: Switch(
+                      value: _settings.browserDntEnabled.value,
+                      onChanged: (v) => _settings.setBrowserDntEnabled(v),
+                    ),
+                  )),
+              Obx(() => ListTile(
+                    leading: const Icon(LucideIcons.cookie),
+                    title: const Text('Block 3rd-party cookies'),
+                    trailing: Switch(
+                      value: _settings.browserBlockThirdPartyCookies.value,
+                      onChanged: (v) =>
+                          _settings.setBrowserBlockThirdPartyCookies(v),
+                    ),
+                  )),
             ],
           ),
         ),
@@ -1498,6 +1577,70 @@ class _BrowserViewState extends State<BrowserView> {
                   },
                 )),
           ),
+          // Recently closed tabs
+          Obx(() {
+            if (_browser.closedTabs.isEmpty) return const SizedBox.shrink();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Recently closed',
+                        style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13, fontWeight: FontWeight.w700)),
+                    TextButton(
+                      onPressed: () {
+                        _browser.closedTabs.clear();
+                      },
+                      child: const Text('Clear'),
+                    ),
+                  ],
+                ),
+                SizedBox(
+                  height: 80,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _browser.closedTabs.length.clamp(0, 8),
+                    itemBuilder: (context, i) {
+                      final closed = _browser.closedTabs[i];
+                      return GestureDetector(
+                        onTap: () {
+                          _browser.reopenClosedTab();
+                          Get.back();
+                        },
+                        child: Container(
+                          width: 140,
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isDark ? Dt.cardDark : Dt.card,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Dt.borderColor(isDark)),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(LucideIcons.globe,
+                                  size: 18,
+                                  color: Dt.accent.withValues(alpha: 0.4)),
+                              const SizedBox(height: 4),
+                              Text(closed.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 10)),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          }),
         ]),
       ),
     );

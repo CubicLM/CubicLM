@@ -49,7 +49,8 @@ class ServerView extends GetView<ServerController> {
       ),
       body: TabBarView(
         children: [
-          ListView(
+          ClipRect(
+            child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 96),
             children: [
               Obx(() {
@@ -320,6 +321,7 @@ class ServerView extends GetView<ServerController> {
         );
           }),
             ],
+          ),
           ),
           const SettingsView(embedded: true),
         ],

@@ -564,49 +564,52 @@ Widget buildInlineDownloadProgress(BuildContext context, AiModel model) {
               ),
             ),
             const Spacer(),
-            if (dp.isPaused.value)
-              TextButton.icon(
-                onPressed: () => _c.resumeDownload(model.filename),
-                icon: const Icon(LucideIcons.play, size: 14),
-                label: const Text('Resume'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.success,
-                  textStyle: const TextStyle(fontSize: 12),
-                  iconSize: 14,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              )
-            else
-              TextButton.icon(
-                onPressed: () => _c.pauseDownload(model.filename),
-                icon: const Icon(LucideIcons.pause, size: 14),
-                label: const Text('Pause'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.warning,
-                  textStyle: const TextStyle(fontSize: 12),
-                  iconSize: 14,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
+            Flexible(
+              child: dp.isPaused.value
+                  ? TextButton.icon(
+                      onPressed: () => _c.resumeDownload(model.filename),
+                      icon: const Icon(LucideIcons.play, size: 14),
+                      label: const Text('Resume'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.success,
+                        textStyle: const TextStyle(fontSize: 12),
+                        iconSize: 14,
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    )
+                  : TextButton.icon(
+                      onPressed: () => _c.pauseDownload(model.filename),
+                      icon: const Icon(LucideIcons.pause, size: 14),
+                      label: const Text('Pause'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.warning,
+                        textStyle: const TextStyle(fontSize: 12),
+                        iconSize: 14,
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+            ),
             const SizedBox(width: 4),
-            TextButton.icon(
-              onPressed: () => _c.cancelDownload(model.filename),
-              icon: const Icon(Icons.close, size: 14),
-              label: Text('common_cancel'.tr),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.error,
-                textStyle: const TextStyle(fontSize: 12),
-                iconSize: 14,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            Flexible(
+              child: TextButton.icon(
+                onPressed: () => _c.cancelDownload(model.filename),
+                icon: const Icon(Icons.close, size: 14),
+                label: Text('common_cancel'.tr),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  textStyle: const TextStyle(fontSize: 12),
+                  iconSize: 14,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
               ),
             ),
           ],

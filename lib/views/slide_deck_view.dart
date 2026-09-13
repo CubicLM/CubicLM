@@ -344,56 +344,58 @@ class _SlideDeckViewState extends State<SlideDeckView> {
           // (Sources + research live under the + sheet.)
           const SizedBox(height: 4),
           // Row 1: + sheet . model pill . style/audience . count . generate CTA.
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              IconButton(
-                tooltip: 'Add source, AI research or vision sketch',
-                icon: Obx(() => Icon(
-                      (c.sourceFile.value != null || c.useResearch.value || c.inputImage.value != null)
-                          ? LucideIcons.plusCircle
-                          : LucideIcons.plus,
-                      size: 20,
-                      color: (c.sourceFile.value != null ||
-                              c.useResearch.value ||
-                              c.inputImage.value != null)
-                          ? Dt.accent
-                          : Dt.textSecondary,
-                    )),
-                onPressed: c.generating.value
-                    ? null
-                    : () => _showPlusSheet(context),
-              ),
-              SizedBox(
-                width: 125,
-                child: Obx(() => AppModelPill(
-                      label: _engineLabel(),
-                      onTap: () => showModelSwitcherSheet(context),
-                    )),
-              ),
-              const SizedBox(width: 6),
-              Flexible(child: Obx(() => _styleAudiencePill(context, isDark))),
-              const SizedBox(width: 6),
-              Flexible(child: Obx(() => _countStepper(context, isDark))),
-              const Spacer(),
-              AppCtaButton(
-                icon: c.generating.value
-                    ? Icons.hourglass_top_rounded
-                    : LucideIcons.presentation,
-                onTap: c.generating.value ||
-                        (_topicCtrl.text.trim().isEmpty &&
-                            c.sourceFile.value == null)
-                    ? null
-                    : () async {
-                        c.topic.value = _topicCtrl.text;
-                        await c.generate();
-                        _page = 0;
-                        if (_pageCtrl.hasClients) {
-                          _pageCtrl.jumpToPage(0);
-                        }
-                      },
-              ),
-            ],
+          ClipRect(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                IconButton(
+                  tooltip: 'Add source, AI research or vision sketch',
+                  icon: Obx(() => Icon(
+                        (c.sourceFile.value != null || c.useResearch.value || c.inputImage.value != null)
+                            ? LucideIcons.plusCircle
+                            : LucideIcons.plus,
+                        size: 20,
+                        color: (c.sourceFile.value != null ||
+                                c.useResearch.value ||
+                                c.inputImage.value != null)
+                            ? Dt.accent
+                            : Dt.textSecondary,
+                      )),
+                  onPressed: c.generating.value
+                      ? null
+                      : () => _showPlusSheet(context),
+                ),
+                SizedBox(
+                  width: 125,
+                  child: Obx(() => AppModelPill(
+                        label: _engineLabel(),
+                        onTap: () => showModelSwitcherSheet(context),
+                      )),
+                ),
+                const SizedBox(width: 6),
+                Flexible(child: Obx(() => _styleAudiencePill(context, isDark))),
+                const SizedBox(width: 6),
+                Flexible(child: Obx(() => _countStepper(context, isDark))),
+                const Spacer(),
+                AppCtaButton(
+                  icon: c.generating.value
+                      ? Icons.hourglass_top_rounded
+                      : LucideIcons.presentation,
+                  onTap: c.generating.value ||
+                          (_topicCtrl.text.trim().isEmpty &&
+                              c.sourceFile.value == null)
+                      ? null
+                      : () async {
+                          c.topic.value = _topicCtrl.text;
+                          await c.generate();
+                          _page = 0;
+                          if (_pageCtrl.hasClients) {
+                            _pageCtrl.jumpToPage(0);
+                          }
+                        },
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -691,7 +693,7 @@ class _SlideDeckViewState extends State<SlideDeckView> {
     final disabled = c.generating.value;
     return Container(
       height: Dt.pillHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       decoration: BoxDecoration(
         color: Dt.pillMuted,
         borderRadius: BorderRadius.circular(Dt.pillHeight),
@@ -703,22 +705,22 @@ class _SlideDeckViewState extends State<SlideDeckView> {
             onTap: disabled ? null : () => c.setCount(c.slideCount.value - 1),
             customBorder: const CircleBorder(),
             child: Padding(
-              padding: const EdgeInsets.all(3),
+              padding: const EdgeInsets.all(2),
               child: Icon(Icons.remove,
-                  size: 15,
+                  size: 14,
                   color: disabled ? Dt.textPlaceholder : Dt.textPrimary),
             ),
           ),
           Text('${c.slideCount.value}',
               style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12.5, fontWeight: FontWeight.w800)),
+                  fontSize: 11.5, fontWeight: FontWeight.w800)),
           InkWell(
             onTap: disabled ? null : () => c.setCount(c.slideCount.value + 1),
             customBorder: const CircleBorder(),
             child: Padding(
-              padding: const EdgeInsets.all(3),
+              padding: const EdgeInsets.all(2),
               child: Icon(Icons.add,
-                  size: 15,
+                  size: 14,
                   color: disabled ? Dt.textPlaceholder : Dt.textPrimary),
             ),
           ),

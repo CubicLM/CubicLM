@@ -149,6 +149,12 @@ class SettingsController extends GetxController {
   /// Browser bookmarks (explicit user saves only — never auto-recorded).
   /// Each entry: {title, url, addedAt}. Plain JSON-string pref.
   final browserBookmarks = <Map<String, String>>[].obs;
+  /// Block HTTP sites entirely (HTTPS-only mode). Plain bool pref.
+  final browserHttpsOnly = false.obs;
+  /// Send Do-Not-Track / Global Privacy Control headers. Plain bool pref.
+  final browserDntEnabled = true.obs;
+  /// Block third-party cookies. Plain bool pref.
+  final browserBlockThirdPartyCookies = false.obs;
   /// Dismissible upsell pill shown inside the composer card.
   final composerUpsellDismissed = false.obs;
   final liteRtPerformanceMode = AppConstants.defaultLiteRtPerformanceMode.obs;
@@ -488,6 +494,18 @@ class SettingsController extends GetxController {
         _hive.getSetting<String>(AppConstants.keyBrowserAllowlist)));
     browserBookmarks.assignAll(_decodeBookmarks(
         _hive.getSetting<String>(AppConstants.keyBrowserBookmarks)));
+    browserHttpsOnly.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserHttpsOnly,
+            defaultValue: false) ??
+        false;
+    browserDntEnabled.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserDntEnabled,
+            defaultValue: true) ??
+        true;
+    browserBlockThirdPartyCookies.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserBlockThirdPartyCookies,
+            defaultValue: false) ??
+        false;
     composerUpsellDismissed.value = _hive.getSetting<bool>(
             AppConstants.keyComposerUpsellDismissed,
             defaultValue: false) ??
@@ -1495,6 +1513,21 @@ class SettingsController extends GetxController {
   Future<void> setBrowserForcedDark(bool enabled) async {
     browserForcedDark.value = enabled;
     await _hive.setSetting(AppConstants.keyBrowserForcedDark, enabled);
+  }
+
+  Future<void> setBrowserHttpsOnly(bool enabled) async {
+    browserHttpsOnly.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserHttpsOnly, enabled);
+  }
+
+  Future<void> setBrowserDntEnabled(bool enabled) async {
+    browserDntEnabled.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserDntEnabled, enabled);
+  }
+
+  Future<void> setBrowserBlockThirdPartyCookies(bool enabled) async {
+    browserBlockThirdPartyCookies.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserBlockThirdPartyCookies, enabled);
   }
 
   /// True when [url]'s host (or any parent domain) is allowlisted.
