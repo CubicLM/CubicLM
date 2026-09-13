@@ -49,12 +49,16 @@ class ServerView extends GetView<ServerController> {
       ),
       body: TabBarView(
         children: [
-          Obx(() {
+          ListView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 96),
+            children: [
+              Obx(() {
         final isRunning = controller.isRunning.value;
         final hasKey = controller.apiKey.value.trim().isNotEmpty;
 
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 96),
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Status
             _groupedCard(isDark, children: [
@@ -315,6 +319,8 @@ class ServerView extends GetView<ServerController> {
           ],
         );
           }),
+            ],
+          ),
           const SettingsView(embedded: true),
         ],
       ),

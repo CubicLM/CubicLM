@@ -78,6 +78,10 @@ class _SlideDeckViewState extends State<SlideDeckView> {
           Obx(() => c.hasDeck
               ? Row(
                   children: [
+                    // Slide Sorter
+                    _miniBtn(context, LucideIcons.layoutGrid, 'Slide sorter',
+                        () => _showSlideSorter(context)),
+                    const SizedBox(width: 4),
                     // Adaptive Content: Resize
                     _miniBtn(context, LucideIcons.scaling, 'Resize deck',
                         () => _showResizeDialog(context)),
@@ -179,6 +183,15 @@ class _SlideDeckViewState extends State<SlideDeckView> {
                   if (c.hasDeck) ...[
                     const SizedBox(height: 12),
                     _deckBar(context, isDark),
+                    if (c.generating.value)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: LinearProgressIndicator(
+                          backgroundColor: Dt.pillMuted,
+                          color: Dt.accent,
+                          minHeight: 2,
+                        ),
+                      ),
                     const SizedBox(height: 10),
                     _carousel(context, isDark),
                   ] else if (c.generating.value) ...[
@@ -330,19 +343,20 @@ class _SlideDeckViewState extends State<SlideDeckView> {
           ),
           // (Sources + research live under the + sheet.)
           const SizedBox(height: 4),
-          // Row 1: + sheet . model pill . style/audience . generate CTA.
+          // Row 1: + sheet . model pill . style/audience . count . generate CTA.
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               IconButton(
-                tooltip: 'Add source or AI research',
+                tooltip: 'Add source, AI research or vision sketch',
                 icon: Obx(() => Icon(
-                      (c.sourceFile.value != null || c.useResearch.value)
+                      (c.sourceFile.value != null || c.useResearch.value || c.inputImage.value != null)
                           ? LucideIcons.plusCircle
                           : LucideIcons.plus,
                       size: 20,
                       color: (c.sourceFile.value != null ||
-                              c.useResearch.value)
+                              c.useResearch.value ||
+                              c.inputImage.value != null)
                           ? Dt.accent
                           : Dt.textSecondary,
                     )),
@@ -359,6 +373,8 @@ class _SlideDeckViewState extends State<SlideDeckView> {
               ),
               const SizedBox(width: 6),
               Flexible(child: Obx(() => _styleAudiencePill(context, isDark))),
+              const SizedBox(width: 6),
+              Flexible(child: Obx(() => _countStepper(context, isDark))),
               const Spacer(),
               AppCtaButton(
                 icon: c.generating.value
@@ -379,19 +395,6 @@ class _SlideDeckViewState extends State<SlideDeckView> {
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          // Row 2: visual style + slide count.
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Flexible(child: Obx(() => _visualStylePill(context, isDark))),
-              const SizedBox(width: 6),
-              Flexible(child: Obx(() => _countStepper(context, isDark))),
-            ],
-          ),
-          const SizedBox(height: 6),
-          // Vision input
-          Obx(() => _visionPill(context, isDark)),
         ],
       ),
     );
@@ -475,7 +478,7 @@ class _SlideDeckViewState extends State<SlideDeckView> {
       isScrollControlled: true,
       builder: (_) => SafeArea(
         child: DefaultTabController(
-          length: 2,
+          length: 3,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -488,6 +491,7 @@ class _SlideDeckViewState extends State<SlideDeckView> {
                 tabs: const [
                   Tab(text: 'Slide Style'),
                   Tab(text: 'Target Audience'),
+                  Tab(text: 'Visual Style'),
                 ],
               ),
               SizedBox(
@@ -520,6 +524,19 @@ class _SlideDeckViewState extends State<SlideDeckView> {
                                       a,
                                   onTap: () => c.audience.value =
                                       a == 'General' ? '' : a,
+                                ),
+                            ],
+                          )),
+                    ),
+                    SingleChildScrollView(
+                      child: Obx(() => Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final vs in SlideDeckController.visualStyles)
+                                _optionRow(
+                                  label: vs,
+                                  selected: c.visualStyle.value == vs,
+                                  onTap: () => c.visualStyle.value = vs,
                                 ),
                             ],
                           )),
@@ -611,6 +628,35 @@ class _SlideDeckViewState extends State<SlideDeckView> {
                 activeThumbColor: Dt.accent,
                 onChanged: (v) => c.useResearch.value = v,
               ),
+              ListTile(
+                leading: Obx(() => Icon(
+                      c.inputImage.value != null
+                          ? LucideIcons.badgeCheck
+                          : LucideIcons.imagePlus,
+                      color: c.inputImage.value != null
+                          ? Dt.accent
+                          : Dt.textSecondary,
+                    )),
+                title: Obx(() => Text(
+                      c.inputImage.value != null
+                          ? 'Sketch attached'
+                          : 'Attach Sketch for Vision',
+                      style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14, fontWeight: FontWeight.w600),
+                    )),
+                subtitle: c.inputImage.value != null
+                    ? const Text('AI will use this as visual reference')
+                    : null,
+                trailing: c.inputImage.value != null
+                    ? IconButton(
+                        tooltip: 'Remove sketch',
+                        icon: const Icon(LucideIcons.x,
+                            size: 18, color: AppColors.error),
+                        onPressed: () => c.inputImage.value = null,
+                      )
+                    : null,
+                onTap: () => _pickInputImage(),
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: SizedBox(
@@ -657,7 +703,7 @@ class _SlideDeckViewState extends State<SlideDeckView> {
             onTap: disabled ? null : () => c.setCount(c.slideCount.value - 1),
             customBorder: const CircleBorder(),
             child: Padding(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(3),
               child: Icon(Icons.remove,
                   size: 15,
                   color: disabled ? Dt.textPlaceholder : Dt.textPrimary),
@@ -670,7 +716,7 @@ class _SlideDeckViewState extends State<SlideDeckView> {
             onTap: disabled ? null : () => c.setCount(c.slideCount.value + 1),
             customBorder: const CircleBorder(),
             child: Padding(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(3),
               child: Icon(Icons.add,
                   size: 15,
                   color: disabled ? Dt.textPlaceholder : Dt.textPrimary),
@@ -692,91 +738,6 @@ class _SlideDeckViewState extends State<SlideDeckView> {
     'Clients',
     'Team',
   ];
-
-  Widget _visualStylePill(BuildContext context, bool isDark) {
-    return PopupMenuButton<String>(
-      enabled: !c.generating.value,
-      tooltip: 'Visual style',
-      initialValue: c.visualStyle.value,
-      onSelected: (v) => c.visualStyle.value = v,
-      itemBuilder: (_) => [
-        for (final s in SlideDeckController.visualStyles)
-          PopupMenuItem(
-            value: s,
-            child: Text(s, style: GoogleFonts.plusJakartaSans(fontSize: 13)),
-          ),
-      ],
-      child: Container(
-        height: Dt.pillHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: c.visualStyle.value != 'Professional'
-              ? Dt.accent.withValues(alpha: 0.12)
-              : Dt.pillMuted,
-          borderRadius: BorderRadius.circular(Dt.pillHeight),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(LucideIcons.palette,
-                size: 13,
-                color: c.visualStyle.value != 'Professional' ? Dt.accent : Dt.textSecondary),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                c.visualStyle.value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: c.visualStyle.value != 'Professional' ? Dt.accent : Dt.textPrimary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _visionPill(BuildContext context, bool isDark) {
-    final hasImg = c.inputImage.value != null;
-    return InkWell(
-      onTap: c.generating.value ? null : _pickInputImage,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: hasImg ? Dt.accent.withValues(alpha: 0.12) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: hasImg ? Border.all(color: Dt.accent.withValues(alpha: 0.3)) : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(hasImg ? LucideIcons.badgeCheck : LucideIcons.imagePlus,
-                size: 14, color: hasImg ? Dt.accent : Dt.textSecondary),
-            const SizedBox(width: 6),
-            Text(
-              hasImg ? 'Sketch/Photo attached' : 'Attach Sketch for Vision',
-              style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: hasImg ? Dt.accent : Dt.textSecondary),
-            ),
-            if (hasImg) ...[
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: () => c.inputImage.value = null,
-                child: const Icon(LucideIcons.x, size: 14, color: AppColors.error),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 
   Future<void> _pickInputImage() async {
     final source = await showModalBottomSheet<ImageSource>(
@@ -991,6 +952,98 @@ class _SlideDeckViewState extends State<SlideDeckView> {
       fontHeading: old.fontHeading,
       fontBody: old.fontBody,
       logoBytes: logo ?? old.logoBytes,
+    );
+  }
+
+  void _showSlideSorter(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        builder: (_, scroll) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Text('Slide Sorter',
+                      style: GoogleFonts.plusJakartaSans(
+                          fontSize: 20, fontWeight: FontWeight.w800)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(LucideIcons.x),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const Divider(),
+              Expanded(
+                child: Obx(() => GridView.builder(
+                      controller: scroll,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        childAspectRatio: 4 / 3.5,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                      ),
+                      itemCount: c.slides.length,
+                      itemBuilder: (_, i) {
+                        final s = c.slides[i];
+                        final active = i == _page;
+                        final pal = SlidePalette.fromTheme(c.theme.value);
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() => _page = i);
+                            _pageCtrl.jumpToPage(i);
+                            Navigator.pop(ctx);
+                          },
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: active ? Dt.accent : Dt.hairline,
+                                      width: active ? 2 : 1,
+                                    ),
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: AbsorbPointer(
+                                    child: SlideCanvas(
+                                      slide: s,
+                                      index: i,
+                                      pal: pal,
+                                      logoBytes: c.theme.value.logoBytes,
+                                      interactive: false,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text('${i + 1}',
+                                  style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: active ? Dt.accent : Dt.textSecondary)),
+                            ],
+                          ),
+                        );
+                      },
+                    )),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1381,6 +1434,7 @@ class _SlideDeckViewState extends State<SlideDeckView> {
     return AspectRatio(
       aspectRatio: 4 / 3,
       child: SlideCanvas(
+        key: ValueKey('slide-$index'),
         slide: s,
         index: index,
         pal: pal,

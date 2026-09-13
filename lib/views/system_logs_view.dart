@@ -44,6 +44,19 @@ class _SystemLogsViewState extends State<SystemLogsView> {
     super.dispose();
   }
 
+  Color _getSeverityColor(CwSeverity? severity) {
+    switch (severity) {
+      case CwSeverity.error:
+        return AppColors.error;
+      case CwSeverity.warning:
+        return const Color(0xFFFBBF24);
+      case CwSeverity.info:
+        return const Color(0xFF3B82F6);
+      default:
+        return Dt.accent;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -58,13 +71,15 @@ class _SystemLogsViewState extends State<SystemLogsView> {
     }
     return Scaffold(
       appBar: AppBar(
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.transparent,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('CubicWeb System Logs',
                 style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w800)),
+                    fontWeight: FontWeight.w800, fontSize: 18)),
             Obx(() {
               final n = logger.events.length;
               return Text(
@@ -78,24 +93,63 @@ class _SystemLogsViewState extends State<SystemLogsView> {
             }),
           ],
         ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (v) => setState(() => _query = v),
+              style: GoogleFonts.plusJakartaSans(fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Search code, message, project, command…',
+                hintStyle: GoogleFonts.plusJakartaSans(fontSize: 13, color: Theme.of(context).hintColor.withValues(alpha: 0.7)),
+                prefixIcon: Icon(LucideIcons.search, size: 18, color: Theme.of(context).hintColor),
+                suffixIcon: _query.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(LucideIcons.x, size: 18),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          setState(() => _query = '');
+                        },
+                      ),
+                isDense: true,
+                filled: true,
+                fillColor: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.black.withValues(alpha: 0.02),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.08))),
+                enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05))),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Dt.accent, width: 1.5)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ),
+        ),
         actions: [
           IconButton(
             tooltip: 'Clear logs',
             icon: const Icon(LucideIcons.trash2, size: 20),
             onPressed: () async {
               final ok = await Get.dialog<bool>(AlertDialog(
-                title: const Text('Clear System Logs?'),
-                content: const Text(
-                    'Removes all stored diagnostics (in-memory + persisted).'),
+                title: Text('Clear System Logs?', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+                content: Text(
+                    'Removes all stored diagnostics (in-memory + persisted).',
+                    style: GoogleFonts.plusJakartaSans()),
                 actions: [
                   TextButton(
                       onPressed: () => Get.back(result: false),
-                      child: const Text('Cancel')),
+                      child: Text('Cancel', style: GoogleFonts.plusJakartaSans())),
                   FilledButton(
                     style: FilledButton.styleFrom(
                         backgroundColor: AppColors.error),
                     onPressed: () => Get.back(result: true),
-                    child: const Text('Clear'),
+                    child: Text('Clear', style: GoogleFonts.plusJakartaSans()),
                   ),
                 ],
               ));
@@ -105,47 +159,23 @@ class _SystemLogsViewState extends State<SystemLogsView> {
               }
             },
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Row(children: [
-            _filterChip(context, 'All', null),
-            const SizedBox(width: 6),
-            _filterChip(context, 'Errors', CwSeverity.error),
-            const SizedBox(width: 6),
-            _filterChip(context, 'Warnings', CwSeverity.warning),
-            const SizedBox(width: 6),
-            _filterChip(context, 'Info', CwSeverity.info),
-          ]),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: TextField(
-            controller: _searchCtrl,
-            onChanged: (v) => setState(() => _query = v),
-            style: GoogleFonts.plusJakartaSans(fontSize: 13),
-            decoration: InputDecoration(
-              hintText: 'Search code, message, project, command…',
-              hintStyle: GoogleFonts.plusJakartaSans(fontSize: 13),
-              prefixIcon:
-                  const Icon(LucideIcons.search, size: 18),
-              suffixIcon: _query.isEmpty
-                  ? null
-                  : IconButton(
-                      icon: const Icon(LucideIcons.x, size: 18),
-                      onPressed: () {
-                        _searchCtrl.clear();
-                        setState(() => _query = '');
-                      },
-                    ),
-              isDense: true,
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10)),
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 10, vertical: 8),
-            ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              _filterChip(context, 'All', null),
+              const SizedBox(width: 8),
+              _filterChip(context, 'Errors', CwSeverity.error),
+              const SizedBox(width: 8),
+              _filterChip(context, 'Warnings', CwSeverity.warning),
+              const SizedBox(width: 8),
+              _filterChip(context, 'Info', CwSeverity.info),
+            ]),
           ),
         ),
         Expanded(
@@ -168,25 +198,30 @@ class _SystemLogsViewState extends State<SystemLogsView> {
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Text(
-                    logger.events.isEmpty
-                        ? 'No system events yet.\nRuntime and platform failures will appear here — code errors stay with the AI debugger.'
-                        : 'No events match this filter.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        height: 1.5,
-                        color: Theme.of(context).hintColor),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(LucideIcons.terminal, size: 40, color: Theme.of(context).hintColor.withValues(alpha: 0.4)),
+                      const SizedBox(height: 12),
+                      Text(
+                        logger.events.isEmpty
+                            ? 'No system events yet.\nRuntime and platform failures will appear here — code errors stay with the AI debugger.'
+                            : 'No events match this filter.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            height: 1.5,
+                            color: Theme.of(context).hintColor),
+                      ),
+                    ],
                   ),
                 ),
               );
             }
             return ListView.builder(
-              padding:
-                  const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               itemCount: items.length,
-              itemBuilder: (_, i) =>
-                  _eventCard(context, isDark, items[i]),
+              itemBuilder: (_, i) => _eventCard(context, isDark, items[i]),
             );
           }),
         ),
@@ -194,129 +229,185 @@ class _SystemLogsViewState extends State<SystemLogsView> {
     );
   }
 
-  Widget _filterChip(
-      BuildContext context, String label, CwSeverity? sev) {
+  Widget _filterChip(BuildContext context, String label, CwSeverity? sev) {
     final selected = _sevFilter == sev;
+    final chipColor = _getSeverityColor(sev);
     return InkWell(
       onTap: () => setState(() => _sevFilter = sev),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: selected
-              ? Dt.accent.withValues(alpha: 0.15)
+              ? chipColor.withValues(alpha: 0.15)
               : (Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.black.withValues(alpha: 0.05)),
-          borderRadius: BorderRadius.circular(8),
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : Colors.black.withValues(alpha: 0.03)),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
               color: selected
-                  ? Dt.accent.withValues(alpha: 0.4)
+                  ? chipColor.withValues(alpha: 0.4)
                   : Colors.transparent),
         ),
-        child: Text(label,
-            style: GoogleFonts.plusJakartaSans(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                color: selected
-                    ? Dt.accent
-                    : Theme.of(context).hintColor)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (sev != null) ...[
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: chipColor),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(label,
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: selected ? FontWeight.bold : FontWeight.w600,
+                    color: selected ? chipColor : Theme.of(context).hintColor)),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _eventCard(
-      BuildContext context, bool isDark, SystemLogEvent e) {
-    final dot = e.severity == CwSeverity.error
-        ? AppColors.error
-        : e.severity == CwSeverity.warning
-            ? const Color(0xFFFBBF24)
-            : const Color(0xFF4ADE80);
-    return GestureDetector(
-      onTap: () => _showDetail(context, e),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.surface : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.07)
-                  : Dt.hairline),
+  Widget _eventCard(BuildContext context, bool isDark, SystemLogEvent e) {
+    final accentColor = _getSeverityColor(e.severity);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surface : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          )
+        ],
+        border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.black.withValues(alpha: 0.04)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        // Accent stripe via left border — avoids the IntrinsicHeight +
+        // stretch Row pair that mis-measures unbounded text (~14px
+        // bottom overflow on device).
+        child: Container(
+          decoration: BoxDecoration(
+            border:
+                Border(left: BorderSide(width: 4, color: accentColor)),
+          ),
+          child: InkWell(
+            onTap: () => _showDetail(context, e),
+            borderRadius: const BorderRadius.only(
+              topRight: Radius.circular(14),
+              bottomRight: Radius.circular(14),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                          Row(
+                            children: [
+                              if (e.errorCode.isNotEmpty) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: accentColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(e.errorCode,
+                                      style: GoogleFonts.firaCode(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: accentColor)),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              Expanded(
+                                child: Text(e.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark ? Colors.white : const Color(0xFF1E293B))),
+                              ),
+                              if (e.occurrenceCount > 1)
+                                Container(
+                                  margin: const EdgeInsets.only(left: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: accentColor.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text('×${e.occurrenceCount}',
+                                      style: GoogleFonts.firaCode(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: accentColor)),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                    '${e.component} · ${e.category.name.toUpperCase()}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                        color: Theme.of(context).hintColor)),
+                              ),
+                              Text(_fmtTime(e.lastAtMs),
+                                  style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                      color: Theme.of(context).hintColor)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(e.message,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12.5,
+                                  height: 1.4,
+                                  color: isDark ? Colors.white70 : const Color(0xFF475569))),
+                          if (!e.aiCanFix) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppColors.error.withValues(alpha: 0.15)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(LucideIcons.alertTriangle, size: 12, color: AppColors.error),
+                                  const SizedBox(width: 4),
+                                  Text("Environment Issue — AI can't fix automatically",
+                                      style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.error)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ]),
+                  ),
+                ),
         ),
-        child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                        shape: BoxShape.circle, color: dot)),
-                const SizedBox(width: 6),
-                if (e.errorCode.isNotEmpty)
-                  Text(e.errorCode,
-                      style: GoogleFonts.firaCode(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: dot)),
-                if (e.errorCode.isNotEmpty)
-                  const SizedBox(width: 6),
-                Expanded(
-                  child: Text(e.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800)),
-                ),
-                if (e.occurrenceCount > 1)
-                  Container(
-                    margin: const EdgeInsets.only(left: 6),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: dot.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text('×${e.occurrenceCount}',
-                        style: GoogleFonts.firaCode(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: dot)),
-                  ),
-              ]),
-              const SizedBox(height: 4),
-              Text(
-                  '${e.component} · ${e.category.name.toUpperCase()} · ${_fmtTime(e.lastAtMs)}',
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10.5,
-                      color: Theme.of(context).hintColor)),
-              const SizedBox(height: 4),
-              Text(e.message,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12, height: 1.4)),
-              if (!e.aiCanFix) ...[
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text("AI can't fix — environment issue",
-                      style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.error)),
-                ),
-              ],
-            ]),
       ),
     );
   }
@@ -336,133 +427,122 @@ class _SystemLogsViewState extends State<SystemLogsView> {
   }
 
   void _showDetail(BuildContext context, SystemLogEvent e) {
-    final c = Get.isRegistered<AgentController>()
-        ? Get.find<AgentController>()
-        : null;
+    final c = Get.isRegistered<AgentController>() ? Get.find<AgentController>() : null;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetCtx) => SafeArea(
         child: DraggableScrollableSheet(
-          initialChildSize: 0.7,
-          minChildSize: 0.4,
-          maxChildSize: 0.92,
+          initialChildSize: 0.75,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
           expand: false,
           builder: (_, scrollCtrl) => ListView(
             controller: scrollCtrl,
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
             children: [
               Center(
                 child: Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 12),
+                  width: 40,
+                  height: 5,
+                  margin: const EdgeInsets.only(bottom: 18),
                   decoration: BoxDecoration(
-                    color: Theme.of(sheetCtx)
-                        .hintColor
-                        .withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
+                    color: Theme.of(sheetCtx).hintColor.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(2.5),
                   ),
                 ),
               ),
               Text(e.title,
                   style: GoogleFonts.plusJakartaSans(
-                      fontSize: 17, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 8),
-              _kv('Error code', e.errorCode.isEmpty ? '—' : e.errorCode, mono: true),
-              _kv('Severity', e.severity.name.toUpperCase()),
-              _kv('Category', e.category.name.toUpperCase()),
-              _kv('Component', e.component),
-              _kv('Time', _fmtTime(e.timestampMs)),
-              _kv('Trace ID', e.traceId, mono: true),
-              if (e.projectId.isNotEmpty)
-                _kv('Project', e.projectId, mono: true),
-              if (e.operation.isNotEmpty)
-                _kv('Operation', e.operation, mono: true),
-              if (e.command.isNotEmpty)
-                _kv('Command', e.command, mono: true),
-              if (e.exitCode != null)
-                _kv('Exit code', '${e.exitCode}'),
-              if (e.platform.isNotEmpty)
-                _kv('Platform', e.platform, mono: true),
-              if (e.runtime.isNotEmpty)
-                _kv('Runtime', e.runtime, mono: true),
-              _kv('AI can fix',
-                  e.aiCanFix ? 'Yes — route to AI debugger' : 'No — environment issue'),
-              if (e.fallbackAvailable.isNotEmpty)
-                _kv('Fallback', e.fallbackAvailable, mono: true),
-              if (e.fallbackUsed.isNotEmpty)
-                _kv('Fallback used', e.fallbackUsed, mono: true),
-              if (e.occurrenceCount > 1)
-                _kv('Occurrences',
-                    '×${e.occurrenceCount} (first ${_fmtTime(e.firstAtMs)}, last ${_fmtTime(e.lastAtMs)})'),
-              const SizedBox(height: 8),
-              Text(e.message,
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13, height: 1.5)),
+                      fontSize: 18, fontWeight: FontWeight.w800, height: 1.3)),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).hintColor.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Theme.of(context).hintColor.withValues(alpha: 0.05)),
+                ),
+                child: Column(
+                  children: [
+                    _kv('Error code', e.errorCode.isEmpty ? '—' : e.errorCode, mono: true),
+                    _kv('Severity', e.severity.name.toUpperCase()),
+                    _kv('Category', e.category.name.toUpperCase()),
+                    _kv('Component', e.component),
+                    _kv('Time', _fmtTime(e.timestampMs)),
+                    _kv('Trace ID', e.traceId, mono: true),
+                    if (e.projectId.isNotEmpty) _kv('Project', e.projectId, mono: true),
+                    if (e.operation.isNotEmpty) _kv('Operation', e.operation, mono: true),
+                    if (e.command.isNotEmpty) _kv('Command', e.command, mono: true),
+                    if (e.exitCode != null) _kv('Exit code', '${e.exitCode}'),
+                    if (e.platform.isNotEmpty) _kv('Platform', e.platform, mono: true),
+                    if (e.runtime.isNotEmpty) _kv('Runtime', e.runtime, mono: true),
+                    _kv('AI can fix', e.aiCanFix ? 'Yes — route to AI debugger' : 'No — environment issue'),
+                    if (e.fallbackAvailable.isNotEmpty) _kv('Fallback', e.fallbackAvailable, mono: true),
+                    if (e.fallbackUsed.isNotEmpty) _kv('Fallback used', e.fallbackUsed, mono: true),
+                    if (e.occurrenceCount > 1)
+                      _kv('Occurrences', '×${e.occurrenceCount} (first ${_fmtTime(e.firstAtMs)}, last ${_fmtTime(e.lastAtMs)})'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('Log Message', style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              SelectableText(e.message,
+                  style: GoogleFonts.plusJakartaSans(fontSize: 13, height: 1.5, color: Theme.of(context).textTheme.bodyLarge?.color?.withValues(alpha: 0.85))),
               if (e.technicalDetails.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 ExpansionTile(
                   tilePadding: EdgeInsets.zero,
-                  title: Text('Technical details',
+                  title: Text('Technical details & evidence',
                       style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
+                          fontSize: 13.5,
                           fontWeight: FontWeight.w700)),
                   children: [
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF101014),
-                        borderRadius: BorderRadius.circular(8),
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: SelectableText(e.technicalDetails,
                           style: GoogleFonts.firaCode(
-                              fontSize: 10.5,
+                              fontSize: 11,
                               height: 1.5,
-                              color:
-                                  const Color(0xFFCDD6F4))),
+                              color: const Color(0xFFE2E8F0))),
                     ),
                   ],
                 ),
               ],
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 FilledButton.tonalIcon(
                   onPressed: () {
                     Clipboard.setData(ClipboardData(
-                        text:
-                            '${e.errorCode.isEmpty ? e.title : '${e.errorCode} — ${e.title}'}\n${e.message}'));
+                        text: '${e.errorCode.isEmpty ? e.title : '${e.errorCode} — ${e.title}'}\n${e.message}'));
                     Get.back();
-                    AppSnackbar.showTop(
-                        'Copied', 'Error summary copied.',
-                        logHistory: false);
+                    AppSnackbar.showTop('Copied', 'Error summary copied.', logHistory: false);
                   },
                   icon: const Icon(LucideIcons.copy, size: 16),
                   label: const Text('Copy Error'),
                 ),
                 OutlinedButton.icon(
                   onPressed: () {
-                    Clipboard.setData(
-                        ClipboardData(text: _fullExport(e)));
+                    Clipboard.setData(ClipboardData(text: _fullExport(e)));
                     Get.back();
-                    AppSnackbar.showTop(
-                        'Copied', 'Full details copied.',
-                        logHistory: false);
+                    AppSnackbar.showTop('Copied', 'Full details copied.', logHistory: false);
                   },
-                  icon:
-                      const Icon(LucideIcons.clipboardList, size: 16),
+                  icon: const Icon(LucideIcons.clipboardList, size: 16),
                   label: const Text('Copy Details'),
                 ),
-                if (e.fallbackAvailable == 'USE_CLOUD_RUNTIME' &&
-                    c != null)
+                if (e.fallbackAvailable == 'USE_CLOUD_RUNTIME' && c != null)
                   FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                        backgroundColor: Dt.accent),
+                    style: FilledButton.styleFrom(backgroundColor: Dt.accent),
                     onPressed: () {
                       Get.back();
                       c.useCloudFallback();
@@ -472,9 +552,8 @@ class _SystemLogsViewState extends State<SystemLogsView> {
                   ),
                 OutlinedButton.icon(
                   onPressed: () => Get.back(),
-                  icon:
-                      const Icon(LucideIcons.terminal, size: 16),
-                  label: const Text('Back to Terminal'),
+                  icon: const Icon(LucideIcons.cornerUpLeft, size: 16),
+                  label: const Text('Close'),
                 ),
               ]),
             ],
@@ -486,18 +565,18 @@ class _SystemLogsViewState extends State<SystemLogsView> {
 
   Widget _kv(String k, String v, {bool mono = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SizedBox(
-          width: 110,
+          width: 115,
           child: Text(k,
               style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12, color: Dt.textSecondary)),
+                  fontSize: 12, color: Dt.textSecondary, fontWeight: FontWeight.w500)),
         ),
         Expanded(
           child: SelectableText(v,
               style: mono
-                  ? GoogleFonts.firaCode(fontSize: 12)
+                  ? GoogleFonts.firaCode(fontSize: 11.5, color: Dt.accent)
                   : GoogleFonts.plusJakartaSans(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600)),
@@ -509,8 +588,7 @@ class _SystemLogsViewState extends State<SystemLogsView> {
   String _fullExport(SystemLogEvent e) {
     final b = StringBuffer()
       ..writeln('${e.errorCode.isEmpty ? '' : '${e.errorCode} — '}${e.title}')
-      ..writeln(
-          'Severity: ${e.severity.name} · Category: ${e.category.name} · Component: ${e.component}')
+      ..writeln('Severity: ${e.severity.name} · Category: ${e.category.name} · Component: ${e.component}')
       ..writeln('Trace: ${e.traceId} · Occurrences: ${e.occurrenceCount}')
       ..writeln(e.message);
     if (e.command.isNotEmpty) b.writeln('Command: ${e.command}');

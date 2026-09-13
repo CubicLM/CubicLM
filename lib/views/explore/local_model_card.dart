@@ -544,18 +544,22 @@ Widget buildInlineDownloadProgress(BuildContext context, AiModel model) {
               ),
             ),
             const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.secondary.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                DownloadService.formatSpeed(dp.bytesPerSecond.value),
-                style: GoogleFonts.firaCode(
-                  fontSize: 12,
-                  color: AppColors.secondary,
-                  fontWeight: FontWeight.w600,
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  DownloadService.formatSpeed(dp.bytesPerSecond.value),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.firaCode(
+                    fontSize: 12,
+                    color: AppColors.secondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -563,23 +567,47 @@ Widget buildInlineDownloadProgress(BuildContext context, AiModel model) {
             if (dp.isPaused.value)
               TextButton.icon(
                 onPressed: () => _c.resumeDownload(model.filename),
-                icon: const Icon(LucideIcons.play, size: 16),
+                icon: const Icon(LucideIcons.play, size: 14),
                 label: const Text('Resume'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.success),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.success,
+                  textStyle: const TextStyle(fontSize: 12),
+                  iconSize: 14,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
               )
             else
               TextButton.icon(
                 onPressed: () => _c.pauseDownload(model.filename),
-                icon: const Icon(LucideIcons.pause, size: 16),
+                icon: const Icon(LucideIcons.pause, size: 14),
                 label: const Text('Pause'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.warning),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.warning,
+                  textStyle: const TextStyle(fontSize: 12),
+                  iconSize: 14,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
               ),
             const SizedBox(width: 4),
             TextButton.icon(
               onPressed: () => _c.cancelDownload(model.filename),
-              icon: const Icon(Icons.close, size: 16),
+              icon: const Icon(Icons.close, size: 14),
               label: Text('common_cancel'.tr),
-              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.error,
+                textStyle: const TextStyle(fontSize: 12),
+                iconSize: 14,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
             ),
           ],
         ),

@@ -29,9 +29,10 @@ void main() {
     await tester.pump();
     expect(tester.takeException(), isNull);
 
-    // Scope to the chip: "ERROR" also appears as a log entry's level text.
+    // Scope to the level-filter chip: "ERROR" also appears as a log
+    // entry's level badge text (which has no InkWell ancestor).
     final errorChip = find.descendant(
-      of: find.byType(ChoiceChip),
+      of: find.byType(InkWell),
       matching: find.text('ERROR'),
     );
     expect(errorChip, findsOneWidget);
@@ -40,5 +41,23 @@ void main() {
     await tester.pump();
     // A rebuild happened and no reactive-scope error was thrown.
     expect(tester.takeException(), isNull);
+    // Filter applied: only the error entry remains visible.
+    expect(logs.selectedLevel.value, 'ERROR');
+  });
+
+  testWidgets('huge message + details card lays out without overflow',
+      (tester) async {
+    // Regression: the stripe card used IntrinsicHeight + unbounded
+    // SelectableText, which overflowed ~14px on device (K20 Pro log).
+    final logs = Get.find<AppLogService>();
+    final bigMsg = List.filled(40, 'A RenderFlex overflowed by 4.4 pixels.').join('\n');
+    final bigDetails = List.filled(120, 'debugCreator: Row ← Column ← Obx').join('\n');
+    logs.error(bigMsg, details: bigDetails);
+
+    await tester.pumpWidget(const MaterialApp(home: LogView()));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    // The entry actually rendered (message first line visible).
+    expect(find.textContaining('A RenderFlex overflowed'), findsWidgets);
   });
 }

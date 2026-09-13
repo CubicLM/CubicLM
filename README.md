@@ -1102,7 +1102,7 @@ curl http://<device-ip>:8080/v1/chat/completions \
 ## 🖥️ Universal Multi-Platform — *One Codebase, Three Shells*
 
 > [!IMPORTANT]
-> **Web ⇄ Windows Desktop ⇄ Android** — same `lib/` product, **not three forks**. Per `docs/multiplatfrom.md` (AUDIT→PLAN→BUILD).
+> **Web ⇄ Windows Desktop ⇄ Android** — same `lib/` product, **not three forks**. Per `docs/PLATFORM_DIFFERENCES.md` (AUDIT→PLAN→BUILD).
 
 <table>
 <tr>
@@ -1411,44 +1411,100 @@ Auto-detects **10 crash patterns**:
 
 ```text
 lib/
-├── main.dart                    # App entry point — window_manager on Windows + critical path (Hive 5s + Settings) before runApp(), heavy services 2200ms after first frame, _MemoryBox fallback
+├── main.dart                              # App entry point — critical path (Hive 5s + Settings), heavy services 2200ms deferred
 ├── core/
-│   ├── colors.dart              # App color palette (warm Claude-inspired)
-│   ├── constants.dart           # Settings keys (incl. autoLoadLastModel, keyLanguage, keyOnboardingDone), model catalog, API endpoints
-│   ├── routes.dart              # Route definitions
-│   ├── theme.dart               # Light/dark theme with warm accent palette
-│   ├── design_tokens.dart       # Claude APK-measured warm palette (canvas #F8F4ED, pill, accent, hairline)
-│   ├── languages.dart           # 15 supported languages (code, name, nativeName, flag, Locale)
-│   └── app_translations.dart    # GetX Translations — ~160 keys × 15 languages
+│   ├── app_translations.dart              # GetX Translations — ~160 keys × 15 languages
+│   ├── assets_data.dart                   # Embedded asset catalog helpers
+│   ├── colors.dart                        # App color palette (warm Claude-inspired)
+│   ├── constants.dart                     # Settings keys, model catalog, API endpoints
+│   ├── languages.dart                     # 15 supported languages (code, name, nativeName, flag, Locale)
+│   ├── routes.dart                        # Route definitions
+│   └── theme.dart                         # Light/dark theme with warm accent palette
+├── theme/
+│   └── design_tokens.dart                 # Claude APK-measured warm palette (canvas #F8F4ED, pill, accent, hairline)
 ├── models/
-│   ├── ai_model.dart            # AI model data class
-│   ├── chat_message.dart        # Chat message (revision history + webSources + usedSkills)
-│   ├── chat_session.dart        # Chat session model
-│   ├── web_source.dart          # Web source (url/domain/favicon/title/success)
-│   ├── task_model.dart          # Automated task model
-│   ├── notification_entry.dart  # Model-switch history entry
-│   └── skill_model.dart         # Skill (name/description/content/enabled/isBuiltIn/source)
+│   ├── ai_model.dart                      # AI model data class
+│   ├── chat_message.dart                  # Chat message (revision history + webSources + usedSkills)
+│   ├── chat_session.dart                  # Chat session model
+│   ├── folder_model.dart                  # Chat folder/label model
+│   ├── notification_entry.dart            # Model-switch history entry
+│   ├── project_model.dart                 # CubicWeb project model
+│   ├── skill_model.dart                   # Skill (name/description/content/enabled/isBuiltIn/source)
+│   ├── task_model.dart                    # Automated task model
+│   └── web_source.dart                    # Web source (url/domain/favicon/title/success)
 ├── controllers/
-│   ├── chat_controller.dart     # Chat logic, streaming, per-prompt skill/web-source tracking
-│   ├── cloud_model_controller.dart  # Cloud model selection
-│   ├── home_controller.dart     # Tab navigation, model resume (520ms delay, async file check, 90s crash guard, 80% RAM guard, chat-idle defer)
-│   ├── model_controller.dart    # Model download/import management
-│   ├── server_controller.dart   # Local API server
-│   ├── settings_controller.dart # App settings + locale, baseSystemPromptForModel / effectiveSystemPromptForPrompt + autoLoadLastModel
-│   └── task_controller.dart     # Automated task execution
+│   ├── agent_controller.dart              # Agent/skill lifecycle
+│   ├── battle_arena_controller.dart       # Side-by-side model comparison
+│   ├── chat_controller.dart               # Chat logic, streaming, per-prompt skill/web-source tracking
+│   ├── cloud_model_controller.dart        # Cloud model selection
+│   ├── home_controller.dart               # Tab navigation, model resume (520ms delay, async file check, 90s crash guard)
+│   ├── model_controller.dart              # Model download/import management
+│   ├── server_controller.dart             # Local API server
+│   ├── settings_controller.dart           # App settings + locale, effectiveSystemPromptForPrompt, autoLoadLastModel
+│   ├── slide_deck_controller.dart         # Slide Maker engine
+│   ├── task_controller.dart               # Automated task execution
+│   └── vision_live_controller.dart        # Live vision camera
 ├── services/
-│   ├── cloud_service.dart       # Multi-provider cloud API (delegates to providers) + usage tracking hook
-│   ├── usage_tracker_service.dart # Estimated per-provider/model token usage (Hive JSON, chars/4)
-│   ├── cloud/                   # Cloud provider plugin architecture
-│   │   ├── cloud_provider.dart          # Abstract CloudProvider interface
-│   │   ├── cloud_provider_registry.dart # Provider registry (ID → instance)
-│   │   └── providers/                   # One file per provider
-│   │       ├── openai_compatible_provider.dart  # Shared OpenAI-format base
+│   ├── agent_workspace.dart               # Skill/agent workspace persistence
+│   ├── app_log_service.dart               # App logging with categories & crash detection
+│   ├── chat_backup.dart                   # Chat backup/restore
+│   ├── cloud_service.dart                 # Multi-provider cloud API (delegates to providers) + usage tracking
+│   ├── code_interpreter_service.dart      # Sandboxed code execution
+│   ├── crash_reporting_service.dart       # Firebase Crashlytics
+│   ├── deploy_service.dart                # Vercel/Netlify deploy
+│   ├── device_info_native.dart            # Native device info (Android)
+│   ├── device_info_service.dart           # RAM/tier + SoC/GPU detection
+│   ├── device_info_web.dart               # Web device info stubs
+│   ├── document_extractor_service.dart    # PDF/text extraction
+│   ├── download_native.dart               # Resumable streaming downloader (HTTP Range)
+│   ├── download_service.dart              # Download orchestrator (native FGS + Dart fallback)
+│   ├── download_web.dart                  # Web stubs
+│   ├── execution_service.dart             # Task execution engine
+│   ├── hive_service.dart                  # Local persistence (7 boxes, per-box 3s timeout)
+│   ├── image_generation_notification_service.dart
+│   ├── inference_android.dart             # Android llama.cpp / LiteRT engine bridge
+│   ├── inference_gguf.dart                # GGUF inference backend
+│   ├── inference_litert.dart              # LiteRT-LM inference backend
+│   ├── inference_service.dart             # Cross-platform inference orchestrator
+│   ├── inference_stub.dart                # Web/no-ffi stub
+│   ├── inference_text.dart                # Text inference helpers
+│   ├── inference_types.dart               # Inference type definitions
+│   ├── local_image_service.dart           # Stable Diffusion inference
+│   ├── memory_service.dart                # Context memory management
+│   ├── notification_history_service.dart  # Model-switch history (Hive, max 100)
+│   ├── openai_server_service.dart         # Built-in OpenAI-compatible server
+│   ├── openai_server_service_io.dart      # IO platform implementation
+│   ├── openai_server_service_stub.dart    # Web stub
+│   ├── preview_server.dart                # CubicWeb preview server
+│   ├── sd_isolate_processor.dart          # SD processing in isolates
+│   ├── sd_isolate_worker.dart             # SD isolate worker
+│   ├── sd_isolate_worker_io.dart          # IO platform SD worker
+│   ├── sd_isolate_worker_web.dart         # Web platform SD worker
+│   ├── secure_key_store.dart              # Secure key storage
+│   ├── soc_family.dart                    # SoC family detection
+│   ├── stats_service.dart                 # Usage statistics
+│   ├── tts_service.dart                   # Text-to-speech
+│   ├── update_service.dart                # App update checker
+│   ├── usage_tracker_service.dart         # Per-provider/model token usage (Hive JSON, chars/4)
+│   ├── vector_service.dart                # Vector embedding service
+│   ├── web_fetch_service.dart             # URL fetching → clean text + WebSource
+│   ├── win_toast_io.dart                  # Windows toast notification (IO)
+│   ├── win_toast_notify.dart              # Windows toast notification
+│   ├── win_toast_stub.dart                # Windows toast stub
+│   ├── browser/
+│   │   └── adblock_service.dart           # Privacy browser adblock (318 rules)
+│   ├── cloud/                             # Cloud provider plugin architecture
+│   │   ├── cloud_provider.dart            # Abstract CloudProvider interface
+│   │   ├── cloud_provider_config.dart     # Provider configuration
+│   │   ├── cloud_provider_registry.dart   # Provider registry (ID → instance)
+│   │   ├── model_health.dart              # Model health tracking
+│   │   └── providers/                     # 26 provider files
+│   │       ├── openai_compatible_provider.dart
 │   │       ├── openai_provider.dart
-│   │       ├── anthropic_provider.dart          # Native Messages API
-│   │       ├── google_provider.dart             # Native Gemini API
+│   │       ├── anthropic_provider.dart
+│   │       ├── google_provider.dart
 │   │       ├── deepseek_provider.dart
-│   │       ├── zai_provider.dart                # GLM catalog models
+│   │       ├── zai_provider.dart
 │   │       ├── groq_provider.dart
 │   │       ├── mistral_provider.dart
 │   │       ├── together_provider.dart
@@ -1457,107 +1513,224 @@ lib/
 │   │       ├── cerebras_provider.dart
 │   │       ├── fireworks_provider.dart
 │   │       ├── cohere_provider.dart
-│   │       ├── huggingface_provider.dart        # HF Inference Providers router
-│   │       ├── xkiro_provider.dart              # Smart-routing gateway
-│   │       ├── tokenrouter_provider.dart        # Unified vendor hub
+│   │       ├── huggingface_provider.dart
+│   │       ├── xkiro_provider.dart
+│   │       ├── tokenrouter_provider.dart
+│   │       ├── agentrouter_provider.dart
+│   │       ├── orcarouter_provider.dart
+│   │       ├── apinex_provider.dart
 │   │       ├── kimi_provider.dart
 │   │       ├── nvidia_provider.dart
-│   │       ├── openrouter_provider.dart         # FREE tag parsing
-│   │       ├── stability_provider.dart          # Image generation
-│   │       └── custom_provider.dart             # User-defined endpoint
-│   ├── inference_service.dart   # Cross-platform inference orchestrator
-│   ├── inference_android.dart   # Android llama.cpp / LiteRT engine bridge
-│   ├── openai_server_service.dart   # Built-in OpenAI-compatible server
-│   ├── download_native.dart         # Resumable streaming downloader (HTTP Range)
-├── download_web.dart            # Web stubs
-├── download_service.dart        # Download orchestrator (native FGS + Dart fallback)
-│   ├── hive_service.dart        # Local persistence (7 boxes, per-box 3s timeout)
-│   ├── notification_history_service.dart # Model-switch history (Hive, max 100)
-│   ├── skills/
-│   │   ├── skill_registry_service.dart # Hive skillsBox, import, enable/disable
-│   │   ├── skill_injector.dart         # Concatenates skills + per-prompt selection
-│   │   ├── github_skill_source.dart    # anthropics/skills REST + raw fetch
-│   │   └── url_skill_source.dart       # Any URL markdown fetch
-│   ├── mcp/
-│   │   ├── mcp_config.dart             # Single McpConfig
-│   │   ├── mcp_connection.dart         # HTTP/SSE JSON-RPC
-│   │   └── mcp_registry_service.dart   # Hive + secure storage, status stream
-│   ├── device_info_service.dart # RAM/tier + SoC/GPU detection
-│   ├── web_fetch_service.dart   # URL fetching → clean text + WebSource
-│   ├── execution_service.dart   # Task execution engine
-│   ├── document_extractor_service.dart  # PDF/text extraction
-│   ├── local_image_service.dart # Stable Diffusion inference
-│   ├── sd_isolate_processor.dart    # SD processing in isolates
-│   ├── image_generation_notification_service.dart
-│   ├── app_log_service.dart     # App logging with categories & crash detection
-│   └── crash_reporting_service.dart  # Firebase Crashlytics
+│   │       ├── openrouter_provider.dart
+│   │       ├── stability_provider.dart
+│   │       └── custom_provider.dart
+│   ├── cubicdata/                         # CubicDataSheet engine
+│   │   ├── controller.dart
+│   │   ├── formulas.dart
+│   │   ├── models.dart
+│   │   ├── search.dart
+│   │   └── vault_store.dart
+│   ├── cubicweb/                          # CubicWeb event system
+│   │   ├── cubicweb_event.dart
+│   │   └── cubicweb_logger.dart
+│   ├── mcp/                               # MCP (Model Context Protocol)
+│   │   ├── mcp_config.dart
+│   │   ├── mcp_connection.dart
+│   │   └── mcp_registry_service.dart
+│   ├── runtime/                           # CubicWeb dev-server + CLI manager
+│   │   ├── ansi.dart
+│   │   ├── cli_manager.dart
+│   │   ├── cli_manifest.dart
+│   │   ├── cli_providers.dart
+│   │   ├── cloud_runtime.dart
+│   │   ├── dev_server_manager.dart
+│   │   ├── dev_url_parser.dart
+│   │   ├── framework_runtime.dart
+│   │   ├── preview_router.dart
+│   │   ├── process_runner.dart
+│   │   ├── project_detector.dart
+│   │   ├── project_validator.dart
+│   │   ├── runtime_manager.dart
+│   │   └── frameworks/                    # Framework adapters
+│   │       ├── framework.dart
+│   │       ├── nextjs.dart
+│   │       ├── node_generic.dart
+│   │       ├── static_site.dart
+│   │       └── vite.dart
+│   └── skills/                            # Skills system
+│       ├── skill_registry_service.dart
+│       ├── skill_injector.dart
+│       ├── github_skill_source.dart
+│       └── url_skill_source.dart
 ├── views/
-│   ├── splash_view.dart         # 1380ms shimmer + 760ms fade-out
-│   ├── onboarding_view.dart     # 3-page PageView + dots + Hive persist
-│   ├── home_view.dart           # Main navigation scaffold
-│   ├── chat_view.dart           # Chat interface
-│   ├── model_view.dart          # Model Hub — 4-way toggle
-│   ├── explore_skills_mcp_tabs.dart # Explore Skills + MCP tabs
-│   ├── server_view.dart         # Nodes page — Node + Config tabs
-│   ├── settings_view.dart       # Config sections
-│   ├── app_settings_view.dart   # App Settings
-│   ├── language_picker_view.dart # Full-page language picker
-│   ├── about_view.dart          # About page
-│   ├── notification_history_view.dart # History page
-│   ├── log_view.dart            # System diagnostics viewer
-│   └── task_view.dart           # Automated tasks
+│   ├── splash_view.dart                   # 1380ms shimmer + 760ms fade-out
+│   ├── onboarding_view.dart               # 3-page PageView + dots + Hive persist
+│   ├── home_view.dart                     # Main navigation scaffold (IndexedStack 5 tabs)
+│   ├── chat_view.dart                     # Chat interface
+│   ├── model_view.dart                    # Model Hub — 4-way toggle (Local/Online/Skills/MCP)
+│   ├── explore_skills_mcp_tabs.dart       # Explore Skills + MCP tabs
+│   ├── server_view.dart                   # Nodes page — Node + Config tabs
+│   ├── settings_view.dart                 # Config sections
+│   ├── app_settings_view.dart             # App Settings
+│   ├── language_picker_view.dart          # Full-page language picker
+│   ├── about_view.dart                    # About page
+│   ├── notification_history_view.dart     # Notification history page
+│   ├── log_view.dart                      # System diagnostics viewer (Live Logs + Saved Files)
+│   ├── system_logs_view.dart              # CubicWeb system logs
+│   ├── task_view.dart                     # Automated tasks
+│   ├── toolkit_view.dart                  # Toolkit hub (Battle Arena, Slide Maker, CubicWeb Builder)
+│   ├── battle_arena_view.dart             # Side-by-side model comparison
+│   ├── agent_ide_view.dart                # Agent IDE
+│   ├── gallery_view.dart                  # Image gallery
+│   ├── slide_deck_view.dart               # Slide Maker composer
+│   ├── update_view.dart                   # Update checker
+│   ├── update_settings_view.dart          # Update settings
+│   ├── chat/                              # Chat decomposition
+│   │   ├── chat_bars.dart
+│   │   ├── chat_dialogs.dart
+│   │   ├── chat_format.dart
+│   │   ├── chat_sidebar.dart
+│   │   ├── chat_widgets.dart
+│   │   ├── empty_state.dart
+│   │   ├── input_bar.dart
+│   │   ├── project_context_view.dart
+│   │   ├── selection_bar.dart
+│   │   └── template_sheets.dart
+│   ├── cubicdata/                         # CubicDataSheet views
+│   │   ├── dashboard_view.dart
+│   │   ├── datasheet_home_view.dart
+│   │   ├── doc_view.dart
+│   │   ├── hybrid_view.dart
+│   │   ├── palette_view.dart
+│   │   └── sheet_view.dart
+│   ├── cubicweb/                          # CubicWeb Builder views
+│   │   ├── agent_preview.dart
+│   │   ├── browser_view.dart
+│   │   ├── chat_cards.dart
+│   │   ├── component_card.dart
+│   │   ├── diff_view.dart
+│   │   ├── file_cards.dart
+│   │   ├── knowledge_graph_view.dart
+│   │   ├── project_sheets.dart
+│   │   ├── responsive_grid_view.dart
+│   │   └── version_timeline.dart
+│   ├── explore/                           # Explore tab components
+│   │   ├── add_model_sheet.dart
+│   │   ├── local_model_card.dart
+│   │   ├── provider_cards.dart
+│   │   ├── provider_dialogs.dart
+│   │   ├── provider_theme.dart
+│   │   └── toolkit_tab.dart
+│   ├── settings/                          # Settings sub-sections
+│   │   ├── apple_widgets.dart
+│   │   ├── device_card.dart
+│   │   ├── model_params.dart
+│   │   └── skills_section.dart
+│   └── slides/                            # Slide Maker sub-views
+│       ├── slide_canvas.dart
+│       ├── slide_charts.dart
+│       ├── slide_dialogs.dart
+│       ├── slide_outline_view.dart
+│       ├── slide_painters.dart
+│       └── slide_present_view.dart
 ├── widgets/
-│   ├── chat_bubble.dart         # Message bubble
-│   ├── code_block.dart          # Syntax-highlighted code blocks
-│   ├── model_switcher_sheet.dart
-│   ├── attachment_preview.dart
-│   ├── image_viewer.dart
-│   ├── thought_disclosure.dart  # Reasoning tag expansion
-│   ├── thinking_orb.dart        # 3D particle sphere animation
-│   └── typing_indicator.dart    # Typing animation
+│   ├── app_ui.dart                        # Shared UI components
+│   ├── artifact_renderer.dart             # Markdown/artifact rendering
+│   ├── attachment_preview.dart            # Attachment preview chips
+│   ├── chat_branch_timeline.dart          # Branch history timeline
+│   ├── chat_bubble.dart                   # Message bubble + _sanitizeUtf16
+│   ├── citation_chip.dart                 # Source citation chip (favicon + domain)
+│   ├── cli_sheets.dart                    # CLI terminal sheets
+│   ├── code_block.dart                    # Syntax-highlighted code blocks
+│   ├── image_viewer.dart                  # Full-screen image viewer
+│   ├── model_switcher_sheet.dart          # In-chat model switcher
+│   ├── thinking_orb.dart                  # 3D particle sphere animation (9 states)
+│   ├── thought_disclosure.dart            # Reasoning tag expansion
+│   ├── typing_indicator.dart              # Typing animation
+│   ├── typing_text.dart                   # Typewriter text animation
+│   └── voice_overlay.dart                 # Voice input overlay
 ├── ffi/
-│   └── sd_ffi_bindings.dart     # FFI bindings for SD native lib
-└── utils/
-    ├── app_snackbar.dart        # Top spring-animated toast
-    └── thought_parser.dart      # <thought> tag parser
+│   ├── sd_ffi_bindings.dart               # FFI bindings for SD native lib
+│   ├── sd_ffi_bindings_io.dart            # IO platform bindings
+│   └── sd_ffi_bindings_web.dart           # Web platform bindings
+├── utils/
+│   ├── app_snackbar.dart                  # Top spring-animated toast
+│   ├── artifact_parser.dart               # Markdown artifact extraction
+│   ├── battle_scoring.dart                # Battle Arena scoring
+│   ├── export_file.dart                   # Log export (copy/share/save)
+│   ├── history_budget.dart                # Token budget trimming
+│   ├── prompt_export.dart                 # Chat export (Markdown/PDF/TXT)
+│   ├── slide_deck.dart                    # Slide deck data model + PPTX import
+│   ├── slide_palette.dart                 # Slide color palette derivation
+│   ├── slide_pptx.dart                    # PPTX generation
+│   ├── syntax_highlight.dart              # Code syntax highlighting
+│   ├── thought_parser.dart                # <thought> tag parser
+│   ├── web_download.dart                  # Cross-platform web download
+│   ├── web_download_stub.dart             # Web stub
+│   ├── web_download_web.dart              # Web platform download
+│   ├── web_notify.dart                    # Web notification
+│   ├── web_notify_stub.dart               # Web stub
+│   ├── web_notify_web.dart                # Web platform notification
+│   └── web_project.dart                   # Web project helpers
+└── shared/
+    ├── constants/
+    │   └── platform_links.dart            # Centralized platform URLs
+    └── theme/
+        └── tokens.dart                    # Breakpoints, Spacing, TypographyTokens
 
-shared/                          # root single source (for future Tauri/Next.js shells)
-├── constants/platform_links.dart
-└── theme/tokens.dart
+local_plugins/
+├── llama_flutter_android/                 # llama.cpp Flutter plugin (GGUF inference)
+├── flutter_litert_lm/                    # Google LiteRT-LM Flutter plugin
+├── sd_flutter_android/                   # Stable Diffusion Flutter plugin
+├── lucide_icons/                         # Vendored Lucide icon pack (v0.257.0)
+└── speech_to_text_windows/               # Windows speech-to-text plugin
 
-windows/                         # Flutter Windows shell
-├── runner/
+android/
+├── app/src/main/kotlin/com/cubiclm/app/
+│   ├── MainActivity.kt                   # Flutter engine + channel wiring
+│   ├── ModelDownloadService.kt           # Foreground service: Range resume, notification
+│   └── BootReceiver.kt                   # Boot persistence
+└── res/values+drawable/launch_background.xml  # Warm #F8F4ED
+
+windows/
+├── runner/                               # Win32 runner (window_manager)
 ├── CMakeLists.txt
-└── updater_config.json          # auto-update scaffolding (disabled, REPLACE_ME)
+├── installer/cubiclm.iss                 # Inno Setup installer script
+└── updater_config.json                   # auto-update scaffolding (disabled)
 
-web/                             # Flutter Web shell
+web/
 ├── index.html
 └── manifest.json
 
 scripts/
-├── build-all.ps1
-└── build-all.sh                 # one-command Android+Web+Windows
-
-local_plugins/
-├── llama_flutter_android/       # llama.cpp Flutter plugin (GGUF inference)
-├── flutter_litert_lm/          # Google LiteRT-LM Flutter plugin
-└── sd_flutter_android/         # Stable Diffusion Flutter plugin
-
-android/
-├── app/src/main/kotlin/com/cubiclm/app/
-│   ├── MainActivity.kt          # Flutter engine + channel wiring
-│   └── ModelDownloadService.kt  # Foreground service: Range resume, notification
-└── res/values+drawable/launch_background.xml # Warm #F8F4ED
+├── build-all.ps1                         # One-command build (Android + Windows)
+├── build-all.sh                          # One-command build (Android + Web + Windows)
+└── sync-opencode-models.mjs              # Model catalog sync
 
 assets/
-└── skills/                  # 5 bundled starters
+├── adblock_hosts.txt                     # Privacy browser host blocklist
+├── catalog/models.json                   # Bundled model catalog
+├── icons/
+│   ├── CubicLM.png                       # App icon (splash)
+│   └── CubicLM_Icon.png                  # App icon (launcher)
+└── skills/                               # 5 bundled starter skills
+    ├── bn_en_translator.md
+    ├── code_reviewer.md
+    ├── creative_writer.md
+    ├── efficient_prompting.md
+    └── study_helper.md
 
 docs/
-├── ARCHITECTURE.md          # one product, three shells
-├── PLATFORM_DIFFERENCES.md  # Android full vs Web/Windows cloud-only
-├── BUILD_AND_RUN.md         # clean clone → Android/Web/Windows
-├── PLATFORM_LINKS.md        # single-file link editing
-└── ../CHANGELOG.md          # single source
+├── ARCHITECTURE.md                       # One product, three shells
+├── PLATFORM_DIFFERENCES.md               # Android full vs Web/Windows cloud-only
+├── BUILD_AND_RUN.md                      # Clean clone → Android/Web/Windows
+├── PLATFORM_LINKS.md                     # Single-file link editing
+├── AGENT_IDE_DESIGN.md                   # Agent IDE design doc
+├── CUBIC_WEB_SYSTEM_LOGS.md              # CubicWeb diagnostics doc
+├── quick_release.md                      # Release checklist
+├── terminal.md                           # Terminal feature doc
+├── web_builder_nextjs.md                 # Next.js pipeline doc
+└── web_builder_react(vite).md            # Vite/React pipeline doc
 ```
 
 </details>

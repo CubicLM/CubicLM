@@ -121,6 +121,13 @@ class SlideDeckController extends GetxController {
             '${context.isNotEmpty ? "Use this context:\n$context" : ""}',
         system: outlineSystemPrompt(count: slideCount.value, topic: t),
         imagePath: inputImage.value?.path,
+        onProgress: (fullText) {
+          final parsed = parseOutline(fullText);
+          if (parsed.isNotEmpty) {
+            outline.assignAll(parsed);
+            showingOutline.value = true;
+          }
+        },
       );
       final parsed = parseOutline(raw);
       if (parsed.isNotEmpty) {
@@ -154,6 +161,12 @@ class SlideDeckController extends GetxController {
             visualStyle: visualStyle.value,
             audience: audience.value),
         imagePath: inputImage.value?.path,
+        onProgress: (fullText) {
+          final parsed = parseSlides(fullText);
+          if (parsed.isNotEmpty) {
+            slides.assignAll(parsed);
+          }
+        },
       );
       final parsed = parseSlides(raw);
       slides.assignAll(parsed);
@@ -189,6 +202,12 @@ class SlideDeckController extends GetxController {
             visualStyle: visualStyle.value,
             audience: audience.value),
         imagePath: inputImage.value?.path,
+        onProgress: (fullText) {
+          final parsed = parseSlides(fullText);
+          if (parsed.isNotEmpty) {
+            slides.assignAll(parsed);
+          }
+        },
       );
       final parsed = parseSlides(raw);
       slides.assignAll(parsed);
@@ -494,6 +513,15 @@ class SlideDeckController extends GetxController {
             style: style.value,
             visualStyle: visualStyle.value,
             audience: audience.value),
+        onProgress: (fullText) {
+          final parsed = parseSlides(fullText);
+          if (parsed.isNotEmpty) {
+            final keepImages = slides[index].imageBytes;
+            final next = parsed.first;
+            next.imageBytes = keepImages;
+            slides[index] = next;
+          }
+        },
       );
       final parsed = parseSlides(raw);
       if (parsed.isNotEmpty) {
@@ -538,6 +566,15 @@ class SlideDeckController extends GetxController {
             style: style.value,
             visualStyle: visualStyle.value,
             audience: audience.value),
+        onProgress: (fullText) {
+          final parsed = parseSlides(fullText);
+          if (parsed.isNotEmpty) {
+            final keepImages = slides[index].imageBytes;
+            final next = parsed.first;
+            next.imageBytes = keepImages;
+            slides[index] = next;
+          }
+        },
       );
       final parsed = parseSlides(raw);
       if (parsed.isNotEmpty) {
@@ -581,6 +618,17 @@ class SlideDeckController extends GetxController {
             style: newStyle,
             visualStyle: visualStyle.value,
             audience: audience.value),
+        onProgress: (fullText) {
+          final parsed = parseSlides(fullText);
+          if (parsed.isNotEmpty) {
+            // Preserve existing images during restyle streaming
+            for (var i = 0; i < parsed.length && i < slides.length; i++) {
+              parsed[i].imageBytes = slides[i].imageBytes;
+              parsed[i].imageUrl = slides[i].imageUrl;
+            }
+            slides.assignAll(parsed);
+          }
+        },
       );
       final parsed = parseSlides(raw);
       if (parsed.length == slides.length) {
@@ -831,6 +879,12 @@ class SlideDeckController extends GetxController {
             count: skeleton.length,
             style: style.value,
             audience: audience.value),
+        onProgress: (fullText) {
+          final parsed = parseSlides(fullText);
+          if (parsed.isNotEmpty) {
+            slides.assignAll(parsed);
+          }
+        },
       );
       final parsed = parseSlides(raw);
       slides.assignAll(parsed);
@@ -848,7 +902,7 @@ class SlideDeckController extends GetxController {
     slides.refresh();
   }
 
-  Future<String> _ask({required String prompt, required String system, String? imagePath}) async {
+  Future<String> _ask({required String prompt, required String system, String? imagePath, void Function(String)? onProgress}) async {
     final settings = Get.find<SettingsController>();
     final buf = StringBuffer();
     if (settings.inferenceMode.value == 'cloud') {
@@ -871,6 +925,7 @@ class SlideDeckController extends GetxController {
         imageBase64: imgBase64,
       )) {
         buf.write(chunk);
+        onProgress?.call(buf.toString());
       }
       return buf.toString().trim();
     }
@@ -883,7 +938,10 @@ class SlideDeckController extends GetxController {
       systemPrompt: system,
       source: 'slides',
       imagePath: imagePath,
-      onToken: buf.write,
+      onToken: (t) {
+        buf.write(t);
+        onProgress?.call(buf.toString());
+      },
     );
     return buf.toString().trim();
   }

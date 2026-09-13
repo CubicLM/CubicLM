@@ -116,13 +116,17 @@ class ModelView extends GetView<ModelController> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      "${'model_local_models'.tr} (${controller.filteredDisplayedModels.length})",
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).hintColor,
-                        letterSpacing: 1.2,
+                    Flexible(
+                      child: Text(
+                        "${'model_local_models'.tr} (${controller.filteredDisplayedModels.length})",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).hintColor,
+                          letterSpacing: 1.2,
+                        ),
                       ),
                     ),
                     InkWell(

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Directory, File, Platform;
 
@@ -350,5 +350,154 @@ class ExportFile {
       ),
     );
     return saved;
+  }
+
+  /// Returns the path of the export directory (for display).
+  static Future<String> getExportDirPath() async {
+    if (kIsWeb) return 'Browser downloads';
+    if (Platform.isAndroid) {
+      try {
+        final hive = Get.isRegistered<HiveService>()
+            ? Get.find<HiveService>()
+            : null;
+        final treeUri =
+            hive?.getSetting<String>(AppConstants.keyExportTreeUri) ?? '';
+        if (treeUri.isNotEmpty) {
+          final ok = await _androidChannel.invokeMethod<bool>(
+              'checkTreeFolderAccess', {'treeUri': treeUri});
+          if (ok == true) {
+            final path = await _androidChannel.invokeMethod<String>(
+                'getTreeFolderPath', {'treeUri': treeUri});
+            if (path != null && path.isNotEmpty) return path;
+          }
+        }
+      } catch (_) {}
+      // Default: Download/CubicLM
+      try {
+        final dl = await _androidChannel.invokeMethod<String>(
+            'getDownloadsPath');
+        if (dl != null && dl.isNotEmpty) {
+          return '$dl${Platform.pathSeparator}${appSubfolder()}';
+        }
+      } catch (_) {}
+      return 'Download/${appSubfolder()}';
+    }
+    try {
+      final dir = await _desktopExportDir();
+      return dir.path;
+    } catch (_) {}
+    return appSubfolder();
+  }
+
+  /// Lists saved log/export files (*.txt, *.log) in the export directory.
+  static Future<List<ExportedFile>> listSavedLogFiles() async {
+    if (kIsWeb) return [];
+    try {
+      if (Platform.isAndroid) {
+        return _listAndroidLogFiles();
+      }
+      final dir = await _desktopExportDir();
+      return _listDirFiles(dir);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Android: list .txt/.log files via MediaStore or direct Downloads path.
+  static Future<List<ExportedFile>> _listAndroidLogFiles() async {
+    try {
+      final results = await _androidChannel.invokeMethod<List>(
+          'listExportFiles', {'subfolder': appSubfolder()});
+      if (results != null) {
+        return results
+            .map((m) => ExportedFile.fromMap(Map<String, dynamic>.from(m)))
+            .toList();
+      }
+    } catch (_) {}
+    // Fallback: try listing via the Documents directory
+    try {
+      final docs = await getApplicationDocumentsDirectory();
+      final sub = Directory(
+          '${docs.path}${Platform.pathSeparator}${appSubfolder()}');
+      if (await sub.exists()) return _listDirFiles(sub);
+    } catch (_) {}
+    return [];
+  }
+
+  /// Lists .txt/.log files in a directory (desktop + fallback).
+  static Future<List<ExportedFile>> _listDirFiles(Directory dir) async {
+    final files = <ExportedFile>[];
+    await for (final f in dir.list(followLinks: false)) {
+      if (f is File) {
+        final name = f.path.split(Platform.pathSeparator).last;
+        if (name.endsWith('.txt') || name.endsWith('.log')) {
+          final stat = await f.stat();
+          files.add(ExportedFile(
+            name: name,
+            path: f.path,
+            sizeBytes: stat.size,
+            modified: stat.modified,
+          ));
+        }
+      }
+    }
+    files.sort((a, b) => b.modified.compareTo(a.modified));
+    return files;
+  }
+
+  /// Deletes a saved file by path.
+  static Future<bool> deleteFile(String path) async {
+    try {
+      final f = File(path);
+      if (await f.exists()) {
+        await f.delete();
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+
+}
+
+/// Metadata for a saved export file.
+class ExportedFile {
+  final String name;
+  final String path;
+  final int sizeBytes;
+  final DateTime modified;
+
+  ExportedFile({
+    required this.name,
+    required this.path,
+    required this.sizeBytes,
+    required this.modified,
+  });
+
+  factory ExportedFile.fromMap(Map<String, dynamic> m) {
+    final mod = m['modified'];
+    return ExportedFile(
+      name: m['name']?.toString() ?? '',
+      path: m['path']?.toString() ?? '',
+      sizeBytes: m['size'] is int ? m['size'] : 0,
+      modified: mod is DateTime
+          ? mod
+          : DateTime.tryParse(mod?.toString() ?? '') ?? DateTime.now(),
+    );
+  }
+
+  String get sizeLabel {
+    if (sizeBytes < 1024) return '${sizeBytes}B';
+    if (sizeBytes < 1024 * 1024) return '${(sizeBytes / 1024).toStringAsFixed(1)}KB';
+    return '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)}MB';
+  }
+
+  String get dateLabel {
+    final now = DateTime.now();
+    final diff = now.difference(modified);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    return '${modified.month.toString().padLeft(2, '0')}-${modified.day.toString().padLeft(2, '0')} ${modified.hour.toString().padLeft(2, '0')}:${modified.minute.toString().padLeft(2, '0')}';
   }
 }

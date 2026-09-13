@@ -1,4 +1,4 @@
-/// Slide deck schema, parser, and renderers (pure Dart, unit-tested).
+﻿/// Slide deck schema, parser, and renderers (pure Dart, unit-tested).
 ///
 /// The model is instructed to emit one fenced block:
 /// ```slides
@@ -34,8 +34,17 @@ class Slide {
   List<List<String>> columns;
   List<Map<String, String>> stats;
 
+  /// Table data: List of rows, where each row is a list of strings.
+  List<List<String>> tableData;
+
   /// Chart data: { "type": "bar|donut|line", "items": [{"label": "...", "value": "42"}] }
   Map<String, dynamic> chartData;
+
+  /// Media embed URL (YouTube, Loom, etc.)
+  String? embedUrl;
+
+  /// Image styling mask: circle | hexagon | squircle | none
+  String imageMask;
 
   /// Diagram data: Mermaid syntax string.
   String? diagram;
@@ -71,10 +80,13 @@ class Slide {
     this.imageUrl,
     this.backgroundUrl,
     this.audioBytes,
+    this.embedUrl,
+    this.imageMask = 'none',
     List<Map<String, dynamic>>? widgets,
     this.quoteAuthor = '',
     List<List<String>>? columns,
     List<Map<String, String>>? stats,
+    List<List<String>>? tableData,
     Map<String, dynamic>? chartData,
     this.diagram,
     List<Citation>? citations,
@@ -92,6 +104,7 @@ class Slide {
   })  : points = points ?? [],
         columns = columns ?? [],
         stats = stats ?? [],
+        tableData = tableData ?? [],
         chartData = chartData ?? {},
         citations = citations ?? [],
         widgets = widgets ?? [],
@@ -113,7 +126,8 @@ class Slide {
       'chart',
       'diagram',
       'cards',
-      'gallery'
+      'gallery',
+      'table'
     };
     if (valid.contains(v)) return v;
     return 'bullets';
@@ -149,6 +163,13 @@ class Slide {
       }
     }
 
+    List<List<String>> tbl = [];
+    if (m['tableData'] is List) {
+      for (final r in (m['tableData'] as List)) {
+        if (r is List) tbl.add(r.map((e) => e.toString()).toList());
+      }
+    }
+
     return Slide(
       title: (m['title'] ?? '').toString(),
       subtitle: (m['subtitle'] ?? '').toString(),
@@ -164,12 +185,15 @@ class Slide {
       quoteAuthor: (m['quoteAuthor'] ?? '').toString(),
       columns: cols,
       stats: sts,
+      tableData: tbl,
       chartData: chart,
       diagram: (m['diagram'] ?? '').toString(),
       citations: cits,
       speakerNotes: (m['speakerNotes'] ?? '').toString(),
       imageUrl: m['imageUrl']?.toString(),
       backgroundUrl: m['backgroundUrl']?.toString(),
+      embedUrl: m['embedUrl']?.toString(),
+      imageMask: (m['imageMask'] ?? 'none').toString(),
       widgets: (m['widgets'] is List)
           ? (m['widgets'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList()
           : [],
@@ -187,12 +211,15 @@ class Slide {
         'quoteAuthor': quoteAuthor,
         'columns': columns,
         'stats': stats,
+        'tableData': tableData,
         'chartData': chartData,
         'diagram': diagram,
         'citations': citations.map((e) => e.toMap()).toList(),
         'speakerNotes': speakerNotes,
         'imageUrl': imageUrl,
         'backgroundUrl': backgroundUrl,
+        'embedUrl': embedUrl,
+        'imageMask': imageMask,
         'widgets': widgets,
       };
 
@@ -445,16 +472,9 @@ List<Slide> parseSlides(String raw, {SlideDeckTheme? outTheme}) {
   try {
     String? payload = extractSlidesJson(text);
     if (payload != null) {
-      // Try partial JSON repair
-      try {
-        jsonDecode(payload);
-      } catch (_) {
-        if (payload.lastIndexOf('}') < payload.lastIndexOf(']')) {
-          payload += ']}';
-        } else {
-          payload += '}]}';
-        }
-      }
+      // Robust partial JSON repair
+      payload = _repairJson(payload);
+      
       final decoded = jsonDecode(payload);
       if (decoded is Map && decoded['theme'] is Map && outTheme != null) {
         // Potentially update theme if needed, but here we just note it
@@ -478,6 +498,55 @@ List<Slide> parseSlides(String raw, {SlideDeckTheme? outTheme}) {
   } catch (_) {}
   // Markdown fallback
   return _parseMarkdownSlides(text);
+}
+
+String _repairJson(String s) {
+  s = s.trim();
+  if (s.isEmpty) return '';
+
+  int openBraces = 0;
+  int openBrackets = 0;
+  bool inString = false;
+  bool escape = false;
+  
+  StringBuffer sb = StringBuffer();
+  for (int i = 0; i < s.length; i++) {
+    var c = s[i];
+    sb.write(c);
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (c == '\\') {
+      escape = true;
+    } else if (c == '"') {
+      inString = !inString;
+    } else if (!inString) {
+      if (c == '{') openBraces++;
+      if (c == '}') openBraces--;
+      if (c == '[') openBrackets++;
+      if (c == ']') openBrackets--;
+    }
+  }
+
+  String res = sb.toString();
+  if (inString) res += '"';
+  
+  // Clean up trailing commas before closing
+  res = res.trim();
+  while (res.endsWith(',')) {
+    res = res.substring(0, res.length - 1).trim();
+  }
+
+  while (openBrackets > 0) {
+    res += ']';
+    openBrackets--;
+  }
+  while (openBraces > 0) {
+    res += '}';
+    openBraces--;
+  }
+  return res;
 }
 
 List<Slide> _parseMarkdownSlides(String raw) {
@@ -628,17 +697,21 @@ Visual style for all images: $visualStyle.
 
 Rules — follow ALL of these:
 1. Produce EXACTLY $count slides. No more, no fewer.
-2. Layouts available: title, bullets, image, quote, comparison, stats, timeline, summary, chart, diagram.
+2. Layouts available: title, bullets, image, quote, comparison, stats, timeline, summary, chart, diagram, table.
 3. First slide MUST be layout "title". Last slide MUST be "summary".
 4. VARY layouts — use at least 4 different types across the deck. Never repeat the same layout twice in a row.
 5. Use "diagram" for logical flows, architecture, or cycles using Mermaid syntax.
 6. Use "icons" for bullet points (Lucide icon names like: zap, check, star, bar-chart, users, palette).
-7. EVERY content slide MUST include "imagePrompt" following the style: $visualStyle.
-8. Bullet points: max 15 words each. Use SPECIFIC numbers, percentages, and real-world data.
-9. "notes" is a short summary; "speakerNotes" is the actual script for the presenter.
-10. Add "citations" whenever providing specific data or quotes.
-11. Think like a consultant — structure ideas as Problem → Solution → Evidence → Impact.
-12. Valid JSON only inside the fence. No prose outside.''';
+7. Use "table" for structured data. "tableData" is a 2D array of strings.
+8. Use "embedUrl" (YouTube URL) if the content suggests a video would be helpful.
+9. Use "imageMask" (circle | hexagon | squircle) to style specific slide images.
+10. EVERY content slide MUST include "imagePrompt" following the style: $visualStyle.
+11. Bullet points: max 15 words each. Use SPECIFIC numbers, percentages, and real-world data.
+12. "notes" is a short summary; "speakerNotes" is the actual script for the presenter.
+13. Add "citations" whenever providing specific data or quotes.
+14. Think like a consultant — structure ideas as Problem → Solution → Evidence → Impact.
+15. Valid JSON only inside the fence. No prose outside.
+''';
 }
 
 /// Single-slide regeneration user prompt.
@@ -653,7 +726,7 @@ String slideRegenPrompt({
   final prevCtx = prevTitle != null ? 'Previous slide title: $prevTitle\n' : '';
   final nextCtx = nextTitle != null ? 'Next slide title: $nextTitle\n' : '';
 
-  return '''Regenerate ONLY slide $index of the "$topic" deck. Keep the same JSON shape inside one ```slides fence.
+  return """Regenerate ONLY slide $index of the "$topic" deck. Keep the same JSON shape inside one ```slides fence.
 
 $prevCtx$nextCtx
 Current slide:
@@ -662,7 +735,7 @@ $cur
 Layout: ${current.layout}
 Image: ${current.imagePrompt}
 
-Make it sharper, better formatted, and strictly follow the JSON schema.''';
+Make it sharper, better formatted, and strictly follow the JSON schema.""";
 }
 
 /// Deck → Markdown (export + PDF source).
@@ -873,6 +946,16 @@ String deckToHtml(String topic, List<Slide> slides, {SlideDeckTheme? theme}) {
     if (s.backgroundUrl != null && s.backgroundUrl!.isNotEmpty) {
       style += 'position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:-1;opacity:0.4;';
     }
+    
+    // Phase 7: Image Masking
+    if (s.imageMask == 'circle') {
+      style += 'clip-path: circle(50%); aspect-ratio: 1;';
+    } else if (s.imageMask == 'hexagon') {
+      style += 'clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);';
+    } else if (s.imageMask == 'squircle') {
+      style += 'border-radius: 20%;';
+    }
+
     if (s.imageBytes != null && s.imageBytes!.isNotEmpty) {
       final b64 = base64Encode(s.imageBytes!);
       return '<img src="data:image/jpeg;base64,$b64" class="slide-image" alt="${esc(s.imagePrompt)}" style="$style" />';
@@ -884,6 +967,22 @@ String deckToHtml(String topic, List<Slide> slides, {SlideDeckTheme? theme}) {
       return '<div class="ph"><b>IMAGE</b>${esc(s.imagePrompt.trim())}</div>';
     }
     return '';
+  }
+
+  String renderTable(Slide s) {
+    if (s.tableData.isEmpty) return '';
+    final buf = StringBuffer('<div class="table-container glass"><table class="slide-table">');
+    for (var i = 0; i < s.tableData.length; i++) {
+      final row = s.tableData[i];
+      buf.writeln('<tr>');
+      for (final cell in row) {
+        final tag = i == 0 ? 'th' : 'td';
+        buf.writeln('<$tag>${esc(cell)}</$tag>');
+      }
+      buf.writeln('</tr>');
+    }
+    buf.writeln('</table></div>');
+    return buf.toString();
   }
 
   String renderAudio(Slide s) {
@@ -967,6 +1066,13 @@ ul li::before { content: '▸'; position: absolute; left: 0; color: var(--accent
 .layout-gallery .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
 .gallery-item { border-radius: 12px; overflow: hidden; height: 200px; }
 .gallery-item img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Phase 7: Tables & Interactivity */
+.table-container { margin-top: 20px; overflow-x: auto; border-radius: 12px; }
+.slide-table { width: 100%; border-collapse: collapse; text-align: left; }
+.slide-table th, .slide-table td { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.slide-table th { background: rgba(255,255,255,0.05); color: var(--accent); font-weight: bold; }
+.video-embed, .web-embed { margin-top: 20px; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); }
 
 /* Chart Interactivity */
 .bar-item { transition: filter 0.2s, transform 0.2s; cursor: pointer; }
@@ -1093,6 +1199,8 @@ $logoHtml
         buf.writeln('<div class="gallery-item">${img(s)}</div>');
       }
       buf.writeln('</div>');
+    } else if (s.layout == 'table') {
+      buf.writeln(renderTable(s));
     } else if (s.layout == 'chart') {
       buf.writeln(_chartHtml(s));
     } else if (s.points.isNotEmpty) {
