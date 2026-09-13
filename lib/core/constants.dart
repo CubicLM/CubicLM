@@ -183,7 +183,8 @@ class AppConstants {
 
   // System Prompt (compact for small context models)
   static const String systemPrompt =
-      '''You are CubicLM AI Chat, a helpful and friendly assistant. Be concise, accurate, and conversational. Answer questions directly without unnecessary preamble.''';
+      '''You are CubicLM AI Chat, a helpful and friendly assistant. Be concise, accurate, and conversational. Answer questions directly without unnecessary preamble.
+Use <artifact title="Title" type="html|mermaid|csv|javascript|code">...</artifact> tags for large code blocks, HTML, diagrams, or tables to show them in the side panel.''';
 
   // System Prompt for Uncensored Models
   static const String uncensoredSystemPrompt =

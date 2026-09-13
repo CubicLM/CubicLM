@@ -34,12 +34,24 @@ List<ArtifactParts> parseArtifacts(String text) {
     final typeMatch = RegExp(r'type=["''](.*?)["'']').firstMatch(attrStr);
     final titleMatch = RegExp(r'title=["''](.*?)["'']').firstMatch(attrStr);
     
+    var type = typeMatch?.group(1);
+    final contentText = content.trim();
+    
+    // Auto-detect type from content if missing
+    if (type == null || type.isEmpty) {
+      if (contentText.contains('graph TD') || contentText.contains('sequenceDiagram') || contentText.contains('pie')) {
+        type = 'mermaid';
+      } else if (contentText.startsWith('<!DOCTYPE html') || contentText.contains('<html')) {
+        type = 'html';
+      }
+    }
+    
     artifacts.add(ArtifactParts(
       id: idMatch?.group(1),
-      type: typeMatch?.group(1),
-      title: titleMatch?.group(1),
-      content: content.trim(),
-      remainingText: '', // Will be calculated below
+      type: type,
+      title: titleMatch?.group(1) ?? (type != null ? '${type[0].toUpperCase()}${type.substring(1)}' : 'Artifact'),
+      content: contentText,
+      remainingText: '',
     ));
   }
 
