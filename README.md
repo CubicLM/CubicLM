@@ -233,209 +233,151 @@
 <a href="#-getting-started"><img src="https://img.shields.io/badge/🚀_Setup-3b82f6?style=flat-square&labelColor=0d1117" alt="Setup"/></a>
 <a href="#-frequently-asked-questions"><img src="https://img.shields.io/badge/❓_FAQ-facc15?style=flat-square&labelColor=0d1117" alt="FAQ"/></a>
 
-<br/><br/>
-
-</div>
+<br/>
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- ░░ 3-ZONE GRID ░░                                                   -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
+## 🗂️ Documentation Zones
 
 <table width="100%">
 <tbody>
 <tr>
 
-<!-- ╔═══════════════════════════════════════════════════════════════╗ -->
-<!-- ║  ZONE 1 · CORE                                                 ║ -->
-<!-- ╚═══════════════════════════════════════════════════════════════╝ -->
-
-<td width="33.33%" valign="top">
-
-<br/>
-
-<div align="center">
+<td width="33.33%" valign="top" align="center">
 
 <img src="https://img.shields.io/badge/●_ZONE_1-CORE-FF4D00?style=for-the-badge&labelColor=0d1117" alt="Core"/>
 
 <sub><b>🎯 Start here · Features · Models</b></sub>
 
-</div>
-
 <br/>
 
-**<kbd>①</kbd> &nbsp; 🎯 Introduction**
+---
 
-> *Get to know CubicLM*
+**🎯 Introduction**
 
-| | |
-| :---: | :--- |
-| 🎯 | [What is CubicLM?](#-what-is-cubiclm) |
-| 📥 | [Download — v1.12.0](#-download--v1120) |
+*Get to know CubicLM*
 
-<br/>
+🎯 [What is CubicLM?](#-what-is-cubiclm)
+📥 [Download — v1.12.0](#-download--v1120)
 
-**<kbd>②</kbd> &nbsp; ✨ Core Features**
+---
 
-> *What makes it powerful*
+**✨ Core Features**
 
-| | |
-| :---: | :--- |
-| 🧠 | [Local AI Inference](#-local-ai-inference) |
-| 🎛️ | [Inference Parameters](#️-inference-parameters-nodes--config) |
-| 🚀 | [Startup & Onboarding](#-startup-onboarding--splash) |
-| 🌐 | [Web Access](#-web-access-independent-chat) |
-| 🧠 | [Chat Context Memory](#-chat-context-memory-follow-ups-dont-get-lost) |
-| ☁️ | [Cloud Providers](#️-cloud-ai-providers) |
+*What makes it powerful*
 
-<br/>
+🧠 [Local AI Inference](#-local-ai-inference)
+🎛️ [Inference Parameters](#️-inference-parameters-nodes--config)
+🚀 [Startup & Onboarding](#-startup-onboarding--splash)
+🌐 [Web Access](#-web-access-independent-chat)
+🧠 [Chat Context Memory](#-chat-context-memory-follow-ups-dont-get-lost)
+☁️ [Cloud Providers](#️-cloud-ai-providers)
 
-**<kbd>③</kbd> &nbsp; 🤖 Model Catalog**
+---
 
-> *18+ ready-to-run models*
+**🤖 Model Catalog**
 
-| | |
-| :---: | :--- |
-| ⚡ | [LiteRT-LM Models](#-supported-models) |
-| 🐫 | [GGUF Models](#-supported-models) |
-| 🎨 | [Image Generation](#-supported-models) |
-| 📊 | [Selection Guide](#-supported-models) |
+*18+ ready-to-run models*
+
+⚡ [LiteRT-LM Models](#-supported-models)
+🐫 [GGUF Models](#-supported-models)
+🎨 [Image Generation](#-supported-models)
+📊 [Selection Guide](#-supported-models)
 
 <br/>
-
-<div align="center">
 
 <img src="https://img.shields.io/badge/📍_START_HERE-1_→_2_→_3-FF4D00?style=for-the-badge&labelColor=0d1117" alt="Start"/>
 
-</div>
-
 </td>
 
-<!-- ╔═══════════════════════════════════════════════════════════════╗ -->
-<!-- ║  ZONE 2 · EXTENSIONS                                           ║ -->
-<!-- ╚═══════════════════════════════════════════════════════════════╝ -->
-
-<td width="33.33%" valign="top">
-
-<br/>
-
-<div align="center">
+<td width="33.33%" valign="top" align="center">
 
 <img src="https://img.shields.io/badge/●_ZONE_2-EXTENSIONS-8b5cf6?style=for-the-badge&labelColor=0d1117" alt="Extensions"/>
 
 <sub><b>🧩 Power features · Integrations</b></sub>
 
-</div>
-
 <br/>
 
-**<kbd>④</kbd> &nbsp; 🧩 Extend & Integrate**
+---
 
-> *Add new capabilities*
+**🧩 Extend & Integrate**
 
-| | |
-| :---: | :--- |
-| 🧩 | [Skills System](#-skills--offline-instruction-extensions) |
-| 🔌 | [MCP Server](#-custom-mcp-server--single-remote-connection-no-marketplace) |
-| 🔌 | [Built-in API](#-built-in-openai-compatible-api-server) |
+*Add new capabilities*
 
-<br/>
+🧩 [Skills System](#-skills--offline-instruction-extensions)
+🔌 [MCP Server](#-custom-mcp-server--single-remote-connection-no-marketplace)
+🔌 [Built-in API](#-built-in-openai-compatible-api-server)
 
-**<kbd>⑤</kbd> &nbsp; 🌐 Build & Deploy**
+---
 
-> *Create & ship apps*
+**🌐 Build & Deploy**
 
-| | |
-| :---: | :--- |
-| 🌐 | [CubicWeb Builder](#-cubicweb-builder-toolkit--v1120) |
-| 🖥️ | [Multi-Platform](#️-universal-multi-platform--one-codebase-three-shells) |
-| 🔄 | [Model Switcher](#-universal-multi-platform--one-codebase-three-shells) |
+*Create & ship apps*
 
-<br/>
+🌐 [CubicWeb Builder](#-cubicweb-builder-toolkit--v1120)
+🖥️ [Multi-Platform](#️-universal-multi-platform--one-codebase-three-shells)
+🔄 [Model Switcher](#-universal-multi-platform--one-codebase-three-shells)
 
-**<kbd>⑥</kbd> &nbsp; 🩺 Monitor & Design**
+---
 
-> *Debug & beautify*
+**🩺 Monitor & Design**
 
-| | |
-| :---: | :--- |
-| 🩺 | [System Diagnostics](#-system-diagnostics-nodes--config--system-logs) |
-| 🎨 | [Theming & UX](#-theming--ux-deep-dive) |
-| 🔮 | [Thinking Orbs](#-theming--ux-deep-dive) |
+*Debug & beautify*
+
+🩺 [System Diagnostics](#-system-diagnostics-nodes--config--system-logs)
+🎨 [Theming & UX](#-theming--ux-deep-dive)
+🔮 [Thinking Orbs](#-theming--ux-deep-dive)
 
 <br/>
-
-<div align="center">
 
 <img src="https://img.shields.io/badge/⚡_POWER_USER-Advanced_Features-8b5cf6?style=for-the-badge&labelColor=0d1117" alt="Power"/>
 
-</div>
-
 </td>
 
-<!-- ╔═══════════════════════════════════════════════════════════════╗ -->
-<!-- ║  ZONE 3 · REFERENCE                                            ║ -->
-<!-- ╚═══════════════════════════════════════════════════════════════╝ -->
-
-<td width="33.33%" valign="top">
-
-<br/>
-
-<div align="center">
+<td width="33.33%" valign="top" align="center">
 
 <img src="https://img.shields.io/badge/●_ZONE_3-REFERENCE-3b82f6?style=for-the-badge&labelColor=0d1117" alt="Reference"/>
 
 <sub><b>📖 Docs · Setup · Community</b></sub>
 
-</div>
-
 <br/>
 
-**<kbd>⑦</kbd> &nbsp; 🛠️ Technical Docs**
+---
 
-> *Under the hood*
+**🛠️ Technical Docs**
 
-| | |
-| :---: | :--- |
-| 🛠️ | [Tech Stack](#-tech-stack) |
-| 📂 | [Project Structure](#-project-structure) |
-| 📋 | [Requirements](#-requirements) |
+*Under the hood*
 
-<br/>
+🛠️ [Tech Stack](#-tech-stack)
+📂 [Project Structure](#-project-structure)
+📋 [Requirements](#-requirements)
 
-**<kbd>⑧</kbd> &nbsp; 🚀 Build & Configure**
+---
 
-> *From clone to release*
+**🚀 Build & Configure**
 
-| | |
-| :---: | :--- |
-| 🚀 | [Getting Started](#-getting-started) |
-| ⚙️ | [Configuration](#️-configuration) |
-| 🔐 | [Security & Privacy](#-security--privacy) |
+*From clone to release*
 
-<br/>
+🚀 [Getting Started](#-getting-started)
+⚙️ [Configuration](#️-configuration)
+🔐 [Security & Privacy](#-security--privacy)
 
-**<kbd>⑨</kbd> &nbsp; 💬 Help & Community**
+---
 
-> *Support & contribution*
+**💬 Help & Community**
 
-| | |
-| :---: | :--- |
-| ❓ | [FAQ](#-frequently-asked-questions) |
-| 🐛 | [Troubleshooting](#-troubleshooting) |
-| 🗺️ | [Roadmap](#️-roadmap) |
-| 🤝 | [Contributing](#-contributing) |
-| 💖 | [Acknowledgments](#-acknowledgments) |
-| 📄 | [License](#-license) |
+*Support & contribution*
+
+❓ [FAQ](#-frequently-asked-questions)
+🐛 [Troubleshooting](#-troubleshooting)
+🗺️ [Roadmap](#️-roadmap)
+🤝 [Contributing](#-contributing)
+💖 [Acknowledgments](#-acknowledgments)
+📄 [License](#-license)
 
 <br/>
-
-<div align="center">
 
 <img src="https://img.shields.io/badge/📚_LEARN_MORE-Complete_Guides-3b82f6?style=for-the-badge&labelColor=0d1117" alt="Learn"/>
-
-</div>
 
 </td>
 
@@ -443,26 +385,17 @@
 </tbody>
 </table>
 
----
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- ░░ QUICK PATHS ░░                                                   -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
-<div align="center">
-
-### 🛤️ Choose Your Path
-
+## Choose Your Path
 <sub><i>Pick the journey that matches your goal</i></sub>
 
-<br/><br/>
+<br/>
 
 <table width="100%">
 <tr>
 
 <td width="25%" align="center" valign="top">
-
-<br/>
 
 <h3>🆕</h3>
 
@@ -470,19 +403,10 @@
 
 <sub>Get up and running in 5 minutes</sub>
 
-<br/><br/>
+<br/>
 
-<a href="#-download--v1120">
-  <img src="https://img.shields.io/badge/📥_Download-FF4D00?style=for-the-badge" alt="Download"/>
-</a>
-
-<br/><br/>
-
-<a href="#-getting-started">
-  <img src="https://img.shields.io/badge/🚀_Setup-FF4D00?style=for-the-badge" alt="Setup"/>
-</a>
-
-<br/><br/>
+<a href="#-download--v1120"><img src="https://img.shields.io/badge/📥_Download-FF4D00?style=for-the-badge" alt="Download"/></a>
+<a href="#-getting-started"><img src="https://img.shields.io/badge/🚀_Setup-FF4D00?style=for-the-badge" alt="Setup"/></a>
 
 <sub>1️⃣ Download → 2️⃣ Install → 3️⃣ Chat</sub>
 
@@ -490,27 +414,16 @@
 
 <td width="25%" align="center" valign="top">
 
-<br/>
-
 <h3>🔍</h3>
 
 **Exploring Features?**
 
 <sub>See what CubicLM can do</sub>
 
-<br/><br/>
+<br/>
 
-<a href="#-features">
-  <img src="https://img.shields.io/badge/✨_Features-8b5cf6?style=for-the-badge" alt="Features"/>
-</a>
-
-<br/><br/>
-
-<a href="#-supported-models">
-  <img src="https://img.shields.io/badge/🤖_Models-8b5cf6?style=for-the-badge" alt="Models"/>
-</a>
-
-<br/><br/>
+<a href="#-features"><img src="https://img.shields.io/badge/✨_Features-8b5cf6?style=for-the-badge" alt="Features"/></a>
+<a href="#-supported-models"><img src="https://img.shields.io/badge/🤖_Models-8b5cf6?style=for-the-badge" alt="Models"/></a>
 
 <sub>Local · Cloud · Vision · Image</sub>
 
@@ -518,27 +431,16 @@
 
 <td width="25%" align="center" valign="top">
 
-<br/>
-
 <h3>⚡</h3>
 
 **Power User?**
 
 <sub>Extend with Skills & MCP</sub>
 
-<br/><br/>
+<br/>
 
-<a href="#-skills--offline-instruction-extensions">
-  <img src="https://img.shields.io/badge/🧩_Skills-8b5cf6?style=for-the-badge" alt="Skills"/>
-</a>
-
-<br/><br/>
-
-<a href="#-custom-mcp-server--single-remote-connection-no-marketplace">
-  <img src="https://img.shields.io/badge/🔌_MCP-8b5cf6?style=for-the-badge" alt="MCP"/>
-</a>
-
-<br/><br/>
+<a href="#-skills--offline-instruction-extensions"><img src="https://img.shields.io/badge/🧩_Skills-8b5cf6?style=for-the-badge" alt="Skills"/></a>
+<a href="#-custom-mcp-server--single-remote-connection-no-marketplace"><img src="https://img.shields.io/badge/🔌_MCP-8b5cf6?style=for-the-badge" alt="MCP"/></a>
 
 <sub>Tools · Automation · APIs</sub>
 
@@ -546,27 +448,16 @@
 
 <td width="25%" align="center" valign="top">
 
-<br/>
-
 <h3>👨‍💻</h3>
 
 **Developer?**
 
 <sub>Build from source</sub>
 
-<br/><br/>
+<br/>
 
-<a href="#-project-structure">
-  <img src="https://img.shields.io/badge/📂_Structure-3b82f6?style=for-the-badge" alt="Structure"/>
-</a>
-
-<br/><br/>
-
-<a href="#-contributing">
-  <img src="https://img.shields.io/badge/🤝_Contribute-3b82f6?style=for-the-badge" alt="Contribute"/>
-</a>
-
-<br/><br/>
+<a href="#-project-structure"><img src="https://img.shields.io/badge/📂_Structure-3b82f6?style=for-the-badge" alt="Structure"/></a>
+<a href="#-contributing"><img src="https://img.shields.io/badge/🤝_Contribute-3b82f6?style=for-the-badge" alt="Contribute"/></a>
 
 <sub>Fork · Build · PR</sub>
 
@@ -575,7 +466,7 @@
 </tr>
 </table>
 
-
+---
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <!--                            FEATURES                                     -->
@@ -583,13 +474,11 @@
 
 <div align="center">
 
-# ✨ Features
-
+# Features
 <sub><i>Everything CubicLM can do — organized by capability</i></sub>
-
+## <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/ai/icons8-ai.gif" width="80" /> 
 </div>
 
----
 
 ## 🧠 Local AI Inference
 
@@ -1468,44 +1357,29 @@ Auto-detects **10 crash patterns**:
 
 <div align="center">
 
-# 🛠️ Tech Stack
-
+<div align="center">
+<h1>🛠️ Tech Stack</h1>
+<sub><i>Technologies powering CubicLM</i></sub>
 </div>
 
-<table>
-<tr>
-<td width="50%" valign="top">
-
-### 🎯 Core
+<br/>
 
 | Category | Technologies |
 | :--- | :--- |
-| **Framework** | Flutter 3.x |
-| **Language** | Dart, Kotlin, C++ (native plugins) |
-| **State Management** | GetX |
-| **Local Storage** | Hive |
-| **Networking** | dio, http |
-| **Local Inference** | `llama_flutter_android`, `flutter_litert_lm`, `sd_flutter_android` (custom plugins) |
-| **Cloud Backend** | Firebase Core, Firebase Messaging, Firebase Crashlytics |
+| 🎯 **Framework** | Flutter 3.x |
+| 💻 **Language** | Dart, Kotlin, C++ (native plugins) |
+| 🔄 **State Management** | GetX |
+| 💾 **Local Storage** | Hive |
+| 🌐 **Networking** | dio, http |
+| 🧠 **Local Inference** | `llama_flutter_android`, `flutter_litert_lm`, `sd_flutter_android` (custom plugins) |
+| ☁️ **Cloud Backend** | Firebase Core, Firebase Messaging, Firebase Crashlytics |
+| 🌍 **Localization** | 15 languages — EN, BN, HI, AR, ZH, ES, FR, JA, KO, PT, DE, TR, ID, RU, UR<br>GetX Translations with Hive persistence<br>90+ keys — `nav_*`, `chat_*`, `model_*`, `nodes_*`, `about_*`, `settings_*`, `onboarding_*`<br>`fallbackLocale EN`<br>App Settings + bottom nav + all 5 views reactive via `'.tr'` |
+| 📦 **Other Libraries** | `google_fonts` · `flutter_markdown` · `image_picker` · `share_plus` · `permission_handler` · `speech_to_text` · `lucide_icons` · `url_launcher` · `file_picker` · `flutter_secure_storage` · `dart_mcp` · `window_manager` |
 
-</td>
-<td width="50%" valign="top">
+<br/>
 
-### 🌍 Localization
+---
 
-- **15 languages** — EN, BN, HI, AR, ZH, ES, FR, JA, KO, PT, DE, TR, ID, RU, UR
-- **GetX Translations** with Hive persistence
-- **90+ keys** — `nav_*`, `chat_*`, `model_*`, `nodes_*`, `about_*`, `settings_*`, `onboarding_*`
-- `fallbackLocale EN`
-- App Settings + bottom nav + **all 5 views** reactive via `'.tr'`
-
-### 📦 Other Libraries
-
-`google_fonts` · `flutter_markdown` · `image_picker` · `share_plus` · `permission_handler` · `speech_to_text` · `lucide_icons` · `url_launcher` · `file_picker` · `flutter_secure_storage` · `dart_mcp` · `window_manager`
-
-</td>
-</tr>
-</table>
 
 ### 📊 Dependency Highlights
 
@@ -2427,7 +2301,7 @@ It helps others discover the project and keeps development going.
 
 </div>
 
----
+
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <!-- ░░ FOOTER BAR ░░                                                    -->
