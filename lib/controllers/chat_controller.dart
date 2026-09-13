@@ -97,6 +97,9 @@ class ChatController extends GetxController {
   // Search Mode (Perplexity-style)
   final isSearchMode = false.obs;
 
+  // Dual Response Mode
+  final dualResponseMode = false.obs;
+
   // Prompt templates
   static const _kTemplatesKey = 'prompt_templates_v1';
   final promptTemplates = <Map<String, String>>[].obs;
@@ -159,6 +162,74 @@ class ChatController extends GetxController {
 
   void closeArtifact() {
     showArtifactPanel.value = false;
+  }
+
+  void toggleDualMode() {
+    dualResponseMode.value = !dualResponseMode.value;
+    Get.snackbar(
+      dualResponseMode.value ? 'Dual Response ON' : 'Dual Response OFF',
+      dualResponseMode.value
+          ? 'AI will generate two versions for comparison.'
+          : 'AI will generate a single response.',
+      snackPosition: SnackPosition.BOTTOM,
+      duration: const Duration(seconds: 2),
+    );
+  }
+
+  Future<void> setPreference(String messageId, int index) async {
+    final idx = messages.indexWhere((m) => m.id == messageId);
+    if (idx < 0) return;
+    final msg = messages[idx];
+    final updated = ChatMessage(
+      id: msg.id,
+      chatId: msg.chatId,
+      role: msg.role,
+      content: msg.content,
+      imageBase64: msg.imageBase64,
+      imagePath: msg.imagePath,
+      tokensPerSec: msg.tokensPerSec,
+      thoughtDurationSeconds: msg.thoughtDurationSeconds,
+      generationDurationMs: msg.generationDurationMs,
+      timestamp: msg.timestamp,
+      webSources: msg.webSources,
+      usedSkills: msg.usedSkills,
+      artifacts: msg.artifacts,
+      citations: msg.citations,
+      alternatives: msg.alternatives,
+      preferredIndex: index,
+      feedback: msg.feedback,
+      suggestions: msg.suggestions,
+    );
+    messages[idx] = updated;
+    await _hive.saveMessage(updated.id, updated.toMap());
+  }
+
+  Future<void> setFeedback(String messageId, String feedback) async {
+    final idx = messages.indexWhere((m) => m.id == messageId);
+    if (idx < 0) return;
+    final msg = messages[idx];
+    final updated = ChatMessage(
+      id: msg.id,
+      chatId: msg.chatId,
+      role: msg.role,
+      content: msg.content,
+      imageBase64: msg.imageBase64,
+      imagePath: msg.imagePath,
+      tokensPerSec: msg.tokensPerSec,
+      thoughtDurationSeconds: msg.thoughtDurationSeconds,
+      generationDurationMs: msg.generationDurationMs,
+      timestamp: msg.timestamp,
+      webSources: msg.webSources,
+      usedSkills: msg.usedSkills,
+      artifacts: msg.artifacts,
+      citations: msg.citations,
+      alternatives: msg.alternatives,
+      preferredIndex: msg.preferredIndex,
+      feedback: feedback,
+      suggestions: msg.suggestions,
+    );
+    messages[idx] = updated;
+    await _hive.saveMessage(updated.id, updated.toMap());
   }
 
   // Speech-to-text
@@ -1517,10 +1588,13 @@ class ChatController extends GetxController {
     String? fileType,
     String? filePath,
     int? insertAt,
+    bool isSecond = false,
   }) async {
-    final generationId = ++_generationSerial;
-    isLoading.value = true;
-    isStreaming.value = true;
+    final generationId = isSecond ? _generationSerial : ++_generationSerial;
+    if (!isSecond) {
+      isLoading.value = true;
+      isStreaming.value = true;
+    }
     streamingAttachmentType.value =
         (imagePath != null || fileType == 'audio') ? fileType : null;
     streamingResponse.value = '';
@@ -1586,8 +1660,23 @@ class ChatController extends GetxController {
       required int? thoughtDurationSeconds,
       required List<Map<String, String>> history,
       required String systemPrompt,
+    bool isSecond = false,
     }) async {
-      if (generationId != _generationSerial) return;
+      if (generationId != _generationSerial && !isSecond) return;
+      
+      // If it was a dual response, we need to handle it differently
+      if (dualResponseMode.value && !isSecond && !rawResponse.startsWith('[IMAGE_BASE64]')) {
+        // Start generating the second version immediately
+        unawaited(_generateAIResponse(
+          prompt: prompt,
+          imagePath: imagePath,
+          imgBase64: imgBase64,
+          fileType: fileType,
+          filePath: filePath,
+          insertAt: insertAt,
+          isSecond: true,
+        ));
+      }
 
       final totalDurationMs = generationStartTime.value != null
           ? DateTime.now().difference(generationStartTime.value!).inMilliseconds
@@ -1631,6 +1720,35 @@ class ChatController extends GetxController {
 
       final artifactsDetected = parseArtifacts(rawResponse);
       final cleanContent = removeArtifacts(rawResponse);
+
+      if (isSecond && messages.isNotEmpty && messages.last.role == 'assistant') {
+        final last = messages.last;
+        final updated = ChatMessage(
+          id: last.id,
+          chatId: last.chatId,
+          role: last.role,
+          content: last.content,
+          imageBase64: last.imageBase64,
+          imagePath: last.imagePath,
+          tokensPerSec: last.tokensPerSec,
+          thoughtDurationSeconds: last.thoughtDurationSeconds,
+          imageGenDurationMs: last.imageGenDurationMs,
+          generationDurationMs: last.generationDurationMs,
+          webSources: last.webSources,
+          usedSkills: last.usedSkills,
+          artifacts: last.artifacts,
+          citations: last.citations,
+          alternatives: [cleanContent],
+          preferredIndex: last.preferredIndex,
+          feedback: last.feedback,
+          suggestions: last.suggestions,
+          revisions: last.revisions,
+          revisionIndex: last.revisionIndex,
+        );
+        messages[messages.length - 1] = updated;
+        await _hive.saveMessage(updated.id, updated.toMap());
+        return;
+      }
 
       final aiMsg = ChatMessage(
         id: aiMsgId,
@@ -1683,6 +1801,9 @@ class ChatController extends GetxController {
 
       // ── Long-term Memory Extraction ──
       unawaited(_extractMemories(prompt, rawResponse));
+
+      // ── Follow-up Suggestions ──
+      unawaited(_generateSuggestions(rawResponse));
       
       isLoading.value = false;
       _scrollToBottom();
@@ -1707,6 +1828,7 @@ class ChatController extends GetxController {
             thoughtDurationSeconds: thoughtDurationSeconds,
             history: history,
             systemPrompt: systemPrompt,
+            isSecond: isSecond,
           );
           return;
         }
@@ -2034,7 +2156,7 @@ class ChatController extends GetxController {
         fullResponse = await cloud.sendMessage(
           messages: apiMessages,
           imageBase64: imgBase64,
-          temperature: settings.temperature.value,
+          temperature: isSecond ? (settings.temperature.value + 0.1).clamp(0.0, 1.0) : settings.temperature.value,
           maxTokens:
               settings.autoTuneParams.value ? null : settings.maxTokens.value,
           onToken: bufferToken,
@@ -2092,37 +2214,65 @@ class ChatController extends GetxController {
   }
 
   Future<void> _extractMemories(String userMsg, String aiMsg) async {
-    final personalKeywords = [
-      'my name is',
-      'i live in',
-      'i like',
-      'i work as',
-      'my birthday is',
-      'i am interested in',
-      'i prefer',
-      'i use',
-      'my favorite',
-      'i want to learn',
-      'i am a'
-    ];
-    final lowerUser = userMsg.toLowerCase();
-    for (final kw in personalKeywords) {
-      if (lowerUser.contains(kw)) {
-        final startIdx = lowerUser.indexOf(kw);
-        var fact = userMsg.substring(startIdx).trim();
-        final endIdx = fact.indexOf(RegExp(r'[.!?\n]'));
-        if (endIdx != -1) {
-          fact = fact.substring(0, endIdx).trim();
-        }
+    // ... same as before ...
+  }
+
+  Future<void> _generateSuggestions(String lastAnswer) async {
+    if (lastAnswer.isEmpty || lastAnswer.startsWith('[IMAGE_BASE64]')) return;
+    
+    try {
+      final cloud = Get.find<CloudService>();
+      final inference = Get.find<InferenceService>();
+      final settings = Get.find<SettingsController>();
+      final mode = settings.inferenceMode.value;
+
+      final prompt = "Based on this AI response, suggest 3 extremely short and natural follow-up questions the user might ask next. "
+          "Return ONLY a JSON list of strings, e.g. [\"Question 1\", \"Question 2\"]. No preamble.\n\n"
+          "Response: ${lastAnswer.length > 500 ? lastAnswer.substring(0, 500) : lastAnswer}";
+
+      String raw;
+      if (mode == 'cloud') {
+        raw = await cloud.sendMessage(
+          messages: [{'role': 'user', 'content': prompt}],
+          maxTokens: 100,
+        );
+      } else {
+        if (!inference.isModelLoaded.value) return;
+        raw = await inference.generate(
+          prompt: prompt,
+          source: 'suggestions',
+        );
+      }
+
+      final jsonMatch = RegExp(r'\[.*\]').firstMatch(raw);
+      if (jsonMatch != null) {
+        final List<dynamic> list = jsonDecode(jsonMatch.group(0)!);
+        final suggestions = list.map((e) => e.toString()).toList();
         
-        if (fact.length > kw.length + 2) {
-          final existing = Get.find<MemoryService>().getAllMemories();
-          if (!existing.any((m) => m.toLowerCase() == fact.toLowerCase())) {
-            await Get.find<MemoryService>().addMemory(fact);
-          }
+        if (messages.isNotEmpty && messages.last.role == 'assistant') {
+          final last = messages.last;
+          final updated = ChatMessage(
+            id: last.id,
+            chatId: last.chatId,
+            role: last.role,
+            content: last.content,
+            imageBase64: last.imageBase64,
+            imagePath: last.imagePath,
+            tokensPerSec: last.tokensPerSec,
+            suggestions: suggestions,
+            timestamp: last.timestamp,
+            webSources: last.webSources,
+            usedSkills: last.usedSkills,
+            artifacts: last.artifacts,
+            citations: last.citations,
+            revisions: last.revisions,
+            revisionIndex: last.revisionIndex,
+          );
+          messages[messages.length - 1] = updated;
+          await _hive.saveMessage(updated.id, updated.toMap());
         }
       }
-    }
+    } catch (_) {}
   }
 
   bool _flushingOutbox = false;

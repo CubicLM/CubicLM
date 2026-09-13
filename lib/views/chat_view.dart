@@ -340,8 +340,23 @@ class ChatView extends GetView<ChatController> {
               if (v == 'find') controller.toggleFind(true);
               if (v == 'export') _exportCurrentSession(context);
               if (v == 'select') controller.toggleSelectionMode();
+              if (v == 'dual') controller.toggleDualMode();
             },
             itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'dual',
+                child: Row(children: [
+                  Icon(LucideIcons.gitCompare,
+                      size: 16,
+                      color: controller.dualResponseMode.value ? Dt.accent : null),
+                  const SizedBox(width: 10),
+                  Text(
+                      controller.dualResponseMode.value
+                          ? 'Dual Response: ON'
+                          : 'Dual Response: OFF',
+                      style: GoogleFonts.plusJakartaSans(fontSize: 14)),
+                ]),
+              ),
               PopupMenuItem(
                 value: 'find',
                 enabled: hasSession,

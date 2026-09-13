@@ -37,6 +37,18 @@ class ChatMessage {
   /// Citations for RAG (assistant messages).
   final List<Map<String, dynamic>>? citations;
 
+  /// Secondary responses for dual-response mode (assistant messages).
+  final List<String>? alternatives;
+
+  /// User choice for dual responses (0 = primary, 1+ = alternatives).
+  final int? preferredIndex;
+
+  /// Feedback string ('helpful', 'unhelpful', 'refused', etc).
+  final String? feedback;
+
+  /// Suggested follow-up questions.
+  final List<String>? suggestions;
+
   /// Edit history: each entry is {'content': String, 'response': String?}
   /// revisions[0] = first version, revisions[last] = latest version
   final List<Map<String, dynamic>>? revisions;
@@ -112,6 +124,10 @@ class ChatMessage {
     this.usedSkills,
     this.artifacts,
     this.citations,
+    this.alternatives,
+    this.preferredIndex,
+    this.feedback,
+    this.suggestions,
     this.revisions,
     this.revisionIndex = 0,
   }) : timestamp = timestamp ?? DateTime.now();
@@ -139,6 +155,10 @@ class ChatMessage {
         'usedSkills': usedSkills,
         'artifacts': artifacts,
         'citations': citations,
+        'alternatives': alternatives,
+        'preferredIndex': preferredIndex,
+        'feedback': feedback,
+        'suggestions': suggestions,
         'revisions': revisions,
         'revisionIndex': revisionIndex,
       };
@@ -188,6 +208,16 @@ class ChatMessage {
             ? (map['citations'] as List)
                 .map((e) => Map<String, dynamic>.from(e as Map))
                 .toList()
+            : null,
+        alternatives: map['alternatives'] != null
+            ? List<String>.from(map['alternatives'] as List)
+            : null,
+        preferredIndex: map['preferredIndex'] != null
+            ? (map['preferredIndex'] as num).toInt()
+            : null,
+        feedback: map['feedback']?.toString(),
+        suggestions: map['suggestions'] != null
+            ? List<String>.from(map['suggestions'] as List)
             : null,
         revisions: map['revisions'] != null
             ? List<Map<String, dynamic>>.from(

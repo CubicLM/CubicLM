@@ -22,6 +22,7 @@ import 'image_viewer.dart';
 import 'thought_disclosure.dart';
 import 'citation_chip.dart';
 import 'chat_branch_timeline.dart';
+import 'suggestion_chips.dart';
 import '../views/chat/project_context_view.dart';
 
 class ChatBubble extends StatefulWidget {
@@ -110,6 +111,10 @@ class _ChatBubbleState extends State<ChatBubble> {
 
     final revisions = widget.message.revisions;
     final hasRevisions = revisions != null && revisions.isNotEmpty;
+
+    final alternatives = widget.message.alternatives;
+    final hasAlternatives = alternatives != null && alternatives.isNotEmpty;
+    final preferredIdx = widget.message.preferredIndex;
 
     return TweenAnimationBuilder<double>(
       duration: const Duration(milliseconds: 300),
@@ -254,38 +259,19 @@ class _ChatBubbleState extends State<ChatBubble> {
                                     ],
                                   ),
                                 )
-                        else if (answerContent.isNotEmpty)
-                          _rawMode
-                              ? _rawCodeContainer(answerContent, isDark)
-                              : MarkdownBody(
-                                  data: displayContent,
-                                  selectable: true,
-                                  styleSheet:
-                                      _mdSheet ?? _markdownStyle(context),
-                                  builders: {
-                                    'latex': LatexElementBuilder(
-                                      textStyle: _mdSheet?.p,
-                                    ),
-                                    'code': _codeBuilder ??
-                                        CodeBlockBuilder(context),
-                                    'pre': _codeBuilder ??
-                                        CodeBlockBuilder(context),
-                                    'a': _citationBuilder ??
-                                        CitationLinkBuilder(context, widget.message.citations),
-                                  },
-                                  extensionSet: md.ExtensionSet(
-                                    [
-                                      ...md.ExtensionSet.gitHubFlavored
-                                          .blockSyntaxes,
-                                      LatexBlockSyntax(),
-                                    ],
-                                    [
-                                      ...md.ExtensionSet.gitHubFlavored
-                                          .inlineSyntaxes,
-                                      LatexInlineSyntax(),
-                                    ],
-                                  ),
-                                ),
+                        else ...[
+                          if (hasAlternatives && preferredIdx == null)
+                            _buildDualResponses(answerContent, alternatives, isDark)
+                          else
+                            _buildSingleResponse(
+                                preferredIdx == null
+                                    ? answerContent
+                                    : (preferredIdx == 0 ? answerContent : alternatives![preferredIdx - 1]),
+                                displayContent,
+                                isDark),
+                        ],
+
+                        // Activated skills (intelligent per-prompt)
 
                         // Activated skills (intelligent per-prompt)
                         if (!isUser &&
@@ -336,6 +322,12 @@ class _ChatBubbleState extends State<ChatBubble> {
                               compact: true,
                             ),
                         ],
+
+                        if (!isUser && widget.message.suggestions != null)
+                          SuggestionChips(
+                            suggestions: widget.message.suggestions!,
+                            isDark: isDark,
+                          ),
 
                         // Footer info
                         const SizedBox(height: 8),
@@ -443,6 +435,131 @@ class _ChatBubbleState extends State<ChatBubble> {
           height: 1.6,
           color: isDark ? const Color(0xFFCDD6F4) : Dt.textPrimary,
         ),
+      ),
+    );
+  }
+
+  Widget _buildSingleResponse(String answer, String display, bool isDark) {
+    if (answer.isEmpty) return const SizedBox.shrink();
+    return _rawMode
+        ? _rawCodeContainer(answer, isDark)
+        : MarkdownBody(
+            data: display,
+            selectable: true,
+            styleSheet: _mdSheet ?? _markdownStyle(context),
+            builders: {
+              'latex': LatexElementBuilder(
+                textStyle: _mdSheet?.p,
+              ),
+              'code': _codeBuilder ?? CodeBlockBuilder(context),
+              'pre': _codeBuilder ?? CodeBlockBuilder(context),
+              'a': _citationBuilder ?? CitationLinkBuilder(context, widget.message.citations),
+            },
+            extensionSet: md.ExtensionSet(
+              [...md.ExtensionSet.gitHubFlavored.blockSyntaxes, LatexBlockSyntax()],
+              [...md.ExtensionSet.gitHubFlavored.inlineSyntaxes, LatexInlineSyntax()],
+            ),
+          );
+  }
+
+  Widget _buildDualResponses(String first, List<String> alternatives, bool isDark) {
+    final all = [first, ...alternatives];
+    return Column(
+      children: [
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            const Icon(LucideIcons.gitCompare, size: 16, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text(
+              'Which response do you prefer?',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        LayoutBuilder(builder: (context, constraints) {
+          if (constraints.maxWidth > 600) {
+            // Horizontal for wide screens
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < all.length; i++)
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(right: i == 0 ? 12 : 0),
+                      child: _dualChoiceCard(all[i], i, isDark),
+                    ),
+                  ),
+              ],
+            );
+          }
+          // Vertical for narrow screens
+          return Column(
+            children: [
+              for (var i = 0; i < all.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _dualChoiceCard(all[i], i, isDark),
+                ),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _dualChoiceCard(String content, int index, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.black.withValues(alpha: 0.02),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Response ${index + 1}',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: isDark ? Colors.white54 : Colors.black54,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          MarkdownBody(
+            data: content,
+            styleSheet: _mdSheet ?? _markdownStyle(context),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () => Get.find<ChatController>().setPreference(widget.message.id, index),
+              style: OutlinedButton.styleFrom(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+              ),
+              child: Text(
+                'I prefer this',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -659,6 +776,22 @@ class _ChatBubbleState extends State<ChatBubble> {
                 color: iconColor,
                 size: iconSize,
               ),
+            const SizedBox(width: 8),
+            // Feedback
+            _actionButton(
+              icon: widget.message.feedback == 'helpful' ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
+              tooltip: 'Helpful',
+              onTap: () => Get.find<ChatController>().setFeedback(widget.message.id, 'helpful'),
+              color: widget.message.feedback == 'helpful' ? AppColors.success : iconColor,
+              size: iconSize - 2,
+            ),
+            _actionButton(
+              icon: widget.message.feedback == 'unhelpful' ? Icons.thumb_down_rounded : Icons.thumb_down_outlined,
+              tooltip: 'Not helpful',
+              onTap: () => Get.find<ChatController>().setFeedback(widget.message.id, 'unhelpful'),
+              color: widget.message.feedback == 'unhelpful' ? AppColors.error : iconColor,
+              size: iconSize - 2,
+            ),
           ],
         ],
       ),
