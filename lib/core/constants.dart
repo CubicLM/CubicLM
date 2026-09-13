@@ -73,6 +73,10 @@ class AppConstants {
   static const String keyAutoTuneParams = 'auto_tune_params';
   static const String keyWebFetchEnabled = 'web_fetch_enabled';
   static const String keyAdblockEnabled = 'adblock_enabled';
+  static const String keyBrowserSearchEngine = 'browser_search_engine';
+  static const String keyBrowserForcedDark = 'browser_forced_dark';
+  static const String keyBrowserAllowlist = 'browser_allowlist';
+  static const String keyBrowserBookmarks = 'browser_bookmarks';
   static const String keyComposerUpsellDismissed =
       'composer_upsell_dismissed';
   static const String keyLocalModelPath = 'local_model_path';

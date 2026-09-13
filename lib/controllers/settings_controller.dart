@@ -22,6 +22,8 @@ import '../utils/export_file.dart';
 import '../ffi/sd_ffi_bindings.dart';
 import 'package:sd_flutter_android/sd_flutter_android.dart';
 import '../services/skills/skill_injector.dart';
+import '../services/browser/adblock_service.dart';
+import '../utils/browser_utils.dart';
 import '../core/languages.dart';
 
 class SettingsController extends GetxController {
@@ -138,6 +140,15 @@ class SettingsController extends GetxController {
   /// Privacy ad-block for the CubicWeb Browser (static host list,
   /// in-memory only). Persisted as a plain bool pref — no history DB.
   final adblockEnabled = true.obs;
+  /// Browser search engine id (see [BrowserSearchEngines]). Plain pref.
+  final browserSearchEngine = 'duckduckgo'.obs;
+  /// Browser forced-dark overlay. Plain bool pref (survives view dispose).
+  final browserForcedDark = false.obs;
+  /// Per-site ad-block allowlist (hosts). Plain JSON-string pref.
+  final browserAllowlist = <String>[].obs;
+  /// Browser bookmarks (explicit user saves only — never auto-recorded).
+  /// Each entry: {title, url, addedAt}. Plain JSON-string pref.
+  final browserBookmarks = <Map<String, String>>[].obs;
   /// Dismissible upsell pill shown inside the composer card.
   final composerUpsellDismissed = false.obs;
   final liteRtPerformanceMode = AppConstants.defaultLiteRtPerformanceMode.obs;
@@ -463,6 +474,20 @@ class SettingsController extends GetxController {
             AppConstants.keyAdblockEnabled,
             defaultValue: true) ??
         true;
+    final engineRaw = _hive.getSetting<String>(
+            AppConstants.keyBrowserSearchEngine,
+            defaultValue: 'duckduckgo') ??
+        'duckduckgo';
+    browserSearchEngine.value =
+        BrowserSearchEngines.isKnown(engineRaw) ? engineRaw : 'duckduckgo';
+    browserForcedDark.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserForcedDark,
+            defaultValue: false) ??
+        false;
+    browserAllowlist.assignAll(_decodeStringList(
+        _hive.getSetting<String>(AppConstants.keyBrowserAllowlist)));
+    browserBookmarks.assignAll(_decodeBookmarks(
+        _hive.getSetting<String>(AppConstants.keyBrowserBookmarks)));
     composerUpsellDismissed.value = _hive.getSetting<bool>(
             AppConstants.keyComposerUpsellDismissed,
             defaultValue: false) ??
@@ -1458,6 +1483,102 @@ class SettingsController extends GetxController {
   Future<void> setAdblockEnabled(bool enabled) async {
     adblockEnabled.value = enabled;
     await _hive.setSetting(AppConstants.keyAdblockEnabled, enabled);
+  }
+
+  Future<void> setBrowserSearchEngine(String engineId) async {
+    final id =
+        BrowserSearchEngines.isKnown(engineId) ? engineId : 'duckduckgo';
+    browserSearchEngine.value = id;
+    await _hive.setSetting(AppConstants.keyBrowserSearchEngine, id);
+  }
+
+  Future<void> setBrowserForcedDark(bool enabled) async {
+    browserForcedDark.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserForcedDark, enabled);
+  }
+
+  /// True when [url]'s host (or any parent domain) is allowlisted.
+  bool isAllowlisted(String url) {
+    if (browserAllowlist.isEmpty) return false;
+    try {
+      return AdblockService.matchesRules(url, browserAllowlist.toSet());
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Toggle [host] on the allowlist. Returns true when now allowlisted.
+  Future<bool> toggleAllowlist(String host) async {
+    final h = host.trim().toLowerCase();
+    if (h.isEmpty) return false;
+    if (browserAllowlist.contains(h)) {
+      browserAllowlist.remove(h);
+    } else {
+      browserAllowlist.add(h);
+    }
+    await _hive.setSetting(
+        AppConstants.keyBrowserAllowlist, jsonEncode(browserAllowlist));
+    return browserAllowlist.contains(h);
+  }
+
+  bool isBookmarked(String url) {
+    final u = url.trim();
+    if (u.isEmpty) return false;
+    return browserBookmarks.any((b) => b['url'] == u);
+  }
+
+  Future<void> addBookmark(String title, String url) async {
+    final u = url.trim();
+    if (u.isEmpty || isBookmarked(u)) return;
+    browserBookmarks.insert(0, {
+      'title': title.trim().isEmpty ? u : title.trim(),
+      'url': u,
+      'addedAt': DateTime.now().toIso8601String(),
+    });
+    await _persistBookmarks();
+  }
+
+  Future<void> removeBookmark(String url) async {
+    browserBookmarks.removeWhere((b) => b['url'] == url.trim());
+    await _persistBookmarks();
+  }
+
+  Future<void> _persistBookmarks() async {
+    browserBookmarks.refresh();
+    await _hive.setSetting(
+        AppConstants.keyBrowserBookmarks, jsonEncode(browserBookmarks));
+  }
+
+  static List<String> _decodeStringList(String? raw) {
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded
+            .whereType<String>()
+            .map((e) => e.trim().toLowerCase())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static List<Map<String, String>> _decodeBookmarks(String? raw) {
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded.whereType<Map>().map((m) {
+          return {
+            'title': '${m['title'] ?? ''}',
+            'url': '${m['url'] ?? ''}',
+            'addedAt': '${m['addedAt'] ?? ''}',
+          };
+        }).where((b) => b['url']!.isNotEmpty).toList();
+      }
+    } catch (_) {}
+    return [];
   }
 
   Future<void> dismissComposerUpsell() async {

@@ -12,6 +12,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 import 'controllers/settings_controller.dart';
 import 'controllers/chat_controller.dart';
+import 'controllers/browser_controller.dart';
 import 'controllers/cloud_model_controller.dart';
 import 'controllers/server_controller.dart';
 import 'controllers/model_controller.dart';
@@ -252,6 +253,7 @@ void main() {
       Get.put(CubicWebLogger());
       unawaited(
           Get.find<CubicWebLogger>().init().then((_) {}, onError: (_) {}));
+      Get.put(BrowserController());
       Get.put(DownloadService());
       Get.put(LocalImageService());
       Get.put(VisionLiveController());

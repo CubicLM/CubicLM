@@ -103,4 +103,40 @@ class AdblockService {
   }
 })();
 ''';
+
+  /// Reader Mode JS: tries to extract main article and strip clutter.
+  static const String readerJs = r'''
+(function(){
+  try {
+    var content = '';
+    var article = document.querySelector('article') || document.querySelector('[role="main"]') || document.querySelector('.main-content') || document.body;
+    var clone = article.cloneNode(true);
+    // Remove scripts, styles, forms, ads
+    var strip = clone.querySelectorAll('script, style, form, iframe, noscript, .ad, .ads, [id^="ad-"], [class^="ad-"]');
+    for(var i=0; i<strip.length; i++) strip[i].remove();
+    return clone.innerHTML;
+  } catch(e) { return ''; }
+})();
+''';
+
+  /// Forced Dark Mode: injects a CSS filter to invert colors while preserving images.
+  static const String darkModeJs = r'''
+(function(){
+  var id = 'cubic-dark-mode';
+  if (document.getElementById(id)) return;
+  var style = document.createElement('style');
+  style.id = id;
+  style.innerHTML = 'html { filter: invert(1) hue-rotate(180deg) !important; background: #000 !important; } ' +
+                    'img, video, iframe, canvas, svg { filter: invert(1) hue-rotate(180deg) !important; }';
+  document.head.appendChild(style);
+})();
+''';
+
+  /// Remove Dark Mode injection.
+  static const String lightModeJs = r'''
+(function(){
+  var style = document.getElementById('cubic-dark-mode');
+  if (style) style.remove();
+})();
+''';
 }

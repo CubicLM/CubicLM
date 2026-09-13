@@ -466,6 +466,10 @@
 </tr>
 </table>
 
+</div>
+
+</div>
+
 ---
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -1391,6 +1395,8 @@ Auto-detects **10 crash patterns**:
 | `dart_mcp ^0.5.2` | MCP client (labs.dart.dev) |
 | `window_manager 0.4.3` | Windows desktop window sizing & positioning |
 | `flutter_secure_storage` | Keystore / Keychain for MCP bearer tokens |
+
+</div>
 
 ---
 
@@ -2503,8 +2509,5 @@ It helps others discover the project and keeps development going.
 </table>
 
 <br/>
-
-</div>
-
 
 </div>
