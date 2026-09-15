@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider paths for sharing APKs with the system installer
+     (MIUI / ACTION_INSTALL_PACKAGE fallback) and opening attachments. -->
+<paths>
+    <cache-path name="cache" path="." />
+    <external-cache-path name="external_cache" path="." />
+    <external-files-path name="external_files" path="." />
+    <files-path name="files" path="." />
+</paths>

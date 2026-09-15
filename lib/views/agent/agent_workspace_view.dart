@@ -10,10 +10,14 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../controllers/agent_runner_controller.dart';
+import '../../controllers/file_watcher_controller.dart';
 import '../../core/colors.dart';
 import '../../services/agent_workspace.dart';
+import '../../services/diff/lcs_diff.dart';
+import '../../services/workspace/file_watcher.dart';
 import '../../theme/design_tokens.dart';
 import 'agent_trace_view.dart';
+import 'diff_viewer.dart';
 
 /// Main agent workspace screen (reached from Toolkit → Agent Workspace).
 class AgentWorkspaceView extends StatelessWidget {
@@ -161,6 +165,7 @@ class AgentWorkspaceView extends StatelessWidget {
             const SizedBox(height: 8),
             Obx(() => AgentTraceView(events: controller.events.toList())),
             const SizedBox(height: 16),
+            _fileWatcherSection(context, controller, isDark),
             _sectionTitle(context, 'Changed files'),
             const SizedBox(height: 8),
             Obx(() => _changedFiles(context, controller, isDark)),
@@ -176,6 +181,110 @@ class AgentWorkspaceView extends StatelessWidget {
       style: GoogleFonts.plusJakartaSans(
           fontSize: 14, fontWeight: FontWeight.w800),
     );
+  }
+
+  Widget _fileWatcherSection(BuildContext context,
+      AgentRunnerController controller, bool isDark) {
+    return Obx(() {
+      final pid = controller.projectId.value;
+      // Start/stop watching based on project selection
+      if (pid != null && pid.isNotEmpty) {
+        _startWatchingIfNeeded(pid);
+      } else {
+        _stopWatchingIfNeeded();
+      }
+      final watcher = Get.find<FileWatcherController>();
+      final changes = watcher.recentChanges.toList();
+      if (changes.isEmpty) return const SizedBox.shrink();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              _sectionTitle(context, 'File changes'),
+              const Spacer(),
+              Text(
+                '${changes.length} event${changes.length == 1 ? '' : 's'}',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11, color: Theme.of(context).hintColor),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => watcher.clearChanges(),
+                child: Icon(Icons.close_rounded,
+                    size: 14, color: Theme.of(context).hintColor),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            constraints: const BoxConstraints(maxHeight: 120),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.grey.withValues(alpha: 0.25),
+              ),
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: changes.length,
+              itemBuilder: (_, i) {
+                final c = changes[i];
+                final icon = switch (c.kind) {
+                  FileChangeKind.added => Icons.add_circle_outline_rounded,
+                  FileChangeKind.modified => Icons.edit_rounded,
+                  FileChangeKind.removed => Icons.remove_circle_outline_rounded,
+                };
+                final color = switch (c.kind) {
+                  FileChangeKind.added => Colors.green,
+                  FileChangeKind.modified => Dt.accent,
+                  FileChangeKind.removed => Colors.red,
+                };
+                return ListTile(
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                  leading: Icon(icon, size: 14, color: color),
+                  title: Text(
+                    c.path.split('/').last,
+                    style: GoogleFonts.firaCode(fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    c.path,
+                    style: GoogleFonts.firaCode(
+                        fontSize: 9, color: Theme.of(context).hintColor),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      );
+    });
+  }
+
+  void _startWatchingIfNeeded(String projectId) {
+    final watcher = Get.find<FileWatcherController>();
+    if (watcher.isWatching.value) return;
+    // Resolve project directory and start watching
+    if (!Get.isRegistered<AgentWorkspaceService>()) return;
+    final ws = Get.find<AgentWorkspaceService>();
+    ws.dirFor(projectId).then((dir) {
+      if (dir.existsSync()) {
+        watcher.startWatching(dir.path);
+      }
+    });
+  }
+
+  void _stopWatchingIfNeeded() {
+    final watcher = Get.find<FileWatcherController>();
+    if (!watcher.isWatching.value) return;
+    watcher.stopWatching();
   }
 
   Widget _projectPicker(AgentRunnerController controller) {
@@ -274,40 +383,7 @@ class AgentWorkspaceView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final f in files)
-          Container(
-            margin: const EdgeInsets.only(bottom: 6),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.grey.withValues(alpha: 0.25),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(f,
-                      style:
-                          GoogleFonts.firaCode(fontSize: 12)),
-                ),
-                TextButton(
-                  onPressed: controller.running.value
-                      ? null
-                      : () => controller.acceptFile(f),
-                  child: const Text('Accept'),
-                ),
-                TextButton(
-                  onPressed: controller.running.value
-                      ? null
-                      : () => controller.undoFile(f),
-                  child: const Text('Undo'),
-                ),
-              ],
-            ),
-          ),
+          _diffFileCard(context, controller, f, isDark),
         if (files.isNotEmpty || cpId != null)
           Wrap(
             spacing: 8,
@@ -335,5 +411,102 @@ class AgentWorkspaceView extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  Widget _diffFileCard(BuildContext context,
+      AgentRunnerController controller, String filePath, bool isDark) {
+    return FutureBuilder<List<DiffLine>>(
+      future: _computeDiff(controller, filePath),
+      builder: (_, snap) {
+        final diffLines = snap.data;
+        if (diffLines == null || diffLines.isEmpty) {
+          // Fallback: simple file name + Accept/Undo
+          return Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.grey.withValues(alpha: 0.25),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(filePath,
+                      style: GoogleFonts.firaCode(fontSize: 12)),
+                ),
+                TextButton(
+                  onPressed: controller.running.value
+                      ? null
+                      : () => controller.acceptFile(filePath),
+                  child: const Text('Accept'),
+                ),
+                TextButton(
+                  onPressed: controller.running.value
+                      ? null
+                      : () => controller.undoFile(filePath),
+                  child: const Text('Undo'),
+                ),
+              ],
+            ),
+          );
+        }
+        // LCS diff display with Accept/Undo buttons
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DiffViewer(
+                filePath: filePath,
+                lines: diffLines,
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: controller.running.value
+                        ? null
+                        : () => controller.acceptFile(filePath),
+                    child: const Text('Accept'),
+                  ),
+                  TextButton(
+                    onPressed: controller.running.value
+                        ? null
+                        : () => controller.undoFile(filePath),
+                    child: const Text('Undo'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<List<DiffLine>> _computeDiff(
+      AgentRunnerController controller, String filePath) async {
+    try {
+      final ws = Get.find<AgentWorkspaceService>();
+      final cpId = controller.checkpointId.value;
+      final pid = controller.projectId.value;
+      if (cpId == null || pid == null) return const [];
+      // Read old content from checkpoint
+      final oldBytes = await ws.readCheckpointFile(pid, cpId, filePath);
+      final oldContent = oldBytes != null
+          ? String.fromCharCodes(oldBytes)
+          : '';
+      // Read new content from live workspace
+      final newContent = await ws.readFile(pid, filePath) ?? '';
+      return buildDiffLines(oldContent, newContent);
+    } catch (_) {
+      return const [];
+    }
   }
 }

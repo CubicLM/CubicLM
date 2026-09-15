@@ -23,6 +23,7 @@ import '../services/sandbox/apk_installer_service.dart';
 import '../theme/design_tokens.dart';
 import '../utils/app_snackbar.dart';
 import '../utils/export_file.dart';
+import 'agent/live_preview.dart';
 
 class CubicAppBuilderView extends StatefulWidget {
   const CubicAppBuilderView({super.key});
@@ -477,6 +478,9 @@ Output ONLY the JSON block. No explanation needed.''';
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // Live preview for HTML/JS/CSS content
+        if (_hasWebPreview()) _livePreviewSection(context, isDark),
+        if (_hasWebPreview()) const SizedBox(height: 16),
         _infoCard(context, isDark),
         const SizedBox(height: 16),
         _projectSummary(context, isDark),
@@ -575,6 +579,70 @@ Output ONLY the JSON block. No explanation needed.''';
                 fontSize: 10, fontWeight: FontWeight.w600)),
       ],
     );
+  }
+
+  bool _hasWebPreview() {
+    if (_generatedFiles.isEmpty) return false;
+    // Check if any generated file is HTML/JS/CSS (previewable content)
+    return _generatedFiles.keys.any((f) =>
+        f.endsWith('.html') ||
+        f.endsWith('.js') ||
+        f.endsWith('.css') ||
+        f.endsWith('.htm'));
+  }
+
+  Widget _livePreviewSection(BuildContext context, bool isDark) {
+    return Container(
+      height: 300,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : Dt.hairline,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: LivePreview(
+        htmlContent: _composePreviewHtml(),
+        title: 'Live Preview',
+      ),
+    );
+  }
+
+  String _composePreviewHtml() {
+    // If there's an index.html, use it; otherwise compose from all files
+    final indexHtml = _generatedFiles['index.html'] ?? _generatedFiles['assets/index.html'];
+    if (indexHtml != null) {
+      // Inline CSS/JS into HTML
+      var html = indexHtml;
+      final cssFiles = _generatedFiles.entries.where((e) => e.key.endsWith('.css'));
+      final jsFiles = _generatedFiles.entries.where((e) => e.key.endsWith('.js'));
+      for (final css in cssFiles) {
+        html = html.replaceAll(
+          RegExp(r'<link\s+rel="stylesheet"\s+href="[^"]*${css.key}"\s*/?>'),
+          '<style>${css.value}</style>',
+        );
+      }
+      for (final js in jsFiles) {
+        html = html.replaceAll(
+          RegExp(r'<script\s+src="[^"]*${js.key}"\s*></script>'),
+          '<script>${js.value}</script>',
+        );
+      }
+      return html;
+    }
+    // Fallback: compose from all files
+    final buffer = StringBuffer('<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>');
+    for (final entry in _generatedFiles.entries) {
+      if (entry.key.endsWith('.css')) {
+        buffer.write('<style>${entry.value}</style>');
+      } else if (entry.key.endsWith('.js')) {
+        buffer.write('<script>${entry.value}</script>');
+      } else if (entry.key.endsWith('.html') || entry.key.endsWith('.htm')) {
+        buffer.write(entry.value);
+      }
+    }
+    buffer.write('</body></html>');
+    return buffer.toString();
   }
 
   Widget _projectSummary(BuildContext context, bool isDark) {

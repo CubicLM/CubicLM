@@ -1,3 +1,4 @@
 {
-    "git.autoRepositoryDetection": false
+    "git.autoRepositoryDetection": false,
+    "cmake.sourceDirectory": "D:/GitHub Project/CubicLM/windows"
 }

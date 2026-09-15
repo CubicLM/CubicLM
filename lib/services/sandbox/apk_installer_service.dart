@@ -5,10 +5,10 @@
 /// ACTION_INSTALL_PACKAGE fallback for MIUI/older):
 /// - MethodChannel `com.cubiclm.app/apkinstaller`, method `installApk`
 ///   {path: String} → {ok: bool, error: String?}.
-/// - NATIVE CONTRACT: MainActivity hosts the channel; on success it opens
+/// - Native side: MainActivity hosts the channel; on success it opens
 ///   a PackageInstaller session, streams the file, and commits (user
-///   confirms on-device, like the reference app). Until the Kotlin side
-///   lands, calls fail gracefully with setup guidance.
+///   confirms on-device). ApkInstallReceiver forwards the system
+///   confirmation dialog, auto-launches on success, and toasts failures.
 /// - Desktop/web: returns an explanatory error (APK install is Android-only).
 library;
 

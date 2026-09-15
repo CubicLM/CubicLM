@@ -7,6 +7,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -46,6 +47,23 @@ class TerminalView extends StatelessWidget {
           style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Export transcript',
+            icon: const Icon(Icons.save_alt_rounded, size: 20),
+            onPressed: () async {
+              final text = term.exportTranscript();
+              if (!context.mounted) return;
+              // Copy to clipboard as simple export
+              await Clipboard.setData(ClipboardData(text: text));
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Transcript copied to clipboard'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
           IconButton(
             tooltip: 'Clear',
             icon: const Icon(Icons.clear_all_rounded),

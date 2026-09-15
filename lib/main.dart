@@ -43,6 +43,7 @@ import 'services/sandbox/apk_installer_service.dart';
 import 'services/sandbox/sandbox_manager.dart';
 import 'services/security/api_key_vault.dart';
 import 'services/terminal/terminal_service.dart';
+import 'controllers/file_watcher_controller.dart';
 import 'services/tools/file_tools.dart';
 import 'services/tools/git_tools.dart';
 import 'services/tools/shell_tools.dart';
@@ -457,6 +458,7 @@ Future<void> _initDeferredServices(
       timeout: const Duration(seconds: 4));
   await safePut(() => ApkInstallerService().init(), 'ApkInstallerService',
       timeout: const Duration(seconds: 4));
+  Get.put(FileWatcherController());
   // DeviceInfo probes hardware (getprop/Vulkan) — slow devices need room.
   await safePut(() => DeviceInfoService().init(), 'DeviceInfoService',
       timeout: const Duration(seconds: 10));

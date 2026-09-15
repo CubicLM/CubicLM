@@ -7,15 +7,18 @@ import android.app.PendingIntent
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.util.Log
 import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import android.provider.Settings
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -338,6 +341,38 @@ class MainActivity : FlutterFragmentActivity() {
             }
         }
 
+        // On-device APK installer (Dart: ApkInstallerService).
+        // Channel "com.cubiclm.app/apkinstaller", method "installApk"
+        // {path} -> {ok, error}. Uses a PackageInstaller session (no ADB);
+        // falls back to a FileProvider ACTION_VIEW on MIUI-style ROMs.
+        val apkChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.cubiclm.app/apkinstaller",
+        )
+        apkChannel.setMethodCallHandler { call, result ->
+            if (call.method != "installApk") {
+                result.notImplemented()
+                return@setMethodCallHandler
+            }
+            val path = call.argument<String>("path")
+            if (path.isNullOrBlank()) {
+                result.success(mapOf("ok" to false, "error" to "APK path is missing."))
+                return@setMethodCallHandler
+            }
+            thread(name = "apk-install") {
+                try {
+                    val outcome = installApkFile(path)
+                    mainHandler.post { result.success(outcome) }
+                } catch (e: Exception) {
+                    mainHandler.post {
+                        result.success(
+                            mapOf("ok" to false, "error" to (e.message ?: e.toString())),
+                        )
+                    }
+                }
+            }
+        }
+
     }
 
     /// Hides app content from Recents screenshots / screen capture while
@@ -351,6 +386,95 @@ class MainActivity : FlutterFragmentActivity() {
             }
         } catch (e: Exception) {
             Log.w("CubicLM", "setSecureFlag failed: ${e.message}")
+        }
+    }
+
+    /// Installs the APK at [path] via a PackageInstaller session (no ADB).
+    /// Returns `{ok, error}` for the apkinstaller channel. The user still
+    /// confirms the install on-device; [ApkInstallReceiver] handles the
+    /// system callback (confirm dialog, auto-launch, failure toast).
+    private fun installApkFile(path: String): Map<String, Any?> {
+        val file = File(path)
+        if (!file.exists() || !file.isFile) {
+            return mapOf("ok" to false, "error" to "APK not found: $path")
+        }
+        if (!path.lowercase().endsWith(".apk")) {
+            return mapOf("ok" to false, "error" to "Not an APK file: $path")
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !packageManager.canRequestPackageInstalls()
+        ) {
+            // Point the user at the unknown-apps permission, then report.
+            try {
+                val settings = Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:$packageName"),
+                ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                startActivity(settings)
+            } catch (_: Exception) {
+            }
+            return mapOf(
+                "ok" to false,
+                "error" to "Allow \"Install unknown apps\" for CubicLM, then retry.",
+            )
+        }
+        try {
+            val installer = packageManager.packageInstaller
+            val params = PackageInstaller.SessionParams(
+                PackageInstaller.SessionParams.MODE_FULL_INSTALL,
+            )
+            val sessionId = installer.createSession(params)
+            val session = installer.openSession(sessionId)
+            try {
+                session.openWrite("apk", 0, -1).use { out ->
+                    java.io.FileInputStream(file).use { input ->
+                        input.copyTo(out)
+                    }
+                    session.fsync(out)
+                }
+                val statusIntent = Intent(
+                    this,
+                    ApkInstallReceiver::class.java,
+                ).apply { action = ApkInstallReceiver.ACTION_INSTALL_STATUS }
+                var flags = PendingIntent.FLAG_UPDATE_CURRENT
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    flags = flags or PendingIntent.FLAG_MUTABLE
+                }
+                val statusPi = PendingIntent.getBroadcast(
+                    this, sessionId, statusIntent, flags,
+                )
+                session.commit(statusPi.intentSender)
+            } finally {
+                try {
+                    session.close()
+                } catch (_: Exception) {
+                }
+            }
+            return mapOf("ok" to true, "error" to null)
+        } catch (e: Exception) {
+            Log.w("CubicLM", "PackageInstaller failed, trying fallback: ${e.message}")
+            return installApkFallback(file)
+        }
+    }
+
+    /// MIUI-style fallback: hand the APK to the system installer via a
+    /// FileProvider content URI.
+    private fun installApkFallback(file: File): Map<String, Any?> {
+        return try {
+            val uri = FileProvider.getUriForFile(
+                this,
+                "$packageName.fileprovider",
+                file,
+            )
+            val view = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(view)
+            mapOf("ok" to true, "error" to null)
+        } catch (e: Exception) {
+            mapOf("ok" to false, "error" to (e.message ?: e.toString()))
         }
     }
 

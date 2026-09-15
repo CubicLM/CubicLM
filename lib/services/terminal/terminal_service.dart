@@ -196,6 +196,22 @@ class TerminalService extends GetxService {
       return -1;
     }
 
+    // CWD tracking for cd commands
+    if (_isCdCommand(cmd)) {
+      final newDir = _resolveCdTarget(cmd);
+      if (newDir != null) {
+        final ok = await setWorkingDir(newDir);
+        if (!ok) {
+          _append(TerminalLine('cd: no such directory: $newDir', isError: true));
+          lastExitCode.value = 1;
+        } else {
+          _append(TerminalLine('\$ $cmd', isCommand: true));
+          lastExitCode.value = 0;
+        }
+        return lastExitCode.value!;
+      }
+    }
+
     _append(TerminalLine('\$ $cmd', isCommand: true));
     _pushHistory(cmd);
     isRunning.value = true;
@@ -229,6 +245,52 @@ class TerminalService extends GetxService {
     } finally {
       isRunning.value = false;
       _stashActive();
+    }
+  }
+
+  /// Export the current session transcript as plain text.
+  String exportTranscript() {
+    final buf = StringBuffer();
+    buf.writeln('CubicLM Terminal — Session: ${activeSessionId.value}');
+    buf.writeln('Working directory: ${workingDir.value}');
+    buf.writeln('Exported: ${DateTime.now()}');
+    buf.writeln('─' * 50);
+    for (final l in lines) {
+      buf.writeln(l.text);
+    }
+    return buf.toString();
+  }
+
+  /// Detect `cd` commands and resolve the target directory.
+  static bool _isCdCommand(String cmd) {
+    final parts = cmd.split(RegExp(r'\s+'));
+    return parts.isNotEmpty && parts[0] == 'cd';
+  }
+
+  String? _resolveCdTarget(String cmd) {
+    final parts = cmd.split(RegExp(r'\s+'));
+    String target;
+    if (parts.length < 2 || parts[1] == '~') {
+      // cd alone or cd ~ goes home
+      target = Platform.environment['HOME'] ??
+          Platform.environment['USERPROFILE'] ??
+          workingDir.value;
+    } else {
+      target = parts[1];
+    }
+    // Resolve relative to current working dir
+    if (!target.startsWith('/') && !target.contains(r':')) {
+      final base = workingDir.value.isEmpty
+          ? (Platform.environment['PWD'] ?? '.')
+          : workingDir.value;
+      target = '$base${Platform.pathSeparator}$target';
+    }
+    // Normalize
+    try {
+      final dir = Directory(target);
+      return dir.path;
+    } catch (_) {
+      return null;
     }
   }
 
