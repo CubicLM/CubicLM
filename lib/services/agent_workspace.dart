@@ -505,4 +505,94 @@ class AgentWorkspaceService extends GetxService {
     list.removeWhere((m) => m['id'] == checkpointId);
     await _saveCheckpointMeta(projectId, list);
   }
+
+  // ── Per-file checkpoint access (binary-safe, for CheckpointManager) ──
+  //
+  // The full-project backup above is the baseline; these helpers read and
+  // update single files inside it so the agent UI can undo/accept per file
+  // without loading whole projects into memory.
+
+  /// Directory of one checkpoint, or null when it does not exist.
+  Future<Directory?> checkpointDirFor(
+      String projectId, String checkpointId) async {
+    try {
+      final cpDir = await _checkpointDir(projectId);
+      final clean = sanitize(checkpointId);
+      if (clean.isEmpty || clean.contains('/')) return null;
+      final dir = Directory('${cpDir.path}/$clean');
+      if (!await dir.exists()) return null;
+      return dir;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Relative file paths inside one checkpoint (sorted).
+  Future<List<String>> listCheckpointFiles(
+      String projectId, String checkpointId) async {
+    final dir = await checkpointDirFor(projectId, checkpointId);
+    if (dir == null) return [];
+    try {
+      final out = <String>[];
+      await for (final e
+          in dir.list(recursive: true, followLinks: false)) {
+        if (e is File) {
+          out.add(e.path
+              .substring(dir.path.length + 1)
+              .replaceAll('\\', '/'));
+        }
+      }
+      out.sort();
+      return out;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Read one checkpoint file as bytes (binary-safe). Null when absent.
+  Future<Uint8List?> readCheckpointFile(
+      String projectId, String checkpointId, String path) async {
+    final dir = await checkpointDirFor(projectId, checkpointId);
+    if (dir == null) return null;
+    final clean = sanitize(path);
+    if (clean.isEmpty) return null;
+    try {
+      final f = File('${dir.path}/$clean');
+      if (!await f.exists()) return null;
+      return await f.readAsBytes();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Write/overwrite one file inside a checkpoint (accept semantics:
+  /// the baseline follows accepted files). Returns error string or null.
+  Future<String?> writeCheckpointFile(String projectId, String checkpointId,
+      String path, Uint8List bytes) async {
+    final dir = await checkpointDirFor(projectId, checkpointId);
+    if (dir == null) return 'Checkpoint not found.';
+    final clean = sanitize(path);
+    if (clean.isEmpty) return 'Rejected path.';
+    try {
+      final out = File('${dir.path}/$clean');
+      await out.parent.create(recursive: true);
+      await out.writeAsBytes(bytes, flush: true);
+      return null;
+    } catch (e) {
+      return '$e';
+    }
+  }
+
+  /// Delete one file inside a checkpoint (accept-of-deletion).
+  Future<void> deleteCheckpointFile(
+      String projectId, String checkpointId, String path) async {
+    final dir = await checkpointDirFor(projectId, checkpointId);
+    if (dir == null) return;
+    final clean = sanitize(path);
+    if (clean.isEmpty) return;
+    try {
+      final f = File('${dir.path}/$clean');
+      if (await f.exists()) await f.delete();
+    } catch (_) {}
+  }
 }

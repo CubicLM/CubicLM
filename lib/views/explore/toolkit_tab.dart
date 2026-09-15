@@ -4,12 +4,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/colors.dart';
 import '../../theme/design_tokens.dart';
+import '../agent/agent_workspace_view.dart';
 import '../agent_ide_view.dart';
 import '../battle_arena_view.dart';
 import '../cubicapp_builder_view.dart';
 import '../cubicdata/datasheet_home_view.dart';
 import '../cubicweb/browser_view.dart';
 import '../slide_deck_view.dart';
+import '../terminal/terminal_view.dart';
 
 /// Explore Toolkit tab cards.
 /// Extracted from views/model_view.dart (one responsibility per file).
@@ -28,6 +30,28 @@ Widget buildToolkitTab(BuildContext context) {
         ),
       ),
       const SizedBox(height: 12),
+      _toolkitCard(
+        context,
+        isDark,
+        icon: LucideIcons.bot,
+        title: 'Agent Workspace',
+        experimental: true,
+        description:
+            'General coding agent: describe any task — explore, edit, test, commit — with tool approvals, per-file undo and checkpoint rollback. Cloud or on-device.',
+        onTap: () => Get.to(() => const AgentWorkspaceView()),
+      ),
+      const SizedBox(height: 10),
+      _toolkitCard(
+        context,
+        isDark,
+        icon: LucideIcons.terminal,
+        title: 'Terminal',
+        experimental: true,
+        description:
+            'Sandboxed on-device shell with streaming output and history. Destructive commands are blocked automatically.',
+        onTap: () => Get.to(() => const TerminalView()),
+      ),
+      const SizedBox(height: 10),
       _toolkitCard(
         context,
         isDark,

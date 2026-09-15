@@ -37,6 +37,20 @@ import 'services/tts_service.dart';
 import 'services/usage_tracker_service.dart';
 import 'services/stats_service.dart';
 import 'services/agent_workspace.dart';
+import 'services/agent/agent_runner.dart';
+import 'services/agent_progress_service.dart';
+import 'services/sandbox/apk_installer_service.dart';
+import 'services/sandbox/sandbox_manager.dart';
+import 'services/security/api_key_vault.dart';
+import 'services/terminal/terminal_service.dart';
+import 'services/tools/file_tools.dart';
+import 'services/tools/git_tools.dart';
+import 'services/tools/shell_tools.dart';
+import 'services/tools/todo_tools.dart';
+import 'services/tools/tool_registry.dart';
+import 'services/tools/web_tools.dart';
+import 'services/workspace/checkpoint_manager.dart';
+import 'services/workspace/workspace_manager.dart';
 import 'services/preview_server.dart';
 import 'services/cubicweb/cubicweb_logger.dart';
 import 'services/runtime/cli_manager.dart';
@@ -408,6 +422,40 @@ Future<void> _initDeferredServices(
   await safePut(() => SkillRegistryService().init(), 'SkillRegistryService',
       timeout: const Duration(seconds: 4));
   await safePut(() => McpRegistryService().init(), 'McpRegistryService',
+      timeout: const Duration(seconds: 4));
+  // ── Agentic workspace (roadmap Phases 1–6) ──
+  // Built-in tool registry: file + shell + web + git tools, merged with
+  // MCP tools at request time by the cloud providers.
+  try {
+    if (!Get.isRegistered<ToolRegistry>()) {
+      final registry = ToolRegistry();
+      registry.registerAll(fileTools());
+      registry.registerAll(shellTools());
+      registry.registerAll(webTools());
+      registry.registerAll(gitTools());
+      registry.registerAll(todoTools());
+      Get.put(registry, permanent: true);
+      unawaited(registry.init());
+    }
+  } catch (e) {
+    appLog.error('Service ToolRegistry failed to init',
+        details: e.toString(), category: LogCategory.system);
+  }
+  await safePut(() => ApiKeyVault().init(), 'ApiKeyVault',
+      timeout: const Duration(seconds: 4));
+  await safePut(() => CheckpointManager().init(), 'CheckpointManager',
+      timeout: const Duration(seconds: 4));
+  await safePut(() => WorkspaceManager().init(), 'WorkspaceManager',
+      timeout: const Duration(seconds: 4));
+  await safePut(() => TerminalService().init(), 'TerminalService',
+      timeout: const Duration(seconds: 4));
+  await safePut(() => AgentRunner().init(), 'AgentRunner',
+      timeout: const Duration(seconds: 4));
+  await safePut(() => SandboxManager().init(), 'SandboxManager',
+      timeout: const Duration(seconds: 4));
+  await safePut(() => AgentProgressService().init(), 'AgentProgressService',
+      timeout: const Duration(seconds: 4));
+  await safePut(() => ApkInstallerService().init(), 'ApkInstallerService',
       timeout: const Duration(seconds: 4));
   // DeviceInfo probes hardware (getprop/Vulkan) — slow devices need room.
   await safePut(() => DeviceInfoService().init(), 'DeviceInfoService',

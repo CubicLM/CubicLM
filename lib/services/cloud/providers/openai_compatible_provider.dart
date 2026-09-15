@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import '../cloud_provider.dart';
 import '../../hive_service.dart';
 import '../../mcp/mcp_registry_service.dart';
+import '../../tools/tool_interface.dart';
+import '../../tools/tool_registry.dart';
 
 /// Abstract base class for providers that use OpenAI-compatible API format.
 ///
@@ -22,18 +24,44 @@ abstract class OpenAICompatibleProvider extends CloudProvider {
 
   List<Map<String, dynamic>>? _mcpToolsPayload() {
     try {
-      if (!Get.isRegistered<McpRegistryService>()) return null;
-      final reg = Get.find<McpRegistryService>();
-      final cfg = reg.config.value;
-      if (cfg == null || !cfg.enabled) return null;
-      final tools = reg.tools;
-      if (tools.isEmpty) {
-        // Still expose schema if server is enabled but not yet connected — spec 3.6.
-        // Try to keep cached tools even when disconnected; if none, return null
-        // and let the model proceed without tools rather than blocking.
-        return null;
+      // Built-in tools (always available if registered)
+      List<Map<String, dynamic>>? builtIn;
+      if (Get.isRegistered<ToolRegistry>()) {
+        final reg = Get.find<ToolRegistry>();
+        builtIn = reg.getOpenAITools();
       }
-      return tools.map((t) => t.toOpenAITool()).toList();
+
+      // MCP tools (external servers)
+      List<Map<String, dynamic>>? mcp;
+      if (Get.isRegistered<McpRegistryService>()) {
+        final reg = Get.find<McpRegistryService>();
+        final cfg = reg.config.value;
+        if (cfg != null && cfg.enabled) {
+          final tools = reg.tools;
+          if (tools.isNotEmpty) {
+            mcp = tools.map((t) => t.toOpenAITool()).toList();
+          }
+        }
+      }
+
+      // Merge: built-in tools take priority on name collision
+      if (builtIn != null && builtIn.isNotEmpty) {
+        if (mcp != null) {
+          final builtInNames = builtIn
+              .map((t) => (t['function'] as Map?)?['name']?.toString() ?? '')
+              .toSet();
+          for (final m in mcp) {
+            final fn = m['function'] as Map?;
+            final name = fn?['name']?.toString() ?? '';
+            if (name.isNotEmpty && !builtInNames.contains(name)) {
+              builtIn.add(m);
+            }
+          }
+        }
+        return builtIn;
+      }
+
+      return mcp;
     } catch (_) {
       return null;
     }
@@ -126,10 +154,6 @@ abstract class OpenAICompatibleProvider extends CloudProvider {
     Map<String, dynamic> firstMessage,
     List<dynamic> toolCalls,
   ) async {
-    if (!Get.isRegistered<McpRegistryService>()) {
-      return firstMessage['content']?.toString() ?? '';
-    }
-    final reg = Get.find<McpRegistryService>();
     final toolResults = <Map<String, dynamic>>[];
     for (final tc in toolCalls) {
       if (tc is! Map) continue;
@@ -155,8 +179,47 @@ abstract class OpenAICompatibleProvider extends CloudProvider {
             ],
             'isError': true,
           };
+        } else if (Get.isRegistered<ToolRegistry>()) {
+          // Try built-in tool first
+          final toolReg = Get.find<ToolRegistry>();
+          final tool = toolReg.getTool(name);
+          if (tool != null) {
+            // Workspace path will be properly set by agent loop; for cloud
+            // provider direct calls, use empty string (file tools will fail gracefully).
+            // executeApproved: approval already happened above; emits a
+            // trace record for the agent loop.
+            final toolResult = await toolReg.executeApproved(name, args, ToolContext(
+              workspacePath: '',
+              approve: (n, a) => _approveToolCall(n, a),
+            ));
+            result = {
+              'content': [
+                {'type': 'text', 'text': toolResult.output}
+              ],
+              'isError': !toolResult.success,
+            };
+          } else if (Get.isRegistered<McpRegistryService>()) {
+            // Fall back to MCP tools
+            final mcpReg = Get.find<McpRegistryService>();
+            result = await mcpReg.callTool(name, args);
+          } else {
+            result = {
+              'content': [
+                {'type': 'text', 'text': 'Tool $name not found.'}
+              ],
+              'isError': true,
+            };
+          }
+        } else if (Get.isRegistered<McpRegistryService>()) {
+          final mcpReg = Get.find<McpRegistryService>();
+          result = await mcpReg.callTool(name, args);
         } else {
-          result = await reg.callTool(name, args);
+          result = {
+            'content': [
+              {'type': 'text', 'text': 'No tool registry available.'}
+            ],
+            'isError': true,
+          };
         }
       } catch (e) {
         result = {

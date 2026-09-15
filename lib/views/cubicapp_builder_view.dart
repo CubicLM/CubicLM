@@ -19,6 +19,7 @@ import '../services/app_log_service.dart';
 import '../services/cloud_service.dart';
 import '../services/cubicapp/cubicapp_templates.dart';
 import '../services/inference_service.dart';
+import '../services/sandbox/apk_installer_service.dart';
 import '../theme/design_tokens.dart';
 import '../utils/app_snackbar.dart';
 import '../utils/export_file.dart';
@@ -525,9 +526,30 @@ Output ONLY the JSON block. No explanation needed.''';
               _stepBadge('3', 'Download APK'),
             ],
           ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            icon: const Icon(LucideIcons.packageOpen, size: 14),
+            label: const Text('Install APK from device'),
+            onPressed: _installApk,
+          ),
         ],
       ),
     );
+  }
+
+  /// Pick a downloaded APK (SAF) and install it without ADB.
+  Future<void> _installApk() async {
+    if (!Get.isRegistered<ApkInstallerService>()) {
+      AppSnackbar.showTop('Unavailable', 'Installer service is not running.');
+      return;
+    }
+    final err =
+        await Get.find<ApkInstallerService>().pickAndInstall();
+    if (err == null) {
+      AppSnackbar.showTop('Installing', 'Confirm the install on your device.');
+    } else if (err != 'No file picked.') {
+      AppSnackbar.showTop('Install failed', err);
+    }
   }
 
   Widget _stepBadge(String num, String label) {
