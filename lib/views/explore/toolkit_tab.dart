@@ -10,6 +10,7 @@ import '../battle_arena_view.dart';
 import '../cubicapp_builder_view.dart';
 import '../cubicdata/datasheet_home_view.dart';
 import '../cubicweb/browser_view.dart';
+import '../runtime/runtime_setup_view.dart';
 import '../slide_deck_view.dart';
 import '../terminal/terminal_view.dart';
 
@@ -50,6 +51,17 @@ Widget buildToolkitTab(BuildContext context) {
         description:
             'Sandboxed on-device shell with streaming output and history. Destructive commands are blocked automatically.',
         onTap: () => Get.to(() => const TerminalView()),
+      ),
+      const SizedBox(height: 10),
+      _toolkitCard(
+        context,
+        isDark,
+        icon: LucideIcons.package,
+        title: 'Runtime & Toolchains',
+        experimental: true,
+        description:
+            'One core Ubuntu runtime, then only the stacks you need — Node, Python, Android, C++, PHP. Isolated agent + terminal execution, on-device.',
+        onTap: () => Get.to(() => const RuntimeSetupView()),
       ),
       const SizedBox(height: 10),
       _toolkitCard(

@@ -74,6 +74,14 @@
             android:foregroundServiceType="dataSync"
             android:stopWithTask="false" />
 
+        <!-- Runtime/toolchain install keep-alive (foreground + wakelock) -->
+        <service
+            android:name=".RuntimeSetupService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:stopWithTask="false" />
+
         <!-- llama.cpp inference foreground service (started/stopped by
              the llama_flutter_android plugin around model loads; keeps
              long native loads alive under background restrictions) -->

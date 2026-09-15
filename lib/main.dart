@@ -57,6 +57,7 @@ import 'services/cubicweb/cubicweb_logger.dart';
 import 'services/runtime/cli_manager.dart';
 import 'services/runtime/dev_server_manager.dart';
 import 'services/runtime/runtime_manager.dart';
+import 'services/runtime/runtime_installer.dart';
 import 'services/deploy_service.dart';
 import 'services/update_service.dart';
 import 'services/vector_service.dart';
@@ -453,6 +454,8 @@ Future<void> _initDeferredServices(
   await safePut(() => AgentRunner().init(), 'AgentRunner',
       timeout: const Duration(seconds: 4));
   await safePut(() => SandboxManager().init(), 'SandboxManager',
+      timeout: const Duration(seconds: 4));
+  await safePut(() => RuntimeInstaller().init(), 'RuntimeInstaller',
       timeout: const Duration(seconds: 4));
   await safePut(() => AgentProgressService().init(), 'AgentProgressService',
       timeout: const Duration(seconds: 4));

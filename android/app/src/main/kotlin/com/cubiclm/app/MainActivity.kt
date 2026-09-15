@@ -41,6 +41,10 @@ class MainActivity : FlutterFragmentActivity() {
     private var pendingSharedText: String? = null
     private val monitoredInAppDownloads = ConcurrentHashMap.newKeySet<Long>()
 
+    /// Runtime root reported by Dart (RuntimeInstaller), e.g.
+    /// <app-support>/runtime. Null until the installer initializes.
+    @Volatile private var pendingRuntimeRoot: String? = null
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -373,6 +377,85 @@ class MainActivity : FlutterFragmentActivity() {
             }
         }
 
+        // Runtime toolchain keep-alive + progress (Dart: RuntimeInstaller).
+        // Channel "com.cubiclm.app/runtime": setKeepAlive {active},
+        // updateProgress {title, fraction, line}, setRuntimeRoot {path}.
+        val runtimeChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.cubiclm.app/runtime",
+        )
+        runtimeChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "setKeepAlive" -> {
+                    val active = call.argument<Boolean>("active") ?: false
+                    RuntimeSetupService.setKeepAlive(this, active)
+                    result.success(null)
+                }
+                "updateProgress" -> {
+                    val title = call.argument<String>("title") ?: ""
+                    val fraction =
+                        (call.argument<Any>("fraction") as? Number)?.toDouble() ?: 0.0
+                    val line = call.argument<String>("line") ?: ""
+                    RuntimeSetupService.updateProgress(title, fraction, line)
+                    result.success(null)
+                }
+                "setRuntimeRoot" -> {
+                    pendingRuntimeRoot = call.argument<String>("path")
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        // Isolated Ubuntu exec (Dart: ProotBackend via SandboxManager).
+        // Channel "com.cubiclm.app/proot": ping -> bool,
+        // exec {command, cwd, timeoutMs} -> {stdout, stderr, exitCode}.
+        // Runs <runtimeRoot>/bin/proot over <runtimeRoot>/ubuntu once the
+        // Core toolchain is installed; false/error until then (Dart falls
+        // back to the screened host shell automatically).
+        val prootChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.cubiclm.app/proot",
+        )
+        prootChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "ping" -> {
+                    thread(name = "proot-ping") {
+                        val ok = try {
+                            isProotReady()
+                        } catch (_: Exception) {
+                            false
+                        }
+                        mainHandler.post { result.success(ok) }
+                    }
+                }
+                "exec" -> {
+                    val command = call.argument<String>("command") ?: ""
+                    val cwd = call.argument<String>("cwd") ?: ""
+                    val timeoutMs =
+                        (call.argument<Any>("timeoutMs") as? Number)?.toLong()
+                            ?: 30000L
+                    thread(name = "proot-exec") {
+                        try {
+                            val outcome = runProotExec(command, cwd, timeoutMs)
+                            mainHandler.post { result.success(outcome) }
+                        } catch (e: Exception) {
+                            mainHandler.post {
+                                result.success(
+                                    mapOf(
+                                        "stdout" to "",
+                                        "stderr" to "PRoot exec failed: ${e.message ?: e}",
+                                        "exitCode" to -1,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
+
     }
 
     /// Hides app content from Recents screenshots / screen capture while
@@ -475,6 +558,180 @@ class MainActivity : FlutterFragmentActivity() {
             mapOf("ok" to true, "error" to null)
         } catch (e: Exception) {
             mapOf("ok" to false, "error" to (e.message ?: e.toString()))
+        }
+    }
+
+    // ── Isolated Ubuntu runtime (PRoot) ──────────────────────────────
+
+    private fun runtimeRoot(): File? {
+        val root = pendingRuntimeRoot
+        if (!root.isNullOrBlank()) return File(root)
+        // Fallbacks if Dart has not reported the path yet.
+        val candidates = listOf(
+            File(filesDir, "runtime"),
+            File(noBackupFilesDir(), "runtime"),
+            File(getExternalFilesDir(null), "runtime"),
+        )
+        return candidates.firstOrNull { it.isDirectory }
+    }
+
+    private fun prootBinary(): File? {
+        val root = runtimeRoot() ?: return null
+        val bin = File(root, "bin/proot")
+        return if (bin.isFile && bin.canExecute()) bin else null
+    }
+
+    /// True when the Core toolchain can execute: rootfs bash + ready
+    /// marker + executable proot binary.
+    private fun isProotReady(): Boolean {
+        val root = runtimeRoot() ?: return false
+        if (!File(root, ".ready-core").isFile) return false
+        if (!File(root, "ubuntu/usr/bin/bash").isFile) return false
+        return prootBinary() != null
+    }
+
+    /// Runs [command] inside the Ubuntu rootfs via proot. The host [cwd]
+    /// must live under app-private storage (jail); it is bound at
+    /// `/workspace` in the guest. Output streams are capped at 256 KB each.
+    private fun runProotExec(
+        command: String,
+        cwd: String,
+        timeoutMs: Long,
+    ): Map<String, Any?> {
+        if (command.isBlank()) {
+            return mapOf("stdout" to "", "stderr" to "Empty command.", "exitCode" to -1)
+        }
+        val root = runtimeRoot()
+            ?: return mapOf("stdout" to "", "stderr" to "Runtime not installed.", "exitCode" to -1)
+        val proot = prootBinary()
+            ?: return mapOf("stdout" to "", "stderr" to "PRoot binary missing.", "exitCode" to -1)
+        val rootfs = File(root, "ubuntu")
+
+        val hostDir = when {
+            cwd.isBlank() -> filesDir
+            else -> File(cwd)
+        }
+        if (!isAppPrivate(hostDir)) {
+            return mapOf(
+                "stdout" to "",
+                "stderr" to "Working directory outside app storage is blocked.",
+                "exitCode" to -1,
+            )
+        }
+        if (!hostDir.isDirectory) hostDir.mkdirs()
+        val tmpDir = File(cacheDir, "proot-tmp").apply { mkdirs() }
+
+        val argv = listOf(
+            proot.absolutePath,
+            "--link2symlink",
+            "-0",
+            "-r", rootfs.absolutePath,
+            "-b", "/dev",
+            "-b", "/proc",
+            "-b", "/sys",
+            "-b", "${hostDir.absolutePath}:/workspace",
+            "-w", "/workspace",
+            "/bin/bash", "-c", command,
+        )
+        val env = mapOf(
+            "HOME" to "/root",
+            "PATH" to "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "LANG" to "C.UTF-8",
+            "TERM" to "xterm-256color",
+            "PROOT_NO_SECCOMP" to "1",
+            "PROOT_TMP_DIR" to tmpDir.absolutePath,
+        )
+        return try {
+            val proc = ProcessBuilder(argv)
+                .directory(hostDir)
+                .apply {
+                    environment().putAll(env)
+                    environment().remove("LD_PRELOAD")
+                }
+                .start()
+            proc.outputStream.close()
+            val outCap = CappedReader(proc.inputStream)
+            val errCap = CappedReader(proc.errorStream)
+            val outThread = thread(name = "proot-stdout") { outCap.drain() }
+            val errThread = thread(name = "proot-stderr") { errCap.drain() }
+            val finished = proc.waitFor(
+                timeoutMs.coerceIn(1000L, 300000L),
+                java.util.concurrent.TimeUnit.MILLISECONDS,
+            )
+            if (!finished) {
+                try {
+                    proc.destroyForcibly()
+                } catch (_: Exception) {
+                }
+                outThread.join(2000)
+                errThread.join(2000)
+                return mapOf(
+                    "stdout" to outCap.text(),
+                    "stderr" to (errCap.text() + "\n[timeout]").trim(),
+                    "exitCode" to 124,
+                )
+            }
+            outThread.join(5000)
+            errThread.join(5000)
+            mapOf(
+                "stdout" to outCap.text(),
+                "stderr" to errCap.text(),
+                "exitCode" to proc.exitValue(),
+            )
+        } catch (e: Exception) {
+            mapOf("stdout" to "", "stderr" to "PRoot exec failed: ${e.message ?: e}", "exitCode" to -1)
+        }
+    }
+
+    /// App-private storage jail for proot binds (mirrors the Dart sandbox).
+    private fun isAppPrivate(dir: File): Boolean {
+        return try {
+            val canon = dir.canonicalPath
+            val roots = listOfNotNull(
+                filesDir?.canonicalPath,
+                cacheDir?.canonicalPath,
+                noBackupFilesDir()?.canonicalPath,
+                getExternalFilesDir(null)?.canonicalPath,
+                codeCacheDir?.canonicalPath,
+            )
+            roots.any { canon == it || canon.startsWith("$it/") }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /// Stream reader capped at 256 KB so runaway output cannot OOM the app.
+    private class CappedReader(
+        private val stream: java.io.InputStream,
+        private val cap: Int = 256 * 1024,
+    ) {
+        private val buf = java.io.ByteArrayOutputStream()
+        private var truncated = false
+
+        fun drain() {
+            try {
+                val tmp = ByteArray(8192)
+                while (true) {
+                    val n = stream.read(tmp)
+                    if (n <= 0) break
+                    if (buf.size() < cap) {
+                        buf.write(tmp, 0, minOf(n, cap - buf.size()))
+                    } else {
+                        truncated = true
+                    }
+                }
+            } catch (_: Exception) {
+            } finally {
+                try {
+                    stream.close()
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        fun text(): String {
+            val s = buf.toString(Charsets.UTF_8.name())
+            return if (truncated) "$s\n[…truncated]" else s
         }
     }
 
