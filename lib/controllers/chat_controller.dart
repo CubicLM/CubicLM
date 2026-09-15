@@ -36,6 +36,7 @@ import '../services/document_extractor_service.dart';
 import '../services/skills/skill_injector.dart';
 import '../models/web_source.dart';
 import '../utils/thought_parser.dart';
+import '../utils/text_sanitize.dart';
 import '../utils/history_budget.dart';
 import '../services/stats_service.dart';
 import '../services/memory_service.dart';
@@ -471,7 +472,8 @@ class ChatController extends GetxController {
       if (text == null || text.trim().isEmpty) return;
       if (currentSessionId.value.isEmpty) createNewChat();
       final cur = textController.text;
-      textController.text = cur.isEmpty ? text : '$cur\n$text';
+      textController.text =
+          cur.isEmpty ? sanitizeUtf16(text) : '$cur\n${sanitizeUtf16(text)}';
       try {
         textController.selection =
             TextSelection.collapsed(offset: textController.text.length);
@@ -495,7 +497,7 @@ class ChatController extends GetxController {
     if (clean.isEmpty) return;
     if (currentSessionId.value.isEmpty) createNewChat();
     final header = title.trim().isEmpty ? url : '${title.trim()} ($url)';
-    final block = '[Web page: $header]\n$clean';
+    final block = sanitizeUtf16('[Web page: $header]\n$clean');
     final cur = textController.text;
     textController.text = cur.isEmpty ? block : '$cur\n\n$block';
     try {
@@ -585,8 +587,8 @@ class ChatController extends GetxController {
       }
       await _speech.listen(
         onResult: (result) {
-          textController.text = result.recognizedWords;
-          inputText.value = result.recognizedWords;
+          textController.text = sanitizeUtf16(result.recognizedWords);
+          inputText.value = textController.text;
           if (voiceMode.value && result.finalResult) {
             final said = result.recognizedWords.trim();
             if (said.isNotEmpty && _voiceSendArmed && !isLoading.value) {
@@ -2156,7 +2158,8 @@ class ChatController extends GetxController {
         fullResponse = await cloud.sendMessage(
           messages: apiMessages,
           imageBase64: imgBase64,
-          temperature: isSecond ? (settings.temperature.value + 0.1).clamp(0.0, 1.0) : settings.temperature.value,
+          temperature:
+              (settings.temperature.value + (isSecond ? 0.1 : 0.0)).clamp(0.0, 1.0),
           maxTokens:
               settings.autoTuneParams.value ? null : settings.maxTokens.value,
           onToken: bufferToken,
@@ -2456,7 +2459,8 @@ class ChatController extends GetxController {
 
   void insertTemplate(String body) {
     final cur = textController.text;
-    textController.text = cur.isEmpty ? body : '$cur\n$body';
+    final clean = sanitizeUtf16(body);
+    textController.text = cur.isEmpty ? clean : '$cur\n$clean';
     try {
       textController.selection =
           TextSelection.collapsed(offset: textController.text.length);
@@ -2680,7 +2684,7 @@ class ChatController extends GetxController {
             {'role': 'system', 'content': systemPrompt},
             ...history,
           ],
-          temperature: settings.temperature.value,
+          temperature: settings.temperature.value.clamp(0.0, 1.0),
           maxTokens:
               settings.autoTuneParams.value ? null : settings.maxTokens.value,
         );

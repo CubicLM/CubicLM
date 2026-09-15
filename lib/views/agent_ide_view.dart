@@ -1610,7 +1610,9 @@ class _AgentIdeViewState extends State<AgentIdeView> {
                       child: CircularProgressIndicator(strokeWidth: 2)),
               ]),
               const SizedBox(height: 8),
-              for (final s in steps)
+              // Cap visible steps: the card lives above an Expanded preview,
+              // an unbounded step list can squeeze it into overflow.
+              for (final s in steps.take(6))
                 Padding(
                   padding: const EdgeInsets.only(bottom: 3),
                   child: Row(children: [
@@ -1641,6 +1643,14 @@ class _AgentIdeViewState extends State<AgentIdeView> {
                               color: Theme.of(context).hintColor)),
                     ),
                   ]),
+                ),
+              if (steps.length > 6)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 3, left: 20),
+                  child: Text('+${steps.length - 6} more steps',
+                      style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          color: Theme.of(context).hintColor)),
                 ),
               if (blockers.isNotEmpty) ...[
                 const SizedBox(height: 4),
@@ -1747,24 +1757,33 @@ class _AgentIdeViewState extends State<AgentIdeView> {
                 fontSize: 13, color: Theme.of(context).hintColor)),
       );
     }
-    return Column(children: [
-      _previewDiagnosisCard(context, isDark),
-      if (working) _liveProgressPill(context, isDark, status),
-      Expanded(
-        child: AgentPreview(
-          url: url,
-          pickMode: c.elementPickMode.value,
-          onConsoleError: (e) => c.onConsoleError(e),
-          onElementPicked: (info) => c.onElementPicked(info),
+    // On short screens the fixed children (diagnosis card + 240px devtools)
+    // can squeeze AgentPreview's Expanded below its 40px header → the
+    // logged 39px bottom overflow. Scale devtools with available height so
+    // the preview keeps room; AgentPreview itself guards <120px.
+    return LayoutBuilder(builder: (context, constraints) {
+      final devH = constraints.maxHeight.isFinite
+          ? (constraints.maxHeight * 0.32).clamp(110.0, 240.0)
+          : 240.0;
+      return Column(children: [
+        _previewDiagnosisCard(context, isDark),
+        if (working) _liveProgressPill(context, isDark, status),
+        Expanded(
+          child: AgentPreview(
+            url: url,
+            pickMode: c.elementPickMode.value,
+            onConsoleError: (e) => c.onConsoleError(e),
+            onElementPicked: (info) => c.onElementPicked(info),
+          ),
         ),
-      ),
-      _devToolsPane(context, isDark),
-    ]);
+        _devToolsPane(context, isDark, height: devH),
+      ]);
+    });
   }
 
-  Widget _devToolsPane(BuildContext context, bool isDark) {
+  Widget _devToolsPane(BuildContext context, bool isDark, {double height = 240}) {
     return Container(
-      height: 240,
+      height: height,
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       decoration: BoxDecoration(
         color: const Color(0xFF0D0D12),

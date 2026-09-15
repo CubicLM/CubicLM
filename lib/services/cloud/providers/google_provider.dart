@@ -75,10 +75,11 @@ class GoogleProvider extends CloudProvider {
       });
     }
 
+    final cloudTemp = clampCloudTemperature(temperature);
     final body = <String, dynamic>{
       'contents': contents,
       'generationConfig': <String, dynamic>{
-        if (temperature != null) 'temperature': temperature,
+        if (cloudTemp != null) 'temperature': cloudTemp,
         if (maxTokens != null) 'maxOutputTokens': maxTokens,
       },
     };
@@ -152,10 +153,11 @@ class GoogleProvider extends CloudProvider {
       });
     }
 
+    final cloudTemp = clampCloudTemperature(temperature);
     final body = <String, dynamic>{
       'contents': contents,
       'generationConfig': <String, dynamic>{
-        if (temperature != null) 'temperature': temperature,
+        if (cloudTemp != null) 'temperature': cloudTemp,
         if (maxTokens != null) 'maxOutputTokens': maxTokens,
       },
     };

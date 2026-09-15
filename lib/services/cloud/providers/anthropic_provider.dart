@@ -85,7 +85,8 @@ class AnthropicProvider extends CloudProvider {
     };
 
     if (systemPrompt != null) body['system'] = systemPrompt;
-    if (temperature != null) body['temperature'] = temperature;
+    final cloudTemp = clampCloudTemperature(temperature);
+    if (cloudTemp != null) body['temperature'] = cloudTemp;
 
     final response = await http
         .post(
@@ -157,7 +158,8 @@ class AnthropicProvider extends CloudProvider {
     };
 
     if (systemPrompt != null) body['system'] = systemPrompt;
-    if (temperature != null) body['temperature'] = temperature;
+    final cloudTemp = clampCloudTemperature(temperature);
+    if (cloudTemp != null) body['temperature'] = cloudTemp;
 
     final request = http.Request('POST', Uri.parse(endpoint));
     request.headers.addAll({

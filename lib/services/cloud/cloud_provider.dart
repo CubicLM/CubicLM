@@ -3,6 +3,15 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+/// Clamp sampling temperature to the 0.0–1.0 range every cloud API accepts.
+///
+/// The in-app temperature slider goes to 2.0 (valid for local llama
+/// sampling), but cloud gateways such as TokenRouter reject anything above
+/// 1.0 with HTTP 400 ("Temperature must be between 0 and 1"). Clamp at the
+/// provider boundary so a high local setting can never fail a cloud call.
+double? clampCloudTemperature(double? temperature) =>
+    temperature?.clamp(0.0, 1.0).toDouble();
+
 /// Abstract base class for all cloud AI providers.
 ///
 /// Each provider implements this interface to handle:
@@ -208,7 +217,8 @@ abstract class CloudProvider {
       'messages': apiMessages,
     };
 
-    if (temperature != null) body['temperature'] = temperature;
+    final cloudTemp = clampCloudTemperature(temperature);
+    if (cloudTemp != null) body['temperature'] = cloudTemp;
     if (maxTokens != null) body['max_tokens'] = maxTokens;
     if (stream) body['stream'] = true;
     if (mcpTools != null && mcpTools.isNotEmpty) {

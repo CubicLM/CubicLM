@@ -256,6 +256,26 @@ class _AgentPreviewState extends State<AgentPreview> {
 
     return LayoutBuilder(builder: (context, constraints) {
       final maxWidth = constraints.maxWidth;
+      // Guard: on small-height devices the preview pane can be squeezed
+      // below the 40px browser header (logged: 39px bottom overflow on
+      // Redmi K20 Pro). Render a compact placeholder instead of a
+      // Column whose fixed header cannot fit — an Expanded with ~0px
+      // still leaves the header overflowing.
+      if (constraints.maxHeight < 120) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(
+              'Preview squeezed — collapse the panels above or below to expand it.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                color: Theme.of(context).hintColor,
+              ),
+            ),
+          ),
+        );
+      }
       final currentWidth = maxWidth * _widthFactor;
 
       return Column(

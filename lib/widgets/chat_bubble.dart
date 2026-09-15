@@ -12,6 +12,7 @@ import '../controllers/chat_controller.dart';
 import '../models/chat_message.dart';
 import '../models/web_source.dart';
 import '../utils/prompt_export.dart';
+import '../utils/text_sanitize.dart';
 import '../utils/thought_parser.dart';
 import '../core/colors.dart';
 import '../theme/design_tokens.dart';
@@ -1391,38 +1392,12 @@ class _ChatBubbleState extends State<ChatBubble> {
   }
 
   String _cleanAssistantText(String text) {
-    return _sanitizeUtf16(text
+    return sanitizeUtf16(text
         .replaceAll('<|endoftext|>', '')
         .replaceAll('<|im_end|>', '')
         .replaceAll('<|end|>', '')
         .trim());
   }
-}
-
-
-/// Strip lone surrogates (U+D800..U+DFFF) that cause
-/// "string is not well-formed UTF-16" crashes in TextSpan.build.
-String _sanitizeUtf16(String s) {
-  final buf = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    final cu = s.codeUnitAt(i);
-    if (cu >= 0xD800 && cu <= 0xDFFF) {
-      // High surrogate must be followed by low surrogate.
-      if (cu <= 0xDBFF && i + 1 < s.length) {
-        final next = s.codeUnitAt(i + 1);
-        if (next >= 0xDC00 && next <= 0xDFFF) {
-          buf.write(s[i]);
-          buf.write(s[i + 1]);
-          i++; // skip the low surrogate
-          continue;
-        }
-      }
-      // Lone surrogate: skip it (replacement character would also work).
-      continue;
-    }
-    buf.write(s[i]);
-  }
-  return buf.toString();
 }
 
 class CitationLinkBuilder extends MarkdownElementBuilder {
