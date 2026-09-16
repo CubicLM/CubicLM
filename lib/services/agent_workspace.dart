@@ -493,7 +493,16 @@ class AgentWorkspaceService extends GetxService {
       if (t == FileSystemEntityType.link) return null;
       if (t == FileSystemEntityType.notFound) return f;
       final resolved = await f.resolveSymbolicLinks();
-      if (resolved != base && !resolved.startsWith('$base/')) return null;
+      // Normalize separators (Windows resolves with `\`) and case
+      // (Windows + macOS resolve case-insensitively) before comparing.
+      String norm(String p) => p.replaceAll('\\', '/');
+      var r = norm(resolved);
+      var b = norm(base);
+      if (Platform.isWindows || Platform.isMacOS) {
+        r = r.toLowerCase();
+        b = b.toLowerCase();
+      }
+      if (r != b && !r.startsWith('$b/')) return null;
       return f;
     } catch (_) {
       return null;
