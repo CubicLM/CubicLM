@@ -18,7 +18,13 @@ enum LogCategory {
   cloud('Cloud'),
   chat('Chat'),
   server('Server'),
-  image('Image');
+  image('Image'),
+  // New-feature lanes (appended — persistence is name-based, so adding
+  // values is safe for old stored rows).
+  agent('Agent'),
+  runtime('Runtime'),
+  terminal('Terminal'),
+  update('Update');
 
   final String label;
   const LogCategory(this.label);
@@ -231,6 +237,80 @@ class AppLogService extends GetxService with WidgetsBindingObserver {
     if (_screenTrail.length > 8) {
       _screenTrail.removeRange(8, _screenTrail.length);
     }
+  }
+
+  // ── User-action trail ──────────────────────────────────────────
+  // What the user DID in new features (agent run, runtime install,
+  // terminal command, export, key save) — newest first, max 30,
+  // in-memory. Errors already carry the screen; the health export
+  // carries this trail, so a pasted report shows actions + errors
+  // together. Never throws. Keep entries short and secret-free
+  // (callers must redact before passing).
+
+  /// Max retained actions.
+  static const maxTrailActions = 30;
+
+  final List<String> _actionTrail = [];
+
+  /// Recent user actions, newest first.
+  List<String> get actionTrail => List.unmodifiable(_actionTrail);
+
+  /// Record one user action (`'agent run finished'`). Safe anywhere.
+  void trail(String action) {
+    try {
+      final a = action.trim();
+      if (a.isEmpty) return;
+      final now = DateTime.now();
+      final t = '${now.hour.toString().padLeft(2, '0')}:'
+          '${now.minute.toString().padLeft(2, '0')}:'
+          '${now.second.toString().padLeft(2, '0')}';
+      _actionTrail.insert(0, '$t $a');
+      if (_actionTrail.length > maxTrailActions) {
+        _actionTrail.removeRange(
+            maxTrailActions, _actionTrail.length);
+      }
+    } catch (_) {}
+  }
+
+  /// Static shorthand (mirrors [trackScreen]). Safe before init.
+  static void trailAction(String action) {
+    try {
+      if (Get.isRegistered<AppLogService>()) {
+        Get.find<AppLogService>().trail(action);
+      }
+    } catch (_) {}
+  }
+
+  // ── Route trail (auto) ─────────────────────────────────────────
+  // Every Navigator push/pop — pages, dialogs, bottom sheets — lands
+  // here via [LogRouteObserver] (wired once in GetMaterialApp). Sheets
+  // never call trackScreen, so without this the trail goes blind the
+  // moment a bottom sheet opens — exactly when layout rows fire.
+  // Ring buffer, newest first, max 12. Never throws.
+
+  /// Max retained route events.
+  static const maxTrailRoutes = 12;
+
+  final List<String> _routeTrail = [];
+
+  /// Recent route pushes/pops, newest first.
+  List<String> get routeTrail => List.unmodifiable(_routeTrail);
+
+  /// Record one route event (`→ GetBottomSheet`). Safe anywhere.
+  void trailRoute(String event) {
+    try {
+      final e = event.trim();
+      if (e.isEmpty) return;
+      final now = DateTime.now();
+      final t = '${now.hour.toString().padLeft(2, '0')}:'
+          '${now.minute.toString().padLeft(2, '0')}:'
+          '${now.second.toString().padLeft(2, '0')}';
+      _routeTrail.insert(0, '$t $e');
+      if (_routeTrail.length > maxTrailRoutes) {
+        _routeTrail.removeRange(
+            maxTrailRoutes, _routeTrail.length);
+      }
+    } catch (_) {}
   }
 
   /// One-line screen tracking for views (no import needed beyond Get,
@@ -954,6 +1034,18 @@ class AppLogService extends GetxService with WidgetsBindingObserver {
     if (_screenTrail.length > 1) {
       buf.writeln('Recent screens: ${_screenTrail.take(5).join(' ← ')}');
     }
+    if (_actionTrail.isNotEmpty) {
+      buf.writeln('Recent actions:');
+      for (final a in _actionTrail.take(8)) {
+        buf.writeln('  • $a');
+      }
+    }
+    if (_routeTrail.isNotEmpty) {
+      buf.writeln('Recent routes:');
+      for (final r in _routeTrail.take(6)) {
+        buf.writeln('  • $r');
+      }
+    }
     if (uniqueErrorCount != errorCount) {
       buf.writeln('(unique error rows: $uniqueErrorCount)');
     }
@@ -996,6 +1088,91 @@ class AppLogService extends GetxService with WidgetsBindingObserver {
       buf.writeln('  ${entry.key}: ${entry.value}');
     }
     return buf.toString();
+  }
+
+  /// Compact AI-ready diagnosis block for one row (Copy-diagnosis button
+  /// + Fix-with-Agent task). Everything a fixer needs, nothing more:
+  /// first line, widget path, environment, screen, recent actions, top
+  /// stack frames. Secrets scrubbed — safe to paste anywhere.
+  /// Never throws.
+  String diagnosisFor(AppLogEntry e, {bool forAgent = false}) {
+    try {
+      final buf = StringBuffer();
+      if (forAgent) {
+        buf.writeln(
+            'You are working in the CubicLM Flutter codebase (Dart/Flutter, GetX). '
+            'Diagnose the issue below and fix it with a minimal change. '
+            'Reply with the file path, the exact edit, and how you verified it.');
+        buf.writeln('');
+      }
+      buf.writeln('### CubicLM issue report');
+      buf.writeln('- App: $_appVersion · $_deviceSummary');
+      buf.writeln(
+          '- When: ${e.lastAt.toIso8601String()}${e.count > 1 ? ' (×${e.count})' : ''}');
+      if (e.screen.isNotEmpty) buf.writeln('- Screen: ${e.screen}');
+      buf.writeln('- Level: ${e.level} [${e.category.label}]');
+      final first = e.message.split('\n').first.trim();
+      buf.writeln('- Error: $first');
+      final path = _sectionOf(e.message, '--- full widget path');
+      if (path.isNotEmpty) {
+        buf.writeln('- Widget path:');
+        buf.writeln('```');
+        buf.writeln(path);
+        buf.writeln('```');
+      }
+      final env = _sectionOf(e.message, '--- environment ---');
+      if (env.isNotEmpty) buf.writeln('- Env: $env');
+      if (_actionTrail.isNotEmpty) {
+        buf.writeln('- Recent actions: ${_actionTrail.take(5).join(' | ')}');
+      }
+      final stackTop = _stackTop(e.details, 15);
+      if (stackTop.isNotEmpty) {
+        buf.writeln('- Stack (top):');
+        buf.writeln('```');
+        buf.writeln(stackTop);
+        buf.writeln('```');
+      }
+      return scrubExportSecrets(buf.toString());
+    } catch (_) {
+      return 'CubicLM issue: ${e.message.split('\n').first}';
+    }
+  }
+
+  /// Text under a `--- marker ---` header up to the next `---` header or
+  /// end, trimmed to [maxChars].
+  String _sectionOf(String message, String marker, {int maxChars = 2000}) {
+    try {
+      final lines = message.split('\n');
+      final start = lines.indexWhere((l) => l.trim().startsWith(marker));
+      if (start < 0) return '';
+      final out = <String>[];
+      for (var i = start + 1; i < lines.length; i++) {
+        final t = lines[i].trimRight();
+        if (t.trimLeft().startsWith('---') && out.isNotEmpty) break;
+        out.add(t);
+      }
+      var text = out.join('\n').trim();
+      if (text.length > maxChars) {
+        text = '${text.substring(0, maxChars)}…';
+      }
+      return text;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// First [maxFrames] `#N` stack lines from details (details already
+  /// trimmed at capture; this keeps the diagnosis block compact).
+  String _stackTop(String? details, int maxFrames) {
+    try {
+      if (details == null || details.isEmpty) return '';
+      final frames =
+          details.split('\n').where((l) => l.startsWith('#')).toList();
+      if (frames.isEmpty) return '';
+      return frames.take(maxFrames).join('\n');
+    } catch (_) {
+      return '';
+    }
   }
 
   // --- Persistence ---
@@ -1078,4 +1255,70 @@ class AppLogService extends GetxService with WidgetsBindingObserver {
 
   String _fmtTime(DateTime t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
+}
+
+/// NavigatorObserver that records every route push/pop (pages, dialogs,
+/// bottom sheets) into the log service's route trail. Sheets never call
+/// trackScreen, so this is what names the open sheet when a layout row
+/// fires. Zero log rows — only the bounded trail buffer. Never throws.
+class LogRouteObserver extends NavigatorObserver {
+  /// Friendly label: `_GetModalBottomSheet<dynamic>` → `BottomSheet`,
+  /// `DialogRoute<T>` → `Dialog`, named pages keep their route name.
+  static String labelOf(Route? route) {
+    try {
+      if (route == null) return 'null';
+      final name = route.settings.name;
+      var t = route.runtimeType.toString();
+      // Strip generics: _GetModalBottomSheet<dynamic> → _GetModalBottomSheet
+      final tick = t.indexOf('<');
+      if (tick >= 0) t = t.substring(0, tick);
+      String label;
+      if (t.contains('ModalBottomSheet')) {
+        label = 'BottomSheet';
+      } else if (t.contains('Dialog')) {
+        label = 'Dialog';
+      } else if (t.contains('PopupMenu')) {
+        label = 'PopupMenu';
+      } else if (t.startsWith('_')) {
+        label = t;
+      } else {
+        label = t
+            .replaceAll('GetPageRoute', 'Page')
+            .replaceAll('MaterialPageRoute', 'Page')
+            .replaceAll('CupertinoPageRoute', 'Page');
+      }
+      if (name != null && name.isNotEmpty && name != '/') {
+        label = '$label($name)';
+      }
+      return label;
+    } catch (_) {
+      return 'route';
+    }
+  }
+
+  void _record(String arrow, Route? route) {
+    try {
+      if (Get.isRegistered<AppLogService>()) {
+        Get.find<AppLogService>().trailRoute('$arrow ${labelOf(route)}');
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void didPush(Route route, Route? previousRoute) {
+    _record('→', route);
+    super.didPush(route, previousRoute);
+  }
+
+  @override
+  void didPop(Route route, Route? previousRoute) {
+    _record('←', route);
+    super.didPop(route, previousRoute);
+  }
+
+  @override
+  void didReplace({Route? newRoute, Route? oldRoute}) {
+    _record('→', newRoute);
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+  }
 }

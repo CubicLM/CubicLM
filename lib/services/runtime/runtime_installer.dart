@@ -29,6 +29,7 @@ import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../hive_service.dart';
+import '../app_log_service.dart';
 import '../sandbox/sandbox_manager.dart';
 import 'toolchain_catalog.dart';
 
@@ -207,6 +208,21 @@ class RuntimeInstaller extends GetxService {
 
   // ── Install / remove ───────────────────────────────────────────────
 
+  /// Runtime-lane logging: trail every install/remove, warning row only
+  /// on failure. Never throws.
+  void _rtLog(String message, {bool warn = false, Object? details}) {
+    try {
+      AppLogService.trailAction(message);
+      if (warn && Get.isRegistered<AppLogService>()) {
+        Get.find<AppLogService>().warning(
+          message,
+          details: details,
+          category: LogCategory.runtime,
+        );
+      }
+    } catch (_) {}
+  }
+
   /// Install [id] (all its bundles in order). One at a time; returns null
   /// on success, else an error message. Never throws.
   Future<String?> install(ToolchainId id) async {
@@ -218,22 +234,28 @@ class RuntimeInstaller extends GetxService {
 
     busy.value = true;
     _cancelRequested = false;
+    _rtLog('runtime install ${id.name} started');
     await _setKeepAlive(true);
     try {
       for (final bundle in stack.bundles) {
         final err = await _installBundle(id, bundle);
         if (err != null) {
           _set(id, state: ToolchainState.failed, error: err);
+          _rtLog('runtime install ${id.name} failed',
+              warn: true, details: err);
           return err;
         }
         if (_cancelRequested) {
           _set(id, state: ToolchainState.notInstalled, line: 'Cancelled.');
+          AppLogService.trailAction(
+              'runtime install ${id.name} cancelled');
           return 'Cancelled.';
         }
       }
       await _writeMarker(id, stack.bundles.map((b) => b.version).join(','));
       await _persistInstalled();
       _set(id, state: ToolchainState.ready, fraction: 1, line: 'Ready.');
+      AppLogService.trailAction('runtime install ${id.name} ready');
       await _refreshSandbox();
       return null;
     } finally {
@@ -264,6 +286,7 @@ class RuntimeInstaller extends GetxService {
       await _persistInstalled();
       await refresh();
       await _refreshSandbox();
+      AppLogService.trailAction('runtime ${id.name} removed');
     } catch (_) {}
   }
 

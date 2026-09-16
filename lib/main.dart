@@ -66,81 +66,8 @@ import 'services/memory_service.dart';
 import 'core/constants.dart';
 import 'core/languages.dart';
 import 'core/app_translations.dart';
-
-/// Full untruncated ancestor widget path for a framework error, nearest
-/// first (e.g. `Row ← _LocalModelCard ← ModelView ← ...`). Flutter's own
-/// `debugCreator` line truncates at 12 entries (`debugGetCreatorChain(12)`
-/// — the ⋯ that makes log rows unfixable), so this walks the live element
-/// tree instead: private widget names survive and the exact file widget is
-/// identifiable from a pasted log row. Never throws.
-String _fullCreatorChain(FlutterErrorDetails details) {
-  try {
-    final el = _resolveElement(details.context?.value);
-    if (el == null) {
-      return 'unresolved (context=${details.context?.runtimeType ?? 'null'})';
-    }
-    final parts = <String>[_elementLabel(el)];
-    el.visitAncestorElements((a) {
-      if (parts.length >= 80) return false;
-      parts.add(_elementLabel(a));
-      return true;
-    });
-    return parts.join(' ← ');
-  } catch (_) {
-    return 'unresolved (walk threw)';
-  }
-}
-
-/// Unwrap Element ← DebugCreator ← RenderObject.debugCreator ←
-/// DiagnosticsNode.value (recursive — the context shape differs per
-/// error kind; GetX lint rows often carry no context at all).
-Element? _resolveElement(Object? node, [int depth = 0]) {
-  try {
-    if (node == null || depth > 3) return null;
-    if (node is Element) return node;
-    if (node is DebugCreator) return node.element;
-    if (node is RenderObject) {
-      return _resolveElement(node.debugCreator, depth + 1);
-    }
-    if (node is DiagnosticsNode) {
-      return _resolveElement(node.value, depth + 1);
-    }
-    return null;
-  } catch (_) {
-    return null;
-  }
-}
-
-/// `runtimeType` plus key when present (keys disambiguate list items).
-String _elementLabel(Element e) {
-  try {
-    final k = e.widget.key;
-    if (k == null) return e.widget.runtimeType.toString();
-    return '${e.widget.runtimeType} key=$k';
-  } catch (_) {
-    return e.widget.runtimeType.toString();
-  }
-}
-
-/// Screen environment layout errors depend on: logical size, DPR,
-/// text scaler, orientation, platform. Context-free (safe mid-build).
-/// Never throws.
-String _diagnosticEnv() {
-  try {
-    final dispatcher = WidgetsBinding.instance.platformDispatcher;
-    if (dispatcher.views.isEmpty) return 'view: unavailable';
-    final v = dispatcher.views.first;
-    final w = v.physicalSize.width / v.devicePixelRatio;
-    final h = v.physicalSize.height / v.devicePixelRatio;
-    final orient = w >= h ? 'landscape' : 'portrait';
-    return 'window: ${w.toStringAsFixed(0)}x${h.toStringAsFixed(0)} logical '
-        '($orient), dpr: ${v.devicePixelRatio}, '
-        'textScale: ${dispatcher.textScaleFactor}, '
-        'platform: ${defaultTargetPlatform.name}';
-  } catch (_) {
-    return 'view: unavailable';
-  }
-}
+import 'utils/error_diagnostics.dart'
+    show fullCreatorChain, diagnosticEnv, trimStack;
 
 void main() {
   final appLogBuffer = <String>[];
@@ -379,10 +306,14 @@ void main() {
     FlutterError.onError = (details) {
       FlutterError.presentError(details);
       final message = StringBuffer(details.exceptionAsString());
-      if (details.informationCollector != null) {
-        for (final line in details.informationCollector!()) {
-          message.write('\n$line');
-        }
+      // Collect once: rendered into the message AND scanned for the
+      // creator element (collectors are pure renderers — single call).
+      Iterable<DiagnosticsNode> infoNodes = const [];
+      try {
+        infoNodes = details.informationCollector?.call() ?? const [];
+      } catch (_) {}
+      for (final line in infoNodes) {
+        message.write('\n$line');
       }
       // ── Diagnostics power-up: Flutter truncates the creator chain
       // with ⋯, which makes layout errors unfixable from the log alone.
@@ -390,29 +321,29 @@ void main() {
       // names included — they pinpoint the exact file widget) plus the
       // screen environment overflows depend on.
       try {
-        final chain = _fullCreatorChain(details);
-        if (chain.isNotEmpty) {
-          message.write('\n--- full widget path (nearest first) ---\n$chain');
-        }
+        message.write(
+            '\n--- full widget path (nearest first) ---\n${fullCreatorChain(details, infoNodes)}');
       } catch (_) {}
       try {
-        message.write('\n--- environment ---\n${_diagnosticEnv()}');
+        message.write('\n--- environment ---\n${diagnosticEnv()}');
       } catch (_) {}
       final text = message.toString();
       if (text.contains('improper use of a GetX')) {
         // Harmless GetX empty-scope hint, not an app failure: keep it
         // searchable in logs but out of errors, diagnostics and crash
         // reports (it used to file a Crashlytics FATAL per occurrence).
+        // Stack is trimmed (GetX rows ship 500+ mount frames); crash
+        // reporters are untouched (this only shapes the logged row).
         appLog.debug(
           text,
-          details: details.stack?.toString() ?? 'No stack',
+          details: trimStack(details.stack),
           category: LogCategory.system,
         );
         return;
       }
       appLog.error(
         text,
-        details: details.stack?.toString() ?? 'No stack',
+        details: trimStack(details.stack),
         category: LogCategory.system,
       );
       crashReporting.recordFlutterFatal(details);
@@ -752,6 +683,7 @@ class CubicLMApp extends StatelessWidget {
         translations: AppTranslations(),
         locale: AppLanguage.localeFromCode('en'),
         fallbackLocale: AppLanguage.localeFromCode('en'),
+        navigatorObservers: [LogRouteObserver()],
       );
     }
     final settings = Get.find<SettingsController>();
@@ -779,6 +711,9 @@ class CubicLMApp extends StatelessWidget {
           translations: AppTranslations(),
           locale: currentLocale,
           fallbackLocale: AppLanguage.localeFromCode('en'),
+          // Route trail for System Logs: every push/pop (pages, dialogs,
+          // bottom sheets) is recorded so error rows name what was open.
+          navigatorObservers: [LogRouteObserver()],
           builder: (ctx, child) => MediaQuery(
             data: MediaQuery.of(ctx).copyWith(
               textScaler: TextScaler.linear(scale),

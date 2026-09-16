@@ -15,6 +15,7 @@ import 'dart:io';
 import 'package:get/get.dart';
 
 import '../hive_service.dart';
+import '../app_log_service.dart';
 import '../sandbox/sandbox_manager.dart';
 import '../security/sandbox_service.dart';
 import '../../utils/preview_guard.dart';
@@ -252,6 +253,7 @@ class TerminalService extends GetxService {
     if (blocked != null) {
       _append(TerminalLine('Blocked: $blocked', isError: true));
       lastExitCode.value = -1;
+      AppLogService.trailAction('terminal blocked ($blocked)');
       return -1;
     }
 
@@ -304,6 +306,12 @@ class TerminalService extends GetxService {
         exitCode = await _runDirect(cmd, timeout: timeout);
       }
       lastExitCode.value = exitCode;
+      // Terminal lane: first token only, secrets scrubbed — never the
+      // full command line.
+      final head = SandboxService.redactSecrets(
+          cmd.split(RegExp(r'\s+')).firstWhere((t) => t.isNotEmpty,
+              orElse: () => 'cmd'));
+      AppLogService.trailAction('terminal $head exit $exitCode');
       _append(TerminalLine('[exit $exitCode]', isError: exitCode != 0));
       return exitCode;
     } finally {

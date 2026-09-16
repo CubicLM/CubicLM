@@ -17,6 +17,7 @@ import '../services/agent/agent_runner.dart';
 import '../services/agent/agent_types.dart';
 import '../services/agent_progress_service.dart';
 import '../services/agent_workspace.dart';
+import '../services/app_log_service.dart';
 import '../services/tools/tool_registry.dart';
 import '../services/tools/todo_tools.dart';
 import '../services/workspace/checkpoint_manager.dart';
@@ -184,6 +185,21 @@ class AgentRunnerController extends GetxController {
 
   bool _cancelled = false;
 
+  /// Agent-lane logging: trail every run, warning row only on failure
+  /// (prompts never enter logs). Never throws.
+  void _agentLog(String message, {bool warn = false, Object? details}) {
+    try {
+      AppLogService.trailAction(message);
+      if (warn && Get.isRegistered<AppLogService>()) {
+        Get.find<AppLogService>().warning(
+          message,
+          details: details,
+          category: LogCategory.agent,
+        );
+      }
+    } catch (_) {}
+  }
+
   /// Live elapsed-time counter for the running agent (Mobile-Harness
   /// parity: "Working… 1:23"). Ticks while [running], frozen otherwise.
   final elapsed = ''.obs;
@@ -270,6 +286,11 @@ class AgentRunnerController extends GetxController {
     _diff = const FileDiff();
     _startElapsed();
 
+    final pid = projectId.value;
+    _agentLog('agent run started '
+        '(${useLocal.value ? 'local' : 'cloud'}'
+        '${pid == null || pid.isEmpty ? ', Q&A' : ', project'})');
+
     // Clear the previous plan so a stale checklist never shows.
     try {
       if (Get.isRegistered<ToolRegistry>()) {
@@ -278,7 +299,6 @@ class AgentRunnerController extends GetxController {
       }
     } catch (_) {}
 
-    final pid = projectId.value;
     await _progress?.showStarted(useLocal.value ? 'Local agent' : 'Agent');
 
     try {
@@ -324,6 +344,14 @@ class AgentRunnerController extends GetxController {
     } finally {
       running.value = false;
       _stopElapsed();
+      if (error.value != null) {
+        _agentLog('agent run failed',
+            warn: true, details: error.value);
+      } else if (_cancelled) {
+        AppLogService.trailAction('agent run cancelled');
+      } else {
+        AppLogService.trailAction('agent run finished');
+      }
       await _persistCurrentChat();
       await refreshDiff();
       if (_cancelled) {
@@ -465,8 +493,11 @@ class AgentRunnerController extends GetxController {
         AppSnackbar.showTop(
             'Export done', '$skipped file(s) skipped (too large).');
       }
+      AppLogService.trailAction(
+          'project exported (ZIP${skipped > 0 ? ', $skipped skipped' : ''})');
     } catch (e) {
       AppSnackbar.showTop('Export failed', '$e');
+      _agentLog('project export failed', warn: true, details: '$e');
     }
   }
 

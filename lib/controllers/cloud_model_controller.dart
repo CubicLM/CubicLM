@@ -909,6 +909,10 @@ class CloudModelController extends GetxController {
 
   Future<void> saveApiKey(String provider, String value) async {
     await _settings.setApiKey(provider, value);
+    // Provider id only — never the key.
+    AppLogService.trailAction(value.isEmpty
+        ? 'cloud key removed ($provider)'
+        : 'cloud key saved ($provider)');
     if (value.isNotEmpty) {
       final hint = keyFormatHint(provider, value);
       if (hint != null) {

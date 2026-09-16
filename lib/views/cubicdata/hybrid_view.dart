@@ -249,7 +249,9 @@ class _HybridEditorViewState extends State<HybridEditorView> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Obx(() {
+    // Builder, not Obx: plain getters/fields only (setState drives
+    // updates) — an empty Obx only spams the logs.
+    return Builder(builder: (_) {
       final f = _file;
       if (f == null) {
         return Scaffold(

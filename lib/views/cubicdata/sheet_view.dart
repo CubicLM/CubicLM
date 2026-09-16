@@ -575,7 +575,9 @@ class _SheetEditorViewState extends State<SheetEditorView> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Obx(() {
+    // Builder, not Obx: this tree reads plain getters/fields only
+    // (setState drives updates) — an empty Obx only spams the logs.
+    return Builder(builder: (_) {
       final f = _file;
       if (f == null) {
         return Scaffold(

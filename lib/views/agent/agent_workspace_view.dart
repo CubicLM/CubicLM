@@ -28,7 +28,7 @@ class AgentWorkspaceView extends StatelessWidget {
     final controller = Get.isRegistered<AgentRunnerController>()
         ? Get.find<AgentRunnerController>()
         : Get.put(AgentRunnerController());
-    final input = TextEditingController();
+    final input = TextEditingController(text: controller.prompt.value);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(

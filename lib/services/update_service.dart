@@ -500,6 +500,8 @@ class UpdateService extends GetxService {
 
     isDownloading.value = true;
     downloadProgress.value = 0.0;
+    AppLogService.trailAction(
+        'update download started${_apkFileName.isNotEmpty ? ' ($_apkFileName)' : ''}');
 
     // Show progress dialog.
     Get.dialog(
@@ -584,6 +586,16 @@ class UpdateService extends GetxService {
           iconName: 'shield_alert',
           duration: const Duration(seconds: 5),
         );
+        AppLogService.trailAction('update failed verification');
+        try {
+          if (Get.isRegistered<AppLogService>()) {
+            Get.find<AppLogService>().warning(
+              'Update failed verification',
+              details: bad,
+              category: LogCategory.update,
+            );
+          }
+        } catch (_) {}
         return;
       }
 

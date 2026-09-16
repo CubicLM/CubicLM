@@ -7,12 +7,14 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/settings_controller.dart';
+import '../controllers/agent_runner_controller.dart';
 import '../core/colors.dart';
 import '../theme/design_tokens.dart';
 import '../services/app_log_service.dart';
 import '../utils/app_snackbar.dart';
 import '../utils/export_file.dart';
 import '../utils/web_download.dart';
+import 'agent/agent_workspace_view.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class LogView extends StatefulWidget {
@@ -705,6 +707,55 @@ class _LogViewState extends State<LogView> {
                                                               height: 1.4)),
                                                     ),
                                                   ],
+                                                  const SizedBox(height: 10),
+                                                  Wrap(
+                                                    spacing: 8,
+                                                    runSpacing: 6,
+                                                    children: [
+                                                      _rowAction(
+                                                        context,
+                                                        icon: LucideIcons.clipboardList,
+                                                        label: 'Copy diagnosis',
+                                                        onTap: () async {
+                                                          final text = logs
+                                                              .diagnosisFor(
+                                                                  entry);
+                                                          await Clipboard.setData(
+                                                              ClipboardData(
+                                                                  text: text));
+                                                          AppSnackbar.showTop(
+                                                            'Diagnosis copied',
+                                                            'Paste it to chat or the agent.',
+                                                            icon: LucideIcons
+                                                                .clipboardCheck,
+                                                            iconName:
+                                                                'clipboard_check',
+                                                            duration:
+                                                                const Duration(
+                                                                    seconds: 2),
+                                                            logHistory: false,
+                                                          );
+                                                        },
+                                                      ),
+                                                      if (entry.level ==
+                                                              'ERROR' ||
+                                                          entry.level ==
+                                                              'WARNING')
+                                                        _rowAction(
+                                                          context,
+                                                          icon: LucideIcons
+                                                              .bot,
+                                                          label:
+                                                              'Fix with Agent',
+                                                          accent: true,
+                                                          onTap: () =>
+                                                              _fixWithAgent(
+                                                                  context,
+                                                                  logs,
+                                                                  entry),
+                                                        ),
+                                                    ],
+                                                  ),
                                                 ]),
                                       ),
                                   ),
@@ -726,9 +777,61 @@ class _LogViewState extends State<LogView> {
     );
   }
 
+  Widget _rowAction(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool accent = false,
+  }) {
+    final color =
+        accent ? Dt.accent : Theme.of(context).hintColor;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: color),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Prefill the agent with this row's diagnosis and open the workspace.
+  /// The composer picks up `prompt` on build, so the task is visible and
+  /// runnable with one tap.
+  void _fixWithAgent(
+      BuildContext context, AppLogService logs, AppLogEntry entry) {
+    try {
+      final c = Get.isRegistered<AgentRunnerController>()
+          ? Get.find<AgentRunnerController>()
+          : Get.put(AgentRunnerController());
+      c.prompt.value = logs.diagnosisFor(entry, forAgent: true);
+      Get.to(() => const AgentWorkspaceView());
+    } catch (e) {
+      AppSnackbar.showTop('Cannot open agent', '$e');
+    }
+  }
+
   Future<void> _showExportSheet(
-      BuildContext context, AppLogService logs, bool isDark) async {
-    final action = await Get.dialog<String>(
+      BuildContext context, AppLogService logs, bool isDark) async {    final action = await Get.dialog<String>(
       AlertDialog(
         backgroundColor: isDark ? AppColors.surface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -914,6 +1017,14 @@ class _LogViewState extends State<LogView> {
         return const Color(0xFF8B5CF6);
       case LogCategory.image:
         return const Color(0xFFEC4899);
+      case LogCategory.agent:
+        return const Color(0xFF14B8A6);
+      case LogCategory.runtime:
+        return const Color(0xFFF97316);
+      case LogCategory.terminal:
+        return const Color(0xFF64748B);
+      case LogCategory.update:
+        return const Color(0xFFA855F7);
     }
   }
 
