@@ -184,6 +184,46 @@ class AgentRunnerController extends GetxController {
 
   bool _cancelled = false;
 
+  /// Live elapsed-time counter for the running agent (Mobile-Harness
+  /// parity: "Working… 1:23"). Ticks while [running], frozen otherwise.
+  final elapsed = ''.obs;
+  int? _runStartedMs;
+  Timer? _elapsedTimer;
+
+  /// m:ss / h:mm:ss for [ms]. Pure for unit tests.
+  static String formatElapsed(int ms) {
+    final total = ms < 0 ? 0 : ms ~/ 1000;
+    final h = total ~/ 3600;
+    final m = (total % 3600) ~/ 60;
+    final s = total % 60;
+    final mm = h > 0 ? m.toString().padLeft(2, '0') : '$m';
+    return '${h > 0 ? '$h:' : ''}$mm:${s.toString().padLeft(2, '0')}';
+  }
+
+  void _startElapsed() {
+    _stopElapsed();
+    _runStartedMs = DateTime.now().millisecondsSinceEpoch;
+    elapsed.value = formatElapsed(0);
+    _elapsedTimer =
+        Timer.periodic(const Duration(seconds: 1), (_) {
+      final start = _runStartedMs;
+      if (start == null) return;
+      elapsed.value = formatElapsed(
+          DateTime.now().millisecondsSinceEpoch - start);
+    });
+  }
+
+  void _stopElapsed() {
+    _elapsedTimer?.cancel();
+    _elapsedTimer = null;
+  }
+
+  @override
+  void onClose() {
+    _stopElapsed();
+    super.onClose();
+  }
+
   AgentRunner? get _runner =>
       Get.isRegistered<AgentRunner>() ? Get.find<AgentRunner>() : null;
 
@@ -228,6 +268,7 @@ class AgentRunnerController extends GetxController {
     checkpointId.value = null;
     error.value = null;
     _diff = const FileDiff();
+    _startElapsed();
 
     // Clear the previous plan so a stale checklist never shows.
     try {
@@ -282,6 +323,7 @@ class AgentRunnerController extends GetxController {
       error.value = e.toString();
     } finally {
       running.value = false;
+      _stopElapsed();
       await _persistCurrentChat();
       await refreshDiff();
       if (_cancelled) {

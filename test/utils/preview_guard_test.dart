@@ -27,4 +27,27 @@ void main() {
       expect(isPreviewUrlAllowed('not a url \\'), isFalse);
     });
   });
+
+  group('findPreviewUrl', () {
+    test('extracts loopback URLs from terminal output', () {
+      expect(
+        findPreviewUrl('Server running at http://localhost:3000/ ready'),
+        'http://localhost:3000/',
+      );
+      expect(
+        findPreviewUrl('vite v5.0.0 ready in 300 ms\n➜  Local: http://127.0.0.1:5173/app'),
+        'http://127.0.0.1:5173/app',
+      );
+      expect(
+        findPreviewUrl('listening on https://api.localhost:8443/v1)'),
+        'https://api.localhost:8443/v1',
+      );
+    });
+
+    test('ignores external URLs and plain text', () {
+      expect(findPreviewUrl('see https://example.com/docs'), isNull);
+      expect(findPreviewUrl('no urls here'), isNull);
+      expect(findPreviewUrl(''), isNull);
+    });
+  });
 }

@@ -347,7 +347,7 @@ class RuntimeInstaller extends GetxService {
           await part.delete();
         } catch (_) {}
         startAt = 0;
-        return _downloadWithResume(url, dest, id);
+        return await _downloadWithResume(url, dest, id);
       }
       if (r.statusCode != 200 && r.statusCode != 206) {
         await r.drain();

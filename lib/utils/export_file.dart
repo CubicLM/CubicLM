@@ -394,10 +394,10 @@ class ExportFile {
     if (kIsWeb) return [];
     try {
       if (Platform.isAndroid) {
-        return _listAndroidLogFiles();
+        return await _listAndroidLogFiles();
       }
       final dir = await _desktopExportDir();
-      return _listDirFiles(dir);
+      return await _listDirFiles(dir);
     } catch (_) {
       return [];
     }
@@ -419,7 +419,7 @@ class ExportFile {
       final docs = await getApplicationDocumentsDirectory();
       final sub = Directory(
           '${docs.path}${Platform.pathSeparator}${appSubfolder()}');
-      if (await sub.exists()) return _listDirFiles(sub);
+      if (await sub.exists()) return await _listDirFiles(sub);
     } catch (_) {}
     return [];
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -12,7 +13,9 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import '../core/colors.dart';
+import '../services/terminal/terminal_service.dart';
 import '../theme/design_tokens.dart';
+import '../views/terminal/terminal_view.dart';
 
 class CodeBlockBuilder extends MarkdownElementBuilder {
   final BuildContext context;
@@ -77,6 +80,105 @@ class _CodeBlockState extends State<_CodeBlock> {
 
   void _shareCode() {
     Share.share(widget.code);
+  }
+
+  /// Shell languages whose blocks get a "Run in Terminal" action
+  /// (Mobile-Harness parity). Multi-line scripts run as-is through the
+  /// sandboxed terminal; blocked commands are rejected there.
+  static const _shellLanguages = {
+    'sh',
+    'bash',
+    'shell',
+    'zsh',
+    'fish',
+    'powershell',
+    'ps1',
+    'pwsh',
+    'bat',
+    'batch',
+    'cmd',
+    'console',
+    'terminal',
+  };
+
+  bool get _isShellScript {
+    final lang = (widget.language ?? '').trim().toLowerCase();
+    if (_shellLanguages.contains(lang)) return true;
+    // Untagged single-line commands are usually shell too.
+    if (lang.isEmpty &&
+        widget.code.trim().isNotEmpty &&
+        !widget.code.contains('\n')) {
+      return true;
+    }
+    return false;
+  }
+
+  void _runInTerminal() {
+    final code = widget.code.trimRight();
+    if (code.isEmpty) return;
+    final preview =
+        code.split('\n').take(8).join('\n') +
+        (code.split('\n').length > 8 ? '\n…' : '');
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+        title: Text('code_run_terminal'.tr,
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Theme.of(context).hintColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                preview,
+                maxLines: 8,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.firaCode(fontSize: 11.5),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Runs in the sandboxed terminal. Blocked commands are rejected automatically.',
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11.5,
+                  color: Theme.of(context).hintColor),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('common_cancel'.tr),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: Dt.accent),
+            onPressed: () {
+              Get.back();
+              try {
+                final term = Get.isRegistered<TerminalService>()
+                    ? Get.find<TerminalService>()
+                    : Get.put(TerminalService());
+                unawaited(term.runCommand(code));
+                Get.to(() => const TerminalView());
+              } catch (e) {
+                Get.snackbar('Cannot run', '$e',
+                    snackPosition: SnackPosition.BOTTOM);
+              }
+            },
+            child: Text('code_run_terminal'.tr),
+          ),
+        ],
+      ),
+      name: 'run-in-terminal-confirm',
+    );
   }
 
   void _openLivePreview() {
@@ -177,6 +279,17 @@ class _CodeBlockState extends State<_CodeBlock> {
                       ),
                     if (_isHtmlDocument && _previewSupported)
                       const SizedBox(width: 4),
+                    if (_isShellScript) ...[
+                      _actionButton(
+                        icon: Icons.terminal_rounded,
+                        label: 'code_run_terminal'.tr,
+                        showLabel: !compact,
+                        color: AppColors.primary,
+                        onTap: _runInTerminal,
+                        isDark: isDark,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
                     _actionButton(
                       icon: _copied ? Icons.check_rounded : Icons.copy_rounded,
                       label: _copied ? 'code_copied'.tr : 'code_copy'.tr,

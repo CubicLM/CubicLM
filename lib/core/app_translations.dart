@@ -101,6 +101,7 @@ class AppTranslations extends Translations {
     'code_copy': 'Copy',
     'code_copied': 'Copied',
     'code_export': 'Export',
+    'code_run_terminal': 'Run',
 
     // Chat
     'chat_input_hint': 'Type a message...',

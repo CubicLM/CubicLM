@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/colors.dart';
 import '../../services/agent_workspace.dart';
@@ -177,6 +178,66 @@ class _TerminalViewState extends State<TerminalView> {
                   },
                 )),
           ),
+          // Dev-server preview chip (Mobile-Harness parity): a loopback
+          // URL in the output becomes an openable chip.
+          Obx(() {
+            final url = term.previewUrl.value;
+            if (url == null || url.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            return Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Dt.accent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: Dt.accent.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.language_rounded,
+                      size: 14, color: Dt.accent),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      url,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.firaCode(
+                          fontSize: 11, color: Dt.accent),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: () async {
+                      try {
+                        await launchUrl(Uri.parse(url),
+                            mode: LaunchMode.externalApplication);
+                      } catch (_) {}
+                    },
+                    child: Text(
+                      'Open',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Dt.accent,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Dismiss',
+                    icon: const Icon(Icons.close_rounded, size: 14),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                        minWidth: 28, minHeight: 28),
+                    onPressed: () => term.previewUrl.value = null,
+                  ),
+                ],
+              ),
+            );
+          }),
           // Helper key row (Mobile-Harness parity): modifiers, history,
           // and shell metacharacters that soft keyboards hide.
           _keyRow(),

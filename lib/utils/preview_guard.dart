@@ -30,3 +30,22 @@ bool isPreviewUrlAllowed(String url) {
   if (host == 'localhost' || host.endsWith('.localhost')) return true;
   return false;
 }
+
+final _loopbackUrlRe = RegExp(
+  r'https?://(?:localhost|127\.0\.0\.1|[a-zA-Z0-9-]+\.localhost)(?::\d+)?(?:/[^\s)\]"<>]*)?',
+);
+
+/// First loopback URL in free text (terminal output, logs), or null.
+/// Mobile-Harness parity: dev servers print `http://localhost:3000` —
+/// the terminal surfaces it as an openable preview chip. Only matches
+/// [isPreviewUrlAllowed] origins. Pure for unit tests.
+String? findPreviewUrl(String text) {
+  try {
+    final m = _loopbackUrlRe.firstMatch(text);
+    if (m == null) return null;
+    final url = m.group(0)!;
+    return isPreviewUrlAllowed(url) ? url : null;
+  } catch (_) {
+    return null;
+  }
+}

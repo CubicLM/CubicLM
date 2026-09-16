@@ -17,6 +17,7 @@ import 'package:get/get.dart';
 import '../hive_service.dart';
 import '../sandbox/sandbox_manager.dart';
 import '../security/sandbox_service.dart';
+import '../../utils/preview_guard.dart';
 
 /// One terminal output line. Public for the view + tests.
 class TerminalLine {
@@ -108,6 +109,10 @@ class TerminalService extends GetxService {
   static const maxLines = 1000;
   static const maxHistory = 100;
   static const maxPersistedLines = 200;
+
+  /// Live transcript byte cap (Mobile-Harness parity: 200 KB). One huge
+  /// `cat` must not grow memory without bound; oldest lines drop first.
+  static const maxLiveChars = 200 * 1024;
   static const defaultSessionId = 'default';
 
   /// Active session observables (the view binds to these).
@@ -117,6 +122,10 @@ class TerminalService extends GetxService {
   final workingDir = ''.obs;
   final lastExitCode = RxnInt();
   final activeSessionId = defaultSessionId.obs;
+
+  /// Latest loopback URL seen in output (Mobile-Harness parity: dev
+  /// servers print `http://localhost:PORT`). Null when none this run.
+  final previewUrl = RxnString();
 
   final Map<String, _SessionState> _sessions = {};
   Process? _process;
@@ -144,6 +153,8 @@ class TerminalService extends GetxService {
     activeSessionId.value = target;
     if (!_sessions.containsKey(target)) _loadSession(target);
     _mirror(target);
+    // Detection is per-run, not persisted.
+    previewUrl.value = null;
   }
 
   void _stashActive() {
@@ -246,6 +257,8 @@ class TerminalService extends GetxService {
 
     // Package installs never stall on interactive prompts.
     final cmd = withAutoConfirm(raw);
+    // Fresh detection scope per command.
+    previewUrl.value = null;
 
     // CWD tracking for cd commands
     if (_isCdCommand(cmd)) {
@@ -398,6 +411,7 @@ class TerminalService extends GetxService {
   /// Clear the active session's output.
   void clear() {
     lines.clear();
+    previewUrl.value = null;
     _stashActive();
   }
 
@@ -405,6 +419,22 @@ class TerminalService extends GetxService {
     lines.add(line);
     if (lines.length > maxLines) {
       lines.removeRange(0, lines.length - maxLines);
+    }
+    var total = 0;
+    for (final l in lines) {
+      total += l.text.length;
+    }
+    while (total > maxLiveChars && lines.length > 1) {
+      total -= lines.first.text.length;
+      lines.removeAt(0);
+    }
+    // Sniff loopback dev-server URLs for the preview chip. Cheap gate
+    // first; full regex only on matching lines.
+    if (!line.isCommand &&
+        previewUrl.value == null &&
+        (line.text.contains('localhost') ||
+            line.text.contains('127.0.0.1'))) {
+      previewUrl.value = findPreviewUrl(line.text);
     }
   }
 
