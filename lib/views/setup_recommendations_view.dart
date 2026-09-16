@@ -126,14 +126,17 @@ class _SetupChecklistCardState extends State<SetupChecklistCard>
   }
 
   int get _doneCount => [
-        _notif,
+        if (SetupChecklist.supportsNotifications) _notif,
         if (SetupChecklist.isAndroid) _battery,
         _runtime,
         _cloud,
         _model,
       ].where((s) => s == SetupItemState.done).length;
 
-  int get _totalCount => SetupChecklist.isAndroid ? 5 : 4;
+  int get _totalCount =>
+      (SetupChecklist.supportsNotifications ? 1 : 0) +
+      (SetupChecklist.isAndroid ? 1 : 0) +
+      3;
 
   Future<void> _allowNotifications() async {
     if (_busy) return;
@@ -211,23 +214,24 @@ class _SetupChecklistCardState extends State<SetupChecklistCard>
           ],
         ),
         const SizedBox(height: 4),
-        _row(
-          context,
-          isDark,
-          pad,
-          icon: LucideIcons.bellRing,
-          title: 'Task notifications',
-          desc:
-              'Live progress while models download and a nudge when the agent finishes or needs you.',
-          privacy: 'Only progress, completion and error alerts. Nothing else.',
-          state: _notif,
-          actionLabel: _notifPermanentlyDenied
-              ? 'Open settings'
-              : 'Allow',
-          onAction: _notifPermanentlyDenied
-              ? () => SetupChecklist.openNotificationSettings()
-              : _allowNotifications,
-        ),
+        if (SetupChecklist.supportsNotifications)
+          _row(
+            context,
+            isDark,
+            pad,
+            icon: LucideIcons.bellRing,
+            title: 'Task notifications',
+            desc:
+                'Live progress while models download and a nudge when the agent finishes or needs you.',
+            privacy: 'Only progress, completion and error alerts. Nothing else.',
+            state: _notif,
+            actionLabel: _notifPermanentlyDenied
+                ? 'Open settings'
+                : 'Allow',
+            onAction: _notifPermanentlyDenied
+                ? () => SetupChecklist.openNotificationSettings()
+                : _allowNotifications,
+          ),
         if (SetupChecklist.isAndroid)
           _row(
             context,

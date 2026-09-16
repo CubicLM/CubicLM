@@ -5,6 +5,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
@@ -531,11 +532,14 @@ Output ONLY the JSON block. No explanation needed.''';
             ],
           ),
           const SizedBox(height: 12),
-          OutlinedButton.icon(
-            icon: const Icon(LucideIcons.packageOpen, size: 14),
-            label: const Text('Install APK from device'),
-            onPressed: _installApk,
-          ),
+          // APK install is inherently Android (PackageInstaller). On
+          // desktop the OS can't install APKs — hide instead of failing.
+          if (Platform.isAndroid)
+            OutlinedButton.icon(
+              icon: const Icon(LucideIcons.packageOpen, size: 14),
+              label: const Text('Install APK from device'),
+              onPressed: _installApk,
+            ),
         ],
       ),
     );

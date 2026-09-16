@@ -60,6 +60,15 @@ android {
         multiDexEnabled = true
     }
 
+    // Vulkan validation layers (~14 MB) are dev-only diagnostics auto-
+    // packaged from the NDK: the loader never requests them at runtime,
+    // so excluding them from every build is pure size win.
+    packaging {
+        jniLibs {
+            excludes += "**/libVkLayer_*.so"
+        }
+    }
+
     // Distribution flavors: `gplay` is the standard release (Firebase
     // inert without google-services.json); `fdroid` gets its own
     // applicationId for parallel install + F-Droid source builds.

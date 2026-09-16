@@ -10,6 +10,7 @@ library;
 
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -32,6 +33,11 @@ class RuntimeSetupView extends StatefulWidget {
 
 class _RuntimeSetupViewState extends State<RuntimeSetupView> {
   int _step = 0;
+
+  /// Isolated runtimes (PRoot + ARM64 rootfs) only exist on Android.
+  /// Elsewhere the agent + terminal use the native host shell with the
+  /// same approval gates — installs are disabled, never attempted.
+  static bool get runtimeSupported => !kIsWeb && Platform.isAndroid;
 
   RuntimeInstaller get _installer {
     if (!Get.isRegistered<RuntimeInstaller>()) {
@@ -169,7 +175,9 @@ class _RuntimeSetupViewState extends State<RuntimeSetupView> {
           title: 'Platform',
           detail: Platform.isAndroid
               ? 'Android — full toolchain setup supported'
-              : '${Platform.operatingSystem} — core Ubuntu needs Android; overlays may still work',
+              : kIsWeb
+                  ? 'Web — runtimes need Android or desktop'
+                  : '${Platform.operatingSystem} — isolated runtimes are Android-only; the agent uses your native shell here',
           ok: true,
         ),
         (
@@ -262,10 +270,44 @@ class _RuntimeSetupViewState extends State<RuntimeSetupView> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (!runtimeSupported) _desktopNote(context, isDark),
           for (final s in stacks) _stackCard(context, isDark, s),
         ],
       );
     });
+  }
+
+  /// Honest non-Android banner (PLATFORM_DIFFERENCES §8.3): no dead
+  /// install buttons, closest real alternative stated upfront.
+  Widget _desktopNote(BuildContext context, bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Dt.accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Dt.accent.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(LucideIcons.info, size: 16, color: Dt.accent),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              kIsWeb
+                  ? 'Toolchain installs need Android or desktop — the web build is cloud-only.'
+                  : 'Isolated Ubuntu runtimes need Android (PRoot). On desktop the agent workspace and terminal run in your native shell with the same approval gates — nothing to install here.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11.5,
+                height: 1.45,
+                color: Theme.of(context).hintColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _stackCard(BuildContext context, bool isDark, ToolchainStack s) {
@@ -352,6 +394,20 @@ class _RuntimeSetupViewState extends State<RuntimeSetupView> {
             ),
           ],
           const SizedBox(height: 8),
+          if (!runtimeSupported)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                s.id == ToolchainId.core
+                    ? 'Android-only runtime — install is disabled on this platform.'
+                    : 'Needs the Core runtime (Android-only) — install is disabled on this platform.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                  color: Theme.of(context).hintColor,
+                ),
+              ),
+            ),
           Row(
             children: [
               if (st.state == ToolchainState.ready)
@@ -372,7 +428,9 @@ class _RuntimeSetupViewState extends State<RuntimeSetupView> {
                   label: Text(st.state == ToolchainState.failed
                       ? 'Retry'
                       : 'Install'),
-                  onPressed: busy ? null : () => _installStack(s.id),
+                  onPressed: busy || !runtimeSupported
+                      ? null
+                      : () => _installStack(s.id),
                 ),
             ],
           ),

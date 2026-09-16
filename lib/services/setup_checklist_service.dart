@@ -40,6 +40,18 @@ class SetupChecklist {
   static bool get isAndroid =>
       !kIsWeb && Platform.isAndroid;
 
+  /// Notifications row needs a working permission surface: Android
+  /// runtime permission or the Web Notification API. Windows/macOS/Linux
+  /// builds use a notification stub, so the row would be dead UI there.
+  static bool get supportsNotifications {
+    if (kIsWeb) return true;
+    try {
+      return Platform.isAndroid;
+    } catch (_) {
+      return false;
+    }
+  }
+
   // ── Notifications ──────────────────────────────────────────────
 
   /// True when task-progress notifications can be shown.
