@@ -41,6 +41,15 @@ flutter config --enable-windows-desktop
 flutter create --platforms=windows .   # already done, generates windows/ if missing
 flutter run -d windows          # default 1280×800, min 400×700, centered
 flutter build windows           # → build/windows/runner/Release/cubiclm.exe
+# NOTE (verified 2026-09-16): `flutter build windows` (Release) currently
+# fails at LINK with `firebase_app.lib` missing — the auto-downloaded
+# Firebase C++ SDK 12.7.0 ships Debug-only libs while firebase_core 3.15.2
+# links `.../Release/firebase_app.lib`. Workarounds: `flutter build
+# windows --debug` (links Debug libs, works — app launches), or set
+# FIREBASE_CPP_SDK_DIR to an SDK that still ships Release libs. If cmake
+# complains the SDK dir is missing after a stale build, delete
+# `build/windows/x64/extracted/` (empty parent fools the EXISTS check) and
+# rebuild — the cached 12.7.0 zip re-extracts automatically.
 
 # All shells share `lib/` — no separate `web/` or `desktop/` codebase.
 ```

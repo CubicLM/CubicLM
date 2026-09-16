@@ -68,32 +68,46 @@ import 'core/languages.dart';
 import 'core/app_translations.dart';
 
 /// Full untruncated ancestor widget path for a framework error, nearest
-/// first (e.g. `Row ← _LocalModelCard ← ModelView ← ...`). Unlike the
-/// `debugCreator` one-liner Flutter prints (truncated with ⋯), this walks
-/// the live element tree, so private widget names survive and the exact
-/// file widget is identifiable from a pasted log row. Never throws.
+/// first (e.g. `Row ← _LocalModelCard ← ModelView ← ...`). Flutter's own
+/// `debugCreator` line truncates at 12 entries (`debugGetCreatorChain(12)`
+/// — the ⋯ that makes log rows unfixable), so this walks the live element
+/// tree instead: private widget names survive and the exact file widget is
+/// identifiable from a pasted log row. Never throws.
 String _fullCreatorChain(FlutterErrorDetails details) {
   try {
-    final value = details.context?.value;
-    Element? el;
-    if (value is Element) {
-      el = value;
-    } else if (value is RenderObject) {
-      final creator = value.debugCreator;
-      if (creator is DebugCreator) el = creator.element;
+    final el = _resolveElement(details.context?.value);
+    if (el == null) {
+      return 'unresolved (context=${details.context?.runtimeType ?? 'null'})';
     }
-    if (el == null) return '';
-    final parts = <String>[];
-    Element? cur = el;
-    parts.add(_elementLabel(cur));
-    cur.visitAncestorElements((a) {
+    final parts = <String>[_elementLabel(el)];
+    el.visitAncestorElements((a) {
       if (parts.length >= 80) return false;
       parts.add(_elementLabel(a));
       return true;
     });
     return parts.join(' ← ');
   } catch (_) {
-    return '';
+    return 'unresolved (walk threw)';
+  }
+}
+
+/// Unwrap Element ← DebugCreator ← RenderObject.debugCreator ←
+/// DiagnosticsNode.value (recursive — the context shape differs per
+/// error kind; GetX lint rows often carry no context at all).
+Element? _resolveElement(Object? node, [int depth = 0]) {
+  try {
+    if (node == null || depth > 3) return null;
+    if (node is Element) return node;
+    if (node is DebugCreator) return node.element;
+    if (node is RenderObject) {
+      return _resolveElement(node.debugCreator, depth + 1);
+    }
+    if (node is DiagnosticsNode) {
+      return _resolveElement(node.value, depth + 1);
+    }
+    return null;
+  } catch (_) {
+    return null;
   }
 }
 
