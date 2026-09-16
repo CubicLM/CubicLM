@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.OpenableColumns
@@ -407,6 +408,29 @@ class MainActivity : FlutterFragmentActivity() {
             }
         }
 
+        // Battery reliability for long tasks (Dart: SetupChecklist).
+        // Channel "com.cubiclm.app/power": isBatteryUnrestricted -> bool,
+        // openBatterySettings -> bool (opened). Settings pages only — never
+        // the direct exemption request (Play-policy friendly).
+        val powerChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.cubiclm.app/power",
+        )
+        powerChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "isBatteryUnrestricted" -> {
+                    val pm = getSystemService(POWER_SERVICE) as? PowerManager
+                    result.success(
+                        pm?.isIgnoringBatteryOptimizations(packageName) == true,
+                    )
+                }
+                "openBatterySettings" -> {
+                    result.success(openBatterySettingsPage())
+                }
+                else -> result.notImplemented()
+            }
+        }
+
         // Isolated Ubuntu exec (Dart: ProotBackend via SandboxManager).
         // Channel "com.cubiclm.app/proot": ping -> bool,
         // exec {command, cwd, timeoutMs} -> {stdout, stderr, exitCode}.
@@ -561,6 +585,28 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
+    /// Open the system battery-optimization settings so the user can exempt
+    /// CubicLM for reliable long downloads/tasks. Returns true when an
+    /// activity was launched. Settings pages only (see power channel).
+    private fun openBatterySettingsPage(): Boolean {
+        val intents = listOf(
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:$packageName"),
+            ),
+        )
+        for (intent in intents) {
+            try {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+                return true
+            } catch (_: Exception) {
+            }
+        }
+        return false
+    }
+
     // ── Isolated Ubuntu runtime (PRoot) ──────────────────────────────
 
     private fun runtimeRoot(): File? {
@@ -569,7 +615,7 @@ class MainActivity : FlutterFragmentActivity() {
         // Fallbacks if Dart has not reported the path yet.
         val candidates = listOf(
             File(filesDir, "runtime"),
-            File(noBackupFilesDir(), "runtime"),
+            File(noBackupFilesDir, "runtime"),
             File(getExternalFilesDir(null), "runtime"),
         )
         return candidates.firstOrNull { it.isDirectory }
@@ -690,7 +736,7 @@ class MainActivity : FlutterFragmentActivity() {
             val roots = listOfNotNull(
                 filesDir?.canonicalPath,
                 cacheDir?.canonicalPath,
-                noBackupFilesDir()?.canonicalPath,
+                noBackupFilesDir?.canonicalPath,
                 getExternalFilesDir(null)?.canonicalPath,
                 codeCacheDir?.canonicalPath,
             )

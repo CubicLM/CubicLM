@@ -67,6 +67,67 @@ import 'core/constants.dart';
 import 'core/languages.dart';
 import 'core/app_translations.dart';
 
+/// Full untruncated ancestor widget path for a framework error, nearest
+/// first (e.g. `Row ← _LocalModelCard ← ModelView ← ...`). Unlike the
+/// `debugCreator` one-liner Flutter prints (truncated with ⋯), this walks
+/// the live element tree, so private widget names survive and the exact
+/// file widget is identifiable from a pasted log row. Never throws.
+String _fullCreatorChain(FlutterErrorDetails details) {
+  try {
+    final value = details.context?.value;
+    Element? el;
+    if (value is Element) {
+      el = value;
+    } else if (value is RenderObject) {
+      final creator = value.debugCreator;
+      if (creator is DebugCreator) el = creator.element;
+    }
+    if (el == null) return '';
+    final parts = <String>[];
+    Element? cur = el;
+    parts.add(_elementLabel(cur));
+    cur.visitAncestorElements((a) {
+      if (parts.length >= 80) return false;
+      parts.add(_elementLabel(a));
+      return true;
+    });
+    return parts.join(' ← ');
+  } catch (_) {
+    return '';
+  }
+}
+
+/// `runtimeType` plus key when present (keys disambiguate list items).
+String _elementLabel(Element e) {
+  try {
+    final k = e.widget.key;
+    if (k == null) return e.widget.runtimeType.toString();
+    return '${e.widget.runtimeType} key=$k';
+  } catch (_) {
+    return e.widget.runtimeType.toString();
+  }
+}
+
+/// Screen environment layout errors depend on: logical size, DPR,
+/// text scaler, orientation, platform. Context-free (safe mid-build).
+/// Never throws.
+String _diagnosticEnv() {
+  try {
+    final dispatcher = WidgetsBinding.instance.platformDispatcher;
+    if (dispatcher.views.isEmpty) return 'view: unavailable';
+    final v = dispatcher.views.first;
+    final w = v.physicalSize.width / v.devicePixelRatio;
+    final h = v.physicalSize.height / v.devicePixelRatio;
+    final orient = w >= h ? 'landscape' : 'portrait';
+    return 'window: ${w.toStringAsFixed(0)}x${h.toStringAsFixed(0)} logical '
+        '($orient), dpr: ${v.devicePixelRatio}, '
+        'textScale: ${dispatcher.textScaleFactor}, '
+        'platform: ${defaultTargetPlatform.name}';
+  } catch (_) {
+    return 'view: unavailable';
+  }
+}
+
 void main() {
   final appLogBuffer = <String>[];
   _bootStart = DateTime.now();
@@ -309,6 +370,20 @@ void main() {
           message.write('\n$line');
         }
       }
+      // ── Diagnostics power-up: Flutter truncates the creator chain
+      // with ⋯, which makes layout errors unfixable from the log alone.
+      // Capture the FULL untruncated ancestor widget path (private widget
+      // names included — they pinpoint the exact file widget) plus the
+      // screen environment overflows depend on.
+      try {
+        final chain = _fullCreatorChain(details);
+        if (chain.isNotEmpty) {
+          message.write('\n--- full widget path (nearest first) ---\n$chain');
+        }
+      } catch (_) {}
+      try {
+        message.write('\n--- environment ---\n${_diagnosticEnv()}');
+      } catch (_) {}
       final text = message.toString();
       if (text.contains('improper use of a GetX')) {
         // Harmless GetX empty-scope hint, not an app failure: keep it

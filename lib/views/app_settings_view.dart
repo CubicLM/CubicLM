@@ -18,6 +18,7 @@ import '../utils/app_snackbar.dart';
 import '../utils/export_file.dart';
 import 'about_view.dart';
 import 'language_picker_view.dart';
+import 'setup_recommendations_view.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_ui.dart';
@@ -676,6 +677,23 @@ class AppSettingsView extends GetView<SettingsController> {
                       value: controller.autoLoadLastModel.value,
                       onChanged: (v) => controller.setAutoLoadLastModel(v),
                     )),
+              ]),
+              const SizedBox(height: 28),
+              _sectionLabel(context, 'SETUP'),
+              _appleGroupedCard(context, isDark, children: [
+                _appleListTile(
+                  context,
+                  isDark,
+                  leading: const Icon(LucideIcons.listChecks,
+                      size: 20, color: Dt.accent),
+                  title: 'Recommended setup',
+                  subtitle:
+                      'Notifications, battery, runtime, keys — all optional',
+                  trailing: const Icon(LucideIcons.chevronRight, size: 20),
+                  showDivider: false,
+                  onTap: () =>
+                      Get.to(() => const SetupRecommendationsView()),
+                ),
               ]),
               const SizedBox(height: 28),
               _sectionLabel(context, 'SECURITY'),

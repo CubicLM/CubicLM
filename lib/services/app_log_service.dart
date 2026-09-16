@@ -397,6 +397,17 @@ class AppLogService extends GetxService with WidgetsBindingObserver {
           e.message.contains('timed out / failed'),
     ),
     CrashPattern(
+      id: 'renderflex_overflow',
+      title: 'Layout overflow (pixels clipped)',
+      description:
+          'A row/column was wider/taller than the screen — content hidden behind the striped warning area.',
+      fix:
+          'The row carries the full widget path + screen size, so the exact widget is identifiable — copy the row and report it with what was open.',
+      matcher: (e) =>
+          e.message.contains('RenderFlex overflowed') ||
+          e.message.contains('overflowed by'),
+    ),
+    CrashPattern(
       id: 'flutter_framework',
       title: 'Flutter framework assertion',
       description:

@@ -375,7 +375,10 @@ class _SlideDeckViewState extends State<SlideDeckView> {
                 const SizedBox(width: 6),
                 Flexible(child: Obx(() => _styleAudiencePill(context, isDark))),
                 const SizedBox(width: 6),
-                Flexible(child: Obx(() => _countStepper(context, isDark))),
+                // Fixed-size stepper: never flex it — squeezing below its
+                // ~54px intrinsic width overflowed 4.3px on 360px phones
+                // (the pill's ellipsis text absorbs slack instead).
+                Obx(() => _countStepper(context, isDark)),
                 const Spacer(),
                 AppCtaButton(
                   icon: c.generating.value

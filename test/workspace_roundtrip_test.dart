@@ -62,4 +62,19 @@ void main() {
       expect(listed, contains(k));
     }
   });
+
+  test('readFilePreview truncates huge content with a marker', () async {
+    final ws = AgentWorkspaceService();
+    final p = await ws.createProject('t', 'Next.js');
+    expect(await ws.writeFile(p.id, 'big.txt', 'x' * 1000), isNull);
+    final full =
+        await ws.readFilePreview(p.id, 'big.txt', maxChars: 100000);
+    expect(full.truncated, isFalse);
+    expect(full.text.length, 1000);
+    final cut = await ws.readFilePreview(p.id, 'big.txt', maxChars: 100);
+    expect(cut.truncated, isTrue);
+    expect(cut.text, contains('truncated'));
+    // Full read is untouched (tools/checkpoints keep exact bytes).
+    expect(await ws.readFile(p.id, 'big.txt'), 'x' * 1000);
+  });
 }

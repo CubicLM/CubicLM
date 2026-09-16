@@ -107,6 +107,63 @@ void main() {
           await pumpCanvas(tester, s, pal);
         }
       });
+
+      // Phone-width regression (Redmi 360px → 66px bottom overflow):
+      // tall fixed layouts must scale down, never overflow. Framework
+      // overflow errors fail the test automatically; takeException
+      // asserts nothing was thrown either.
+      testWidgets('tall fixed layouts fit a 330px canvas', (tester) async {
+        for (final layout in [
+          'timeline',
+          'comparison',
+          'stats',
+          'bullets',
+          'summary',
+          'table',
+        ]) {
+          final s = Slide(
+            title: 'A fairly long slide title that wraps onto two lines',
+            subtitle: '',
+            points: List.generate(
+                8,
+                (i) =>
+                    'Point number $i with enough words to wrap onto multiple lines of body text'),
+            layout: layout,
+            imagePrompt: '',
+            notes: '',
+            quoteAuthor: '',
+            columns: [
+              List.generate(
+                  4, (i) => 'Left item $i with wrapping text here'),
+              List.generate(
+                  4, (i) => 'Right item $i with wrapping text here'),
+            ],
+            stats: List.generate(
+                3, (i) => {'value': '99%', 'label': 'A longish label $i'}),
+            tableData: List.generate(
+                5, (r) => List.generate(3, (c) => 'Cell $r-$c text')),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: Center(
+                  child: SizedBox(
+                    width: 330,
+                    child: SlideCanvas(
+                      slide: s,
+                      index: 0,
+                      pal: pal,
+                      interactive: false,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+          expect(tester.takeException(), isNull);
+        }
+      });
     });
   }
 

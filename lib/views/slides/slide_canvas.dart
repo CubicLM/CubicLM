@@ -46,6 +46,12 @@ class SlideCanvas extends StatelessWidget {
     final showPoints = s.points.take(maxPoints).toList();
     final hidden = s.points.length - showPoints.length;
     final logo = logoBytes;
+    // Chart/diagram lay out with Expanded bars/canvas: they need bounded
+    // loose constraints (plain Center) and self-fit. Every other layout
+    // is fixed-size content: scale it down to fit instead of overflowing
+    // (66px bottom overflow on phones). FittedBox is incompatible with
+    // flex descendants, hence the split.
+    final flexLayout = s.layout == 'chart' || s.layout == 'diagram';
 
     return AspectRatio(
       aspectRatio: aspect,
@@ -132,11 +138,31 @@ class SlideCanvas extends StatelessWidget {
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                         child: Stack(
                           children: [
-                            // Center content vertically if it's sparse
-                            Center(
-                              child: _pptContentByLayout(
-                                  s, index, showPoints, hidden, pal, !hasBanner),
-                            ),
+                            if (flexLayout)
+                              // Center content vertically if it's sparse
+                              Center(
+                                child: _pptContentByLayout(s, index,
+                                    showPoints, hidden, pal, !hasBanner),
+                              )
+                            else
+                              Positioned.fill(
+                                child: LayoutBuilder(
+                                  builder: (_, cons) => FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.center,
+                                    child: SizedBox(
+                                      width: cons.maxWidth,
+                                      child: _pptContentByLayout(
+                                          s,
+                                          index,
+                                          showPoints,
+                                          hidden,
+                                          pal,
+                                          !hasBanner),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             Align(
                               alignment: Alignment.bottomRight,
                               child: Text('${index + 1}',
@@ -383,8 +409,11 @@ class SlideCanvas extends StatelessWidget {
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      // Min sizing: fixed-height card never errors; the
+                      // outer FittedBox scales down instead.
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        for (final p in col1.take(4))
+                        for (final p in col1.take(3))
                           Padding(
                             padding: const EdgeInsets.only(bottom: 4),
                             child: TypingText(text: '• $p',
@@ -410,8 +439,9 @@ class SlideCanvas extends StatelessWidget {
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        for (final p in col2.take(4))
+                        for (final p in col2.take(3))
                           Padding(
                             padding: const EdgeInsets.only(bottom: 4),
                             child: TypingText(text: '✓ $p',
@@ -557,6 +587,9 @@ class SlideCanvas extends StatelessWidget {
             children: [
               Text(
                 s.title.isEmpty ? 'Process Flow' : s.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
                 style: _st(pal, true,
                     size: 15,
                     weight: FontWeight.w800,

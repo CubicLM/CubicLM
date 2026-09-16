@@ -12,6 +12,7 @@ import '../services/download_service.dart';
 import '../services/hive_service.dart';
 import '../core/routes.dart';
 import '../theme/design_tokens.dart';
+import 'setup_recommendations_view.dart';
 
 class OnboardingView extends StatefulWidget {
   const OnboardingView({super.key});
@@ -115,7 +116,7 @@ class _OnboardingViewState extends State<OnboardingView> {
   }
 
   void _next() {
-    if (_index < 2) {
+    if (_index < 3) {
       _page.nextPage(duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic);
     } else {
       _finish();
@@ -305,7 +306,7 @@ class _OnboardingViewState extends State<OnboardingView> {
               child: Row(
                 children: [
                   const Spacer(),
-                  if (_index < 2)
+                  if (_index < 3)
                     TextButton(
                       onPressed: _skip,
                       child: Text('onboarding_skip'.tr,
@@ -341,13 +342,16 @@ class _OnboardingViewState extends State<OnboardingView> {
                     isDark: isDark,
                     extra: _buildRecommendedDownload(isDark),
                   ),
+                  // Page 4: recommended setup (MH parity) — every row is
+                  // optional; Skip stays visible so nothing is forced.
+                  _SetupPage(isDark: isDark, onOpenExplore: _openHub),
                 ],
               ),
             ),
             // Dots
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(3, (i) {
+              children: List.generate(4, (i) {
                 final sel = i == _index;
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
@@ -375,12 +379,12 @@ class _OnboardingViewState extends State<OnboardingView> {
                     textStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
                   ),
                   onPressed: _next,
-                  child: Text(_index == 2 ? 'onboarding_start'.tr : 'onboarding_next'.tr),
+                  child: Text(_index == 3 ? 'onboarding_start'.tr : 'onboarding_next'.tr),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            if (_index == 2)
+            if (_index == 3)
               TextButton(
                 onPressed: _openHub,
                 child: Text('onboarding_open_hub'.tr,
@@ -394,8 +398,7 @@ class _OnboardingViewState extends State<OnboardingView> {
   }
 }
 
-class _OnboardPage extends StatelessWidget {
-  final IconData icon;
+class _OnboardPage extends StatelessWidget {  final IconData icon;
   final String title;
   final String desc;
   final bool isDark;
@@ -408,8 +411,7 @@ class _OnboardPage extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
+        children: [          Container(
             width: 96,
             height: 96,
             decoration: BoxDecoration(
@@ -429,6 +431,62 @@ class _OnboardPage extends StatelessWidget {
               style: GoogleFonts.plusJakartaSans(
                   fontSize: 15, height: 1.5, fontWeight: FontWeight.w500, color: Theme.of(context).hintColor)),
           if (extra != null) extra!,
+        ],
+      ),
+    );
+  }
+}
+
+/// Page 4: recommended setup checklist (MH setup parity).
+/// Scrollable compact card — Skip stays visible, nothing is forced.
+class _SetupPage extends StatelessWidget {
+  final bool isDark;
+  final VoidCallback onOpenExplore;
+  const _SetupPage({required this.isDark, required this.onOpenExplore});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          const SizedBox(height: 8),
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: Dt.accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Icon(
+                LucideIcons.listChecks, size: 30, color: Dt.accent),
+          ),
+          const SizedBox(height: 16),
+          Text('Recommended setup',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  height: 1.1)),
+          const SizedBox(height: 8),
+          Text('Small one-time boosts. Everything is optional — skip anytime.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  height: 1.5,
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(context).hintColor)),
+          const SizedBox(height: 12),
+          Expanded(
+            child: SingleChildScrollView(
+              child: SetupChecklistCard(
+                compact: true,
+                onOpenExplore: onOpenExplore,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
         ],
       ),
     );
