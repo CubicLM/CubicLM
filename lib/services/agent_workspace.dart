@@ -18,11 +18,16 @@ class AgentProject {
   String framework;
   int updatedMs;
 
+  /// True when the name was auto-generated (quick project): empty ones
+  /// are pruned automatically (Mobile-Harness parity).
+  bool quick;
+
   AgentProject({
     required this.id,
     required this.name,
     required this.framework,
     required this.updatedMs,
+    this.quick = false,
   });
 
   factory AgentProject.fromMap(Map m) => AgentProject(
@@ -32,6 +37,7 @@ class AgentProject {
         updatedMs: (m['updatedMs'] is int)
             ? m['updatedMs'] as int
             : int.tryParse(m['updatedMs'].toString()) ?? 0,
+        quick: m['quick'] == true,
       );
 
   Map<String, dynamic> toMap() => {
@@ -39,9 +45,63 @@ class AgentProject {
         'name': name,
         'framework': framework,
         'updatedMs': updatedMs,
+        'quick': quick,
       };
 }
 
+/// One saved conversation in a project's chat switcher
+/// (Mobile-Harness `ProjectChat` parity: auto-titled, index-persisted).
+class AgentChat {
+  /// Max chats kept per project.
+  static const maxPerProject = 20;
+
+  /// Stored prompt/answer truncation (display + re-run, not full trace).
+  static const maxPromptChars = 5000;
+  static const maxAnswerChars = 20000;
+
+  final String id;
+  String title;
+  String prompt;
+  String answer;
+  int updatedMs;
+
+  AgentChat({
+    required this.id,
+    required this.title,
+    required this.prompt,
+    required this.answer,
+    required this.updatedMs,
+  });
+
+  /// Auto-title from the first user message (42 chars, MH parity).
+  static String autoTitle(String prompt) {
+    final first = prompt.trim().split('\n').first.trim();
+    if (first.isEmpty) return 'New chat';
+    return first.length <= 42 ? first : '${first.substring(0, 42)}…';
+  }
+
+  factory AgentChat.fromMap(Map m) => AgentChat(
+        id: (m['id'] ?? '').toString(),
+        title: (m['title'] ?? 'New chat').toString(),
+        prompt: (m['prompt'] ?? '').toString(),
+        answer: (m['answer'] ?? '').toString(),
+        updatedMs: (m['updatedMs'] is int)
+            ? m['updatedMs'] as int
+            : int.tryParse(m['updatedMs'].toString()) ?? 0,
+      );
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'title': title,
+        'prompt': prompt.length > maxPromptChars
+            ? prompt.substring(0, maxPromptChars)
+            : prompt,
+        'answer': answer.length > maxAnswerChars
+            ? answer.substring(0, maxAnswerChars)
+            : answer,
+        'updatedMs': updatedMs,
+      };
+}
 /// A snapshot of project files at a point in time.
 class ProjectCheckpoint {
   final String id;
@@ -83,11 +143,78 @@ class ProjectCheckpoint {
       };
 }
 
+/// Quick-project display names (Mobile-Harness parity): a readable
+/// `Adjective Pioneer` pair, e.g. "Curious Lovelace".
+const _quickAdjectives = [
+  'bright',
+  'calm',
+  'clever',
+  'curious',
+  'gentle',
+  'nimble',
+  'quiet',
+  'swift',
+  'wise',
+  'bold',
+];
+
+/// Historical computing/science pioneers (no living celebrities).
+const _quickPioneers = [
+  'turing',
+  'lovelace',
+  'hopper',
+  'tesla',
+  'curie',
+  'ramanujan',
+  'bose',
+  'kalam',
+  'faraday',
+  'darwin',
+];
+
+String _titleCase(String s) =>
+    s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
+
+/// Generate a unique quick-project name not in [existing] (up to 20
+/// tries, then a numeric suffix — same guarantee as the reference app).
+/// Pure for unit tests.
+String generateQuickProjectName(Set<String> existing, {int? seed}) {
+  var nonce = seed ?? DateTime.now().microsecondsSinceEpoch;
+  String candidate() {
+    final adj = _quickAdjectives[nonce % _quickAdjectives.length];
+    nonce ~/= _quickAdjectives.length;
+    final pio = _quickPioneers[nonce % _quickPioneers.length];
+    nonce = nonce ~/ _quickPioneers.length + 1;
+    return '${_titleCase(adj)} ${_titleCase(pio)}';
+  }
+
+  var name = candidate();
+  for (var i = 0; i < 20 && existing.contains(name); i++) {
+    name = candidate();
+  }
+  if (existing.contains(name)) {
+    var n = 2;
+    while (existing.contains('$name $n')) {
+      n++;
+    }
+    return '$name $n';
+  }
+  return name;
+}
+
 class AgentWorkspaceService extends GetxService {
   static const _kProjects = 'agent_projects';
   static const maxFiles = 30;
   static const maxFileChars = 200000;
   static const maxTotalChars = 5000000;
+
+  /// File-tree cap (Mobile-Harness parity: 2000 entries).
+  static const maxListEntries = 2000;
+
+  /// Viewer truncation (Mobile-Harness parity: 512 KB). Tools, checkpoints,
+  /// fork, and export keep using full [readFile]; only UI display goes
+  /// through [readFilePreview].
+  static const maxPreviewChars = 512 * 1024;
 
   final projects = <AgentProject>[].obs;
 
@@ -150,11 +277,18 @@ class AgentWorkspaceService extends GetxService {
 
   Future<AgentProject> createProject(String name, String framework) async {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
+    final trimmed = name.trim();
+    // Empty name → friendly auto-generated identity (quick-project parity).
+    final quick = trimmed.isEmpty;
+    final display = quick
+        ? generateQuickProjectName(projects.map((p) => p.name).toSet())
+        : trimmed;
     final p = AgentProject(
       id: id,
-      name: name.trim().isEmpty ? 'Untitled project' : name.trim(),
+      name: display,
       framework: framework,
       updatedMs: DateTime.now().millisecondsSinceEpoch,
+      quick: quick,
     );
     await (await dirFor(id)).create(recursive: true);
     projects.insert(0, p);
@@ -184,6 +318,62 @@ class AgentWorkspaceService extends GetxService {
     if (i < 0 || name.trim().isEmpty) return;
     projects[i].name = name.trim();
     await _save();
+  }
+
+  // ── Chats (switcher parity) ────────────────────────────────────
+
+  static String _chatsKey(String projectId) => 'agent_chats_$projectId';
+
+  HiveService? get _hive =>
+      Get.isRegistered<HiveService>() ? Get.find<HiveService>() : null;
+
+  /// Load saved chats for a project, newest first. Never throws.
+  Future<List<AgentChat>> loadChats(String projectId) async {
+    try {
+      final raw = _hive?.getSetting<List>(_chatsKey(projectId));
+      final list = (raw ?? [])
+          .whereType<Map>()
+          .map(AgentChat.fromMap)
+          .where((c) => c.id.isNotEmpty)
+          .toList();
+      list.sort((a, b) => b.updatedMs.compareTo(a.updatedMs));
+      return list;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Persist chats (capped at [AgentChat.maxPerProject]). Never throws.
+  Future<void> saveChats(String projectId, List<AgentChat> chats) async {
+    try {
+      final sorted = chats.toList()
+        ..sort((a, b) => b.updatedMs.compareTo(a.updatedMs));
+      final capped = sorted.take(AgentChat.maxPerProject).toList();
+      await _hive?.setSetting(
+          _chatsKey(projectId), capped.map((c) => c.toMap()).toList());
+    } catch (_) {}
+  }
+
+  /// Delete auto-named (quick) projects that have no files and no chats.
+  /// Returns the number pruned. Never throws.
+  Future<int> pruneEmptyProjects() async {
+    var pruned = 0;
+    try {
+      for (final p in projects.where((p) => p.quick).toList()) {
+        final files = await listFiles(p.id);
+        if (files.isNotEmpty) continue;
+        final chats = await loadChats(p.id);
+        if (chats.isNotEmpty) continue;
+        projects.removeWhere((q) => q.id == p.id);
+        try {
+          final dir = await dirFor(p.id);
+          if (await dir.exists()) await dir.delete(recursive: true);
+        } catch (_) {}
+        pruned++;
+      }
+      if (pruned > 0) await _save();
+    } catch (_) {}
+    return pruned;
   }
 
   /// Fork: copy all files (except checkpoints) into a brand-new project.
@@ -220,7 +410,8 @@ class AgentWorkspaceService extends GetxService {
       if (total + bytes.length > maxTotalChars) {
         return 'Project too large.';
       }
-      final out = File('${dir.path}/$clean');
+      final out = await _resolveInside(dir, clean);
+      if (out == null) return 'Rejected path.';
       await out.parent.create(recursive: true);
       final tmp = File('${out.path}.tmp');
       await tmp.writeAsBytes(bytes, flush: true);
@@ -249,7 +440,8 @@ class AgentWorkspaceService extends GetxService {
       if (total + content.length > maxTotalChars) {
         return 'Project too large.';
       }
-      final out = File('${dir.path}/$clean');
+      final out = await _resolveInside(dir, clean);
+      if (out == null) return 'Rejected path.';
       await out.parent.create(recursive: true);
       // Atomic write: crash mid-write must never leave a truncated
       // file behind (same-dir rename is atomic on POSIX, near-atomic
@@ -278,6 +470,36 @@ class AgentWorkspaceService extends GetxService {
     }
   }
 
+  /// Resolve [clean] (already [sanitize]d) to a [File] guaranteed inside
+  /// [dir]. Returns null when any existing path prefix is a symlink or
+  /// the final target resolves outside the project (Mobile-Harness
+  /// canonical-path parity). Works for not-yet-existing files too.
+  Future<File?> _resolveInside(Directory dir, String clean) async {
+    try {
+      final base = await dir.resolveSymbolicLinks();
+      // Walk segments: every existing prefix must be a real directory —
+      // never a symlink (sanitize already removed `..`, so the join
+      // cannot escape as long as no prefix is a link).
+      var cur = base;
+      final segs = clean.split('/');
+      for (var i = 0; i < segs.length - 1; i++) {
+        cur = '$cur/${segs[i]}';
+        final t = await FileSystemEntity.type(cur, followLinks: false);
+        if (t == FileSystemEntityType.notFound) break;
+        if (t != FileSystemEntityType.directory) return null;
+      }
+      final f = File('$base/$clean');
+      final t = await FileSystemEntity.type(f.path, followLinks: false);
+      if (t == FileSystemEntityType.link) return null;
+      if (t == FileSystemEntityType.notFound) return f;
+      final resolved = await f.resolveSymbolicLinks();
+      if (resolved != base && !resolved.startsWith('$base/')) return null;
+      return f;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<int> _fileLength(Directory dir, String path) async {
     try {
       return await File('${dir.path}/$path').length();
@@ -291,11 +513,33 @@ class AgentWorkspaceService extends GetxService {
     if (clean.isEmpty) return null;
     try {
       final dir = await dirFor(projectId);
-      final f = File('${dir.path}/$clean');
-      if (!await f.exists()) return null;
+      final f = await _resolveInside(dir, clean);
+      if (f == null || !await f.exists()) return null;
       return await f.readAsString();
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Truncated read for UI display (Mobile-Harness 512 KB parity).
+  ///
+  /// Returns a (text, truncated) record; tools/checkpoints keep full
+  /// [readFile]. Never throws.
+  Future<({String text, bool truncated})> readFilePreview(
+    String projectId,
+    String path, {
+    int maxChars = maxPreviewChars,
+  }) async {
+    try {
+      final full = await readFile(projectId, path) ?? '';
+      if (full.length <= maxChars) return (text: full, truncated: false);
+      return (
+        text: '${full.substring(0, maxChars)}\n… [truncated, showing '
+            'first ${maxChars ~/ 1024}KB of ${full.length}]',
+        truncated: true,
+      );
+    } catch (_) {
+      return (text: '', truncated: false);
     }
   }
 
@@ -304,8 +548,9 @@ class AgentWorkspaceService extends GetxService {
     if (clean.isEmpty) return;
     try {
       final dir = await dirFor(projectId);
-      final f = File('${dir.path}/$clean');
-      if (await f.exists()) await f.delete();
+      final f = await _resolveInside(dir, clean);
+      if (f == null || !await f.exists()) return;
+      await f.delete();
       await touch(projectId);
     } catch (_) {}
   }
@@ -317,22 +562,30 @@ class AgentWorkspaceService extends GetxService {
     if (o.isEmpty || n.isEmpty || o == n) return;
     try {
       final dir = await dirFor(projectId);
-      final src = File('${dir.path}/$o');
-      if (!await src.exists()) return;
-      final dst = File('${dir.path}/$n');
+      final src = await _resolveInside(dir, o);
+      final dst = await _resolveInside(dir, n);
+      if (src == null || dst == null || !await src.exists()) return;
       await dst.parent.create(recursive: true);
       await src.rename(dst.path);
       await touch(projectId);
     } catch (_) {}
   }
 
-  /// Relative file paths, sorted, deepest last.
+  /// Relative file paths, sorted, deepest last. Capped at
+  /// [maxListEntries] (Mobile-Harness 2000-entry parity); symlinks are
+  /// never listed.
   Future<List<String>> listFiles(String projectId) async {
     try {
       final dir = await dirFor(projectId);
       if (!await dir.exists()) return [];
       final out = <String>[];
       await for (final e in dir.list(recursive: true, followLinks: false)) {
+        if (out.length >= maxListEntries) break;
+        try {
+          if (FileSystemEntity.isLinkSync(e.path)) continue;
+        } catch (_) {
+          continue;
+        }
         final rel = e.path.substring(dir.path.length + 1).replaceAll('\\', '/');
         if (rel.startsWith('.') || rel.contains('/.')) continue;
         if (e is File) {

@@ -69,6 +69,12 @@ class WorkspaceManager extends GetxService {
       var count = 0;
       await for (final entity in src.list(recursive: true, followLinks: false)) {
         if (count >= AgentWorkspaceService.maxFiles) break;
+        // Never follow or copy symlinks (canonical-path parity).
+        try {
+          if (FileSystemEntity.isLinkSync(entity.path)) continue;
+        } catch (_) {
+          continue;
+        }
         final rel = entity.path
             .substring(src.path.length)
             .replaceAll('\\', '/')

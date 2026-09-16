@@ -3,6 +3,8 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../theme/design_tokens.dart';
+import '../../utils/app_snackbar.dart';
+import '../../utils/preview_guard.dart';
 
 class ResponsiveGridView extends StatelessWidget {
   final String url;
@@ -106,6 +108,18 @@ class ResponsiveGridView extends StatelessWidget {
               javaScriptEnabled: true,
               supportZoom: false,
             ),
+            // Loopback-only navigation (preview guard parity).
+            shouldOverrideUrlLoading: (ctrl, action) async {
+              final target = action.request.url?.toString() ?? '';
+              if (isPreviewUrlAllowed(target)) {
+                return NavigationActionPolicy.ALLOW;
+              }
+              AppSnackbar.showTop(
+                'External link blocked',
+                'Preview stays on localhost.',
+              );
+              return NavigationActionPolicy.CANCEL;
+            },
           ),
         ),
       ],

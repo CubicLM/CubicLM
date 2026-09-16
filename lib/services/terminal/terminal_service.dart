@@ -47,6 +47,54 @@ List<String> buildShellParts(String command) {
   return ['/bin/sh', '-c', command];
 }
 
+/// Make `apt`/`apt-get` non-interactive (Mobile-Harness parity).
+///
+/// Prepends `DEBIAN_FRONTEND=noninteractive` and injects `-y` plus
+/// `--force-confold`/`--force-confdef` dpkg options so package installs
+/// never stall on `y/n` or conffile prompts inside the runtime. Commands
+/// that already opt out, or that are not package-manager invocations
+/// (`install`/`remove`/`update`/… subcommands only), pass through
+/// untouched. Pure for unit tests.
+String withAutoConfirm(String command) {
+  final cmd = command.trim();
+  if (cmd.isEmpty || Platform.isWindows) return command;
+  var rest = cmd;
+  var sudo = '';
+  if (rest == 'sudo' || rest.startsWith('sudo ')) {
+    sudo = 'sudo ';
+    rest = rest.substring(5).trimLeft();
+  }
+  final match = RegExp(r'^(apt|apt-get)(\s|$)').firstMatch(rest);
+  if (match == null) return command;
+  final bin = match.group(1)!;
+  var tail = rest.substring(bin.length);
+  const actionable = {
+    'install',
+    'remove',
+    'purge',
+    'update',
+    'upgrade',
+    'dist-upgrade',
+    'full-upgrade',
+    'autoremove',
+  };
+  final sub = tail
+      .trimLeft()
+      .split(RegExp(r'\s+'))
+      .firstWhere((t) => !t.startsWith('-'), orElse: () => '');
+  if (!actionable.contains(sub)) return command;
+  if (!tail.contains(RegExp(r'(^|\s)(--yes|-y)\b'))) {
+    tail = '$tail -y';
+  }
+  if (!tail.contains('force-confold')) {
+    tail = '$tail -o Dpkg::Options::=--force-confdef '
+        '-o Dpkg::Options::=--force-confold';
+  }
+  const env = 'DEBIAN_FRONTEND=noninteractive ';
+  if (cmd.startsWith(env)) return command;
+  return '$env$sudo$bin$tail';
+}
+
 /// Per-session stored state (mirrored into observables for the active one).
 class _SessionState {
   final List<TerminalLine> lines = [];
@@ -185,16 +233,19 @@ class TerminalService extends GetxService {
   /// Run [command], streaming output into [lines]. Blocked commands are
   /// rejected without spawning a process. Returns the exit code.
   Future<int> runCommand(String command, {Duration? timeout}) async {
-    final cmd = command.trim();
-    if (cmd.isEmpty) return -1;
+    final raw = command.trim();
+    if (raw.isEmpty) return -1;
     if (isRunning.value) return -1;
 
-    final blocked = SandboxService.isCommandBlocked(cmd);
+    final blocked = SandboxService.isCommandBlocked(raw);
     if (blocked != null) {
       _append(TerminalLine('Blocked: $blocked', isError: true));
       lastExitCode.value = -1;
       return -1;
     }
+
+    // Package installs never stall on interactive prompts.
+    final cmd = withAutoConfirm(raw);
 
     // CWD tracking for cd commands
     if (_isCdCommand(cmd)) {

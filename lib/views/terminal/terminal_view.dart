@@ -17,28 +17,89 @@ import '../../services/terminal/terminal_service.dart';
 import '../../theme/design_tokens.dart';
 
 /// Terminal screen (reached from Toolkit → Terminal).
-class TerminalView extends StatelessWidget {
+class TerminalView extends StatefulWidget {
   const TerminalView({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final term = Get.isRegistered<TerminalService>()
+  State<TerminalView> createState() => _TerminalViewState();
+}
+
+class _TerminalViewState extends State<TerminalView> {
+  late final TerminalService term;
+  final input = TextEditingController();
+  final scroll = ScrollController();
+
+  /// -1 = fresh line; otherwise an index into [TerminalService.history]
+  /// (0 = newest). The ↑ ↓ helper keys walk it.
+  int _histIndex = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    term = Get.isRegistered<TerminalService>()
         ? Get.find<TerminalService>()
         : Get.put(TerminalService());
-    final input = TextEditingController();
-    final scroll = ScrollController();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  }
 
-    void run() {
-      final cmd = input.text.trim();
-      if (cmd.isEmpty || term.isRunning.value) return;
-      input.clear();
-      term.runCommand(cmd).then((_) {
-        try {
-          scroll.jumpTo(scroll.position.maxScrollExtent);
-        } catch (_) {}
-      });
+  @override
+  void dispose() {
+    input.dispose();
+    scroll.dispose();
+    super.dispose();
+  }
+
+  void run() {
+    final cmd = input.text.trim();
+    if (cmd.isEmpty || term.isRunning.value) return;
+    input.clear();
+    _histIndex = -1;
+    term.runCommand(cmd).then((_) {
+      try {
+        scroll.jumpTo(scroll.position.maxScrollExtent);
+      } catch (_) {}
+    });
+  }
+
+  /// Insert [text] at the cursor (helper keys below the transcript).
+  void _insert(String text) {
+    final value = input.value;
+    final start = value.selection.start < 0
+        ? value.text.length
+        : value.selection.start;
+    final end =
+        value.selection.end < 0 ? value.text.length : value.selection.end;
+    final next = value.text.replaceRange(start, end, text);
+    input.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: start + text.length),
+    );
+  }
+
+  /// Walk command history: [older]=true moves toward older entries.
+  void _walkHistory(bool older) {
+    final h = term.history;
+    if (h.isEmpty) return;
+    if (older) {
+      if (_histIndex < h.length - 1) _histIndex++;
+    } else {
+      if (_histIndex > 0) {
+        _histIndex--;
+      } else {
+        _histIndex = -1;
+        input.clear();
+        return;
+      }
     }
+    if (_histIndex >= 0) {
+      input.text = h[_histIndex];
+      input.selection =
+          TextSelection.collapsed(offset: input.text.length);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -116,8 +177,11 @@ class TerminalView extends StatelessWidget {
                   },
                 )),
           ),
+          // Helper key row (Mobile-Harness parity): modifiers, history,
+          // and shell metacharacters that soft keyboards hide.
+          _keyRow(),
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
             child: Row(
               children: [
                 Expanded(
@@ -153,6 +217,69 @@ class TerminalView extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// One-tap keys: ESC/TAB/CTRL-C, history ↑ ↓, cursor ← →, and common
+  /// shell metacharacters.
+  Widget _keyRow() {
+    final keys = <({String label, String? insert, VoidCallback? action})>[
+      (label: 'ESC', insert: '\x1B', action: null),
+      (label: 'TAB', insert: '\t', action: null),
+      (
+        label: '^C',
+        insert: null,
+        action: () {
+          if (term.isRunning.value) term.kill();
+        }
+      ),
+      (label: '↑', insert: null, action: () => _walkHistory(true)),
+      (label: '↓', insert: null, action: () => _walkHistory(false)),
+      (label: '|', insert: '|', action: null),
+      (label: '~', insert: '~', action: null),
+      (label: '&&', insert: ' && ', action: null),
+      (label: '/', insert: '/', action: null),
+      (label: '-', insert: '-', action: null),
+    ];
+    return SizedBox(
+      height: 34,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: keys.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (context, i) {
+          final k = keys[i];
+          final enabled = k.action != null || k.insert != null;
+          // ^C only does something while a command runs.
+          final active = k.label != '^C' || term.isRunning.value;
+          return Obx(() {
+            final running = term.isRunning.value;
+            final on = k.label == '^C' ? running : enabled && active;
+            return OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(44, 30),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+              onPressed: !on
+                  ? null
+                  : () {
+                      if (k.insert != null) {
+                        _insert(k.insert!);
+                      } else {
+                        k.action?.call();
+                      }
+                    },
+              child: Text(
+                k.label,
+                style: GoogleFonts.firaCode(fontSize: 12),
+              ),
+            );
+          });
+        },
       ),
     );
   }

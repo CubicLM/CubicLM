@@ -9,6 +9,8 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../theme/design_tokens.dart';
+import '../../utils/app_snackbar.dart';
+import '../../utils/preview_guard.dart';
 
 /// Inline web preview panel for generated HTML/JS/CSS content.
 ///
@@ -70,6 +72,7 @@ class _LivePreviewState extends State<LivePreview> {
           ),
           child: Row(
             children: [
+              // ignore: prefer_const_constructors — Dt.accent is runtime
               Icon(Icons.language_rounded,
                   size: 14, color: Dt.accent),
               const SizedBox(width: 6),
@@ -118,6 +121,22 @@ class _LivePreviewState extends State<LivePreview> {
                   loadWithOverviewMode: true,
                   transparentBackground: true,
                 ),
+                // Loopback-only navigation: external links open in the
+                // system browser instead of inside the preview.
+                shouldOverrideUrlLoading: (ctrl, action) async {
+                  final url = action.request.url?.toString() ?? '';
+                  if (isPreviewUrlAllowed(url)) {
+                    return NavigationActionPolicy.ALLOW;
+                  }
+                  try {
+                    widget.onOpenExternal?.call();
+                  } catch (_) {}
+                  AppSnackbar.showTop(
+                    'External link blocked',
+                    'Preview stays on localhost — opened externally.',
+                  );
+                  return NavigationActionPolicy.CANCEL;
+                },
                 onLoadStart: (_, __) => setState(() => _loading = true),
                 onLoadStop: (_, __) => setState(() => _loading = false),
                 onWebViewCreated: (ctrl) {
@@ -126,7 +145,9 @@ class _LivePreviewState extends State<LivePreview> {
                 },
               ),
               if (_loading)
+                // ignore: prefer_const_constructors — Dt.accent is runtime
                 Center(
+                  // ignore: prefer_const_constructors — Dt.accent is runtime
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                     color: Dt.accent,

@@ -7,7 +7,9 @@ library;
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
 
@@ -20,6 +22,20 @@ import '../services/tools/todo_tools.dart';
 import '../services/workspace/checkpoint_manager.dart';
 import '../services/workspace/workspace_manager.dart';
 import '../utils/app_snackbar.dart';
+import '../utils/export_file.dart';
+
+/// Directories never included in a project ZIP (Mobile-Harness parity,
+/// plus CubicLM-internal state): VCS metadata, dependency installs,
+/// build output, agent checkpoints.
+const exportZipExcludedPrefixes = {
+  '.git/',
+  '.claude/',
+  '.gradle/',
+  'node_modules/',
+  'build/',
+  '.dart_tool/',
+  '.checkpoints/',
+};
 
 /// Controller for AgentWorkspaceView (lazy-put by the view).
 class AgentRunnerController extends GetxController {
@@ -35,6 +51,133 @@ class AgentRunnerController extends GetxController {
   final changedFiles = <String>[].obs;
   final checkpointId = RxnString();
   final error = RxnString();
+
+  /// Chat switcher state (Mobile-Harness multi-chat parity). The null
+  /// project (Q&A mode) uses the pseudo-id 'qa'.
+  final chats = <AgentChat>[].obs;
+  final activeChatId = RxnString();
+
+  static String chatScope(String? pid) =>
+      (pid == null || pid.isEmpty) ? 'qa' : pid;
+
+  @override
+  void onInit() {
+    super.onInit();
+    loadChatsFor(projectId.value);
+  }
+
+  /// Switch project (loads its chats + prunes abandoned quick ones).
+  Future<void> selectProject(String? id) async {
+    if (running.value) return;
+    projectId.value = id;
+    await loadChatsFor(id);
+  }
+
+  /// Load chats for a scope; guarantees at least one (fresh) chat.
+  Future<void> loadChatsFor(String? pid) async {
+    final ws = _ws;
+    final scope = chatScope(pid);
+    List<AgentChat> loaded = [];
+    try {
+      if (ws != null) {
+        loaded = await ws.loadChats(scope);
+        await ws.pruneEmptyProjects();
+      }
+    } catch (_) {}
+    chats.assignAll(loaded);
+    if (loaded.isEmpty) {
+      await newChat(silent: true);
+    } else {
+      activeChatId.value = loaded.first.id;
+    }
+  }
+
+  /// Start a fresh chat (keeps the composer; clears trace display).
+  Future<void> newChat({bool silent = false}) async {
+    if (running.value) return;
+    await _persistCurrentChat();
+    final chat = AgentChat(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      title: 'New chat',
+      prompt: '',
+      answer: '',
+      updatedMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    chats.insert(0, chat);
+    activeChatId.value = chat.id;
+    events.clear();
+    answer.value = '';
+    checkpointId.value = null;
+    error.value = null;
+    changedFiles.clear();
+    _diff = const FileDiff();
+    await _saveChats();
+    if (!silent) {
+      AppSnackbar.showTop('New chat', 'Previous chats stay in the switcher.');
+    }
+  }
+
+  /// Load a saved chat into the composer + trace display.
+  void selectChat(String id) {
+    if (running.value) return;
+    final i = chats.indexWhere((c) => c.id == id);
+    if (i < 0) return;
+    final chat = chats[i];
+    activeChatId.value = id;
+    prompt.value = chat.prompt;
+    answer.value = chat.answer;
+    events.clear();
+    if (chat.answer.isNotEmpty) {
+      events.add(AgentEvent.text(chat.answer));
+    }
+    changedFiles.clear();
+    _diff = const FileDiff();
+    checkpointId.value = null;
+    error.value = null;
+  }
+
+  /// Delete a chat (keeps at least one fresh chat around).
+  Future<void> deleteChat(String id) async {
+    if (running.value) return;
+    chats.removeWhere((c) => c.id == id);
+    if (activeChatId.value == id) activeChatId.value = null;
+    if (chats.isEmpty) {
+      await newChat(silent: true);
+    } else if (activeChatId.value == null) {
+      activeChatId.value = chats.first.id;
+    }
+    await _saveChats();
+  }
+
+  /// Persist the active chat's prompt + answer (called when a run ends
+  /// and when leaving a chat). No-op for empty composers.
+  Future<void> _persistCurrentChat() async {
+    try {
+      final text = prompt.value.trim();
+      if (text.isEmpty) return;
+      final ws = _ws;
+      if (ws == null) return;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final i = chats.indexWhere((c) => c.id == activeChatId.value);
+      if (i < 0) return;
+      final chat = chats[i];
+      chat.prompt = text;
+      chat.answer = answer.value;
+      chat.updatedMs = now;
+      if (chat.title == 'New chat') {
+        chat.title = AgentChat.autoTitle(text);
+      }
+      chats[i] = chat;
+      chats.sort((a, b) => b.updatedMs.compareTo(a.updatedMs));
+      await _saveChats();
+    } catch (_) {}
+  }
+
+  Future<void> _saveChats() async {
+    try {
+      await _ws?.saveChats(chatScope(projectId.value), chats.toList());
+    } catch (_) {}
+  }
 
   FileDiff _diff = const FileDiff();
   FileDiff get diff => _diff;
@@ -139,6 +282,7 @@ class AgentRunnerController extends GetxController {
       error.value = e.toString();
     } finally {
       running.value = false;
+      await _persistCurrentChat();
       await refreshDiff();
       if (_cancelled) {
         await _progress?.cancel();
@@ -230,6 +374,58 @@ class AgentRunnerController extends GetxController {
       await ws.rollbackToCheckpoint(pid, cpId);
       await refreshDiff();
     } catch (_) {}
+  }
+
+  /// Export the selected project as a ZIP (auto-saved + Share sheet).
+  ///
+  /// Excludes VCS/dependency/build/checkpoint dirs ([exportZipExcludedPrefixes])
+  /// and skips files over 10 MB so one huge asset can't OOM the encoder.
+  Future<void> exportProjectZip() async {
+    final pid = projectId.value;
+    final ws = _ws;
+    if (pid == null || pid.isEmpty || ws == null) {
+      AppSnackbar.showTop('No project', 'Select a project first.');
+      return;
+    }
+    try {
+      final dir = await ws.dirFor(pid);
+      final archive = Archive();
+      var skipped = 0;
+      for (final path in await ws.listFiles(pid)) {
+        if (exportZipExcludedPrefixes.any((p) => path.startsWith(p))) {
+          continue;
+        }
+        try {
+          final bytes = await File('${dir.path}/$path').readAsBytes();
+          if (bytes.length > 10 * 1024 * 1024) {
+            skipped++;
+            continue;
+          }
+          archive.addFile(ArchiveFile(path, bytes.length, bytes));
+        } catch (_) {
+          skipped++;
+        }
+      }
+      if (archive.isEmpty) {
+        AppSnackbar.showTop('Nothing to export', 'The project is empty.');
+        return;
+      }
+      final out = ZipEncoder().encode(archive);
+      if (out.isEmpty) throw Exception('ZIP encoder returned nothing.');
+      final stamp = DateTime.now().millisecondsSinceEpoch;
+      final safeName = pid.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '');
+      await ExportFile.quickExport(
+        bytes: Uint8List.fromList(out),
+        fileName: 'cubiclm_project_${safeName}_$stamp.zip',
+        mimeType: 'application/zip',
+      );
+      if (skipped > 0) {
+        AppSnackbar.showTop(
+            'Export done', '$skipped file(s) skipped (too large).');
+      }
+    } catch (e) {
+      AppSnackbar.showTop('Export failed', '$e');
+    }
   }
 
   /// Import an external folder (SAF picker on Android) as a new project.

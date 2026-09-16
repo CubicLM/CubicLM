@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -85,6 +86,11 @@ class UpdateService extends GetxService {
 
   /// The APK download URL extracted from the latest release assets.
   String? _apkDownloadUrl;
+
+  /// The checksums file URL (e.g. `checksums.sha256`) when the release
+  /// publishes one — used to SHA-256-verify the APK before install
+  /// (Mobile-Harness parity).
+  String? _checksumsUrl;
 
   /// The chosen APK filename (ABI-matched) for display during download.
   String _apkFileName = '';
@@ -325,6 +331,7 @@ class UpdateService extends GetxService {
         lastKnownVersion.value = latest;
         updateAvailable.value = true;
         _latestTag = rawTag;
+        _checksumsUrl = null;
         _apkDownloadUrl = await _extractApkUrl(release);
         await _setLastKnownVersion(latest);
         // Silent auto path handles it (download starts); otherwise nudge.
@@ -335,6 +342,7 @@ class UpdateService extends GetxService {
         lastKnownVersion.value = latest;
         updateAvailable.value = false;
         _apkDownloadUrl = null;
+        _checksumsUrl = null;
         await _setLastKnownVersion(latest);
         if (!silent) {
           AppSnackbar.showTop(
@@ -565,6 +573,20 @@ class UpdateService extends GetxService {
       // Close progress dialog.
       if (Get.isDialogOpen == true) Get.back();
 
+      // SHA-256-verify before any install prompt (MH parity).
+      final bad = await _verifyApk(savePath);
+      if (bad != null) {
+        AppSnackbar.showTop(
+          'Update failed verification',
+          bad,
+          icon: LucideIcons.shieldAlert,
+          type: 'general',
+          iconName: 'shield_alert',
+          duration: const Duration(seconds: 5),
+        );
+        return;
+      }
+
       _apkSavePath = savePath;
       // Manual taps always proceed to the installer; the auto path only
       // when "Install automatically" is on (the OS confirms in all cases).
@@ -770,10 +792,78 @@ class UpdateService extends GetxService {
     }
   }
 
+  /// Parse a `sha256sum`-style checksums file into filename → hex hash.
+  /// Handles `*binary` markers and paths (`  ./dir/file.apk`). Pure for
+  /// unit tests.
+  static Map<String, String> parseChecksums(String text) {
+    final out = <String, String>{};
+    for (final raw in text.split('\n')) {
+      final m = RegExp(r'^([0-9a-fA-F]{64})\s+\*?(.+?)\s*$')
+          .firstMatch(raw.trim());
+      if (m == null) continue;
+      final name = m.group(2)!.replaceAll('\\', '/').split('/').last;
+      if (name.isEmpty) continue;
+      out[name] = m.group(1)!.toLowerCase();
+    }
+    return out;
+  }
+
+  /// SHA-256-verify [apkPath] against the release checksums file.
+  /// Returns null on success, or a human-readable failure reason.
+  /// Missing checksums asset / network failure = null with a logged
+  /// warning (fail-open: the OS installer still confirms explicitly).
+  Future<String?> _verifyApk(String apkPath) async {
+    final url = _checksumsUrl;
+    if (url == null || url.isEmpty || _apkFileName.isEmpty) {
+      _log('No checksums asset — skipping APK hash verify.');
+      return null;
+    }
+    try {
+      final res = await http
+          .get(Uri.parse(url),
+              headers: const {'Accept': 'text/plain'})
+          .timeout(const Duration(seconds: 15));
+      if (res.statusCode != 200) {
+        _log('Checksums download HTTP ${res.statusCode} — skipping verify.');
+        return null;
+      }
+      final sums = parseChecksums(res.body);
+      final want = sums[_apkFileName];
+      if (want == null) {
+        _log('No checksum entry for $_apkFileName — skipping verify.');
+        return null;
+      }
+      final digest = await sha256.bind(File(apkPath).openRead()).first;
+      final got = digest.toString();
+      if (got != want) {
+        try {
+          await File(apkPath).delete();
+        } catch (_) {}
+        return 'Hash mismatch (expected $want, got $got). '
+            'The download was deleted — try again.';
+      }
+      return null;
+    } catch (e) {
+      _log('APK verify failed open: $e');
+      return null;
+    }
+  }
+
+  void _log(String message) {
+    try {
+      if (Get.isRegistered<AppLogService>()) {
+        Get.find<AppLogService>().warning(
+          message,
+          category: LogCategory.system,
+        );
+      }
+    } catch (_) {}
+  }
   /// Extracts the APK download URL from GitHub release assets, matching
   /// this device's ABI. Asset names look like
   /// `cubiclm-v1.3.0-arm64-v8a.apk`. The old first-`.apk`-wins logic would
   /// install an incompatible split (e.g. x86_64 on an arm64 phone).
+  /// Also picks up the `checksums.sha256` asset for post-download verify.
   Future<String?> _extractApkUrl(Map<String, dynamic> release) async {
     try {
       final assets = release['assets'] as List<dynamic>?;
@@ -782,7 +872,15 @@ class UpdateService extends GetxService {
       for (final asset in assets) {
         final name = (asset['name'] as String?) ?? '';
         final url = asset['browser_download_url'] as String?;
-        if (name.endsWith('.apk') && url != null && url.isNotEmpty) {
+        if (url == null || url.isEmpty) continue;
+        final lower = name.toLowerCase();
+        if (_checksumsUrl == null &&
+            (lower == 'checksums.sha256' ||
+                lower.endsWith('.sha256') ||
+                lower.contains('checksum'))) {
+          _checksumsUrl = url;
+        }
+        if (name.endsWith('.apk')) {
           apks[name] = url;
         }
       }

@@ -38,6 +38,12 @@ class SandboxService {
   }
 
   /// Reason a command is blocked, or null when allowed.
+  ///
+  /// Catastrophic operations only (Mobile-Harness parity: `rm -rf` on
+  /// filesystem roots, disk writes, fork bombs). Recoverable-but-dangerous
+  /// commands (`git reset --hard`, project-relative `rm -rf`) are NOT
+  /// blocked — [classifyCommand] escalates them to [CommandRisk.high] so
+  /// the approval gate always asks explicitly.
   static String? isCommandBlocked(String command) {
     final lower = command.toLowerCase().trim();
     if (lower.isEmpty) return 'Empty command';
@@ -50,11 +56,22 @@ class SandboxService {
     if (RegExp(r'rm\s+-rf?\s+[a-z]:').hasMatch(lower)) {
       return 'Recursive delete of a drive root';
     }
+    // Bare `rm -rf` on shell roots that resolve outside any project:
+    // `.`, `./`, `*`, `$HOME`, `%USERPROFILE%`, bare `~`.
+    if (RegExp(r'rm\s+(-[a-z]*r[a-z]*\s+)*(-[a-z]*f[a-z]*\s+)?'
+            r'(\.(\/)?|\*|~|\$home\b|%userprofile%)(\s|;|&&|\||$)')
+        .hasMatch(lower)) {
+      return 'Recursive delete of working directory root';
+    }
     if (lower.contains('mkfs.') || lower.contains('format c:')) {
       return 'Filesystem formatting';
     }
     if (lower.contains('> /dev/sda') || lower.contains('dd if=')) {
       return 'Direct disk write';
+    }
+    // Any redirect into a device node (e.g. `> /dev/sda`, `>>/dev/kmem`).
+    if (RegExp(r'>\s*/dev/').hasMatch(lower)) {
+      return 'Direct device write';
     }
     if (lower.contains(':(){:|:&};:')) return 'Fork bomb';
     if (RegExp(r'chmod\s+-r\s+777\s+/').hasMatch(lower)) {
@@ -79,6 +96,12 @@ class SandboxService {
       return (risk: CommandRisk.blocked, reason: blocked);
     }
     final lower = cmd.toLowerCase();
+    // Piped network-to-shell (`curl … | sh`) fetches and runs code —
+    // checked before the generic chain rule so it lands on high.
+    if ((lower.contains('curl') || lower.contains('wget')) &&
+        RegExp(r'\|\s*(sh|bash|zsh|powershell|cmd)\b').hasMatch(lower)) {
+      return (risk: CommandRisk.high, reason: null);
+    }
     if (RegExp(r'(&&|\|\||[;|]|`|\$\()').hasMatch(cmd)) {
       return (risk: CommandRisk.review, reason: null);
     }
@@ -124,6 +147,14 @@ class SandboxService {
       if (safeGit.contains(sub)) {
         return (risk: CommandRisk.safe, reason: null);
       }
+      // Destructive history rewrites: Mobile-Harness shows an explicit
+      // confirm dialog — here they always need explicit approval.
+      if (sub == 'reset' && RegExp(r'\b--hard\b').hasMatch(lower)) {
+        return (risk: CommandRisk.high, reason: null);
+      }
+      if (sub == 'clean' && RegExp(r'(^|\s)-[a-z]*f').hasMatch(lower)) {
+        return (risk: CommandRisk.high, reason: null);
+      }
       const highGit = {'push', 'reset', 'clean', 'checkout'};
       if (highGit.contains(sub)) {
         return (risk: CommandRisk.high, reason: null);
@@ -132,6 +163,16 @@ class SandboxService {
     }
     if (first == 'npm' || first == 'npx' || first == 'flutter' || first == 'dart') {
       return (risk: CommandRisk.review, reason: null);
+    }
+    // Deleting anything recursively always needs explicit approval,
+    // even when the target looks project-relative.
+    if (first == 'rm' && RegExp(r'(^|\s)-[a-z]*r').hasMatch(lower)) {
+      return (risk: CommandRisk.high, reason: null);
+    }
+    // Recursive permission/ownership changes are easy to get wrong.
+    if ((first == 'chmod' || first == 'chown') &&
+        RegExp(r'(^|\s)-[a-z]*R').hasMatch(cmd)) {
+      return (risk: CommandRisk.high, reason: null);
     }
     if (first == 'sudo' || first == 'su' || first == 'doas') {
       return (risk: CommandRisk.high, reason: null);

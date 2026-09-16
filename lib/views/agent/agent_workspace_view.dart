@@ -38,6 +38,21 @@ class AgentWorkspaceView extends StatelessWidget {
           style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Chats',
+            icon: const Icon(Icons.forum_outlined, size: 20),
+            onPressed: controller.running.value
+                ? null
+                : () => _openChatSwitcher(context, controller, input),
+          ),
+          Obx(() => IconButton(
+                tooltip: 'Export project ZIP',
+                icon: const Icon(Icons.folder_zip_outlined, size: 20),
+                onPressed: controller.projectId.value == null ||
+                        controller.running.value
+                    ? null
+                    : () => controller.exportProjectZip(),
+              )),
           Obx(() => Row(
                 children: [
                   Text('Local',
@@ -309,9 +324,78 @@ class AgentWorkspaceView extends StatelessWidget {
         ],
         onChanged: controller.running.value
             ? null
-            : (v) => controller.projectId.value = v,
+            : (v) => controller.selectProject(v),
       );
     });
+  }
+
+  /// Chat switcher (Mobile-Harness parity): new / open / delete chats.
+  void _openChatSwitcher(BuildContext context,
+      AgentRunnerController controller, TextEditingController input) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Obx(() {
+          final list = controller.chats.toList();
+          return ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            children: [
+              ListTile(
+                leading: const Icon(Icons.add_comment_outlined),
+                title: const Text('New chat'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  controller.newChat();
+                  input.clear();
+                },
+              ),
+              const Divider(height: 8),
+              if (list.isEmpty)
+                const ListTile(title: Text('No chats yet.')),
+              for (final c in list)
+                ListTile(
+                  selected: c.id == controller.activeChatId.value,
+                  leading: const Icon(Icons.chat_bubble_outline_rounded),
+                  title: Text(
+                    c.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w700, fontSize: 13),
+                  ),
+                  subtitle: Text(
+                    _chatSubtitle(c),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.plusJakartaSans(fontSize: 11),
+                  ),
+                  trailing: IconButton(
+                    tooltip: 'Delete chat',
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    onPressed: () => controller.deleteChat(c.id),
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    controller.selectChat(c.id);
+                    input.text = controller.prompt.value;
+                  },
+                ),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
+  String _chatSubtitle(AgentChat c) {
+    final dt =
+        DateTime.fromMillisecondsSinceEpoch(c.updatedMs == 0 ? 0 : c.updatedMs);
+    final when =
+        '${dt.day}/${dt.month} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    final preview = c.prompt.trim().split('\n').first.trim();
+    return preview.isEmpty ? when : '$when · $preview';
   }
 
   Widget _todoList(BuildContext context,
