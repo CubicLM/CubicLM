@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:cubiclm/services/runtime/runtime_installer.dart';
 import 'package:cubiclm/services/runtime/toolchain_catalog.dart';
 
 void main() {
@@ -43,6 +44,20 @@ void main() {
       expect(ToolchainCatalog.formatBytes(1536), '1.5 KB');
       expect(ToolchainCatalog.formatBytes(5 * 1024 * 1024), '5.0 MB');
       expect(ToolchainCatalog.formatBytes(-5), '—');
+    });
+
+    test('core extracts to root (ubuntu/ + bin/proot), overlays to rootfs',
+        () {
+      expect(RuntimeInstaller.extractSubdirFor(ToolchainId.core), '');
+      for (final id in [
+        ToolchainId.node,
+        ToolchainId.python,
+        ToolchainId.android,
+        ToolchainId.cpp,
+        ToolchainId.php,
+      ]) {
+        expect(RuntimeInstaller.extractSubdirFor(id), 'ubuntu');
+      }
     });
   });
 }

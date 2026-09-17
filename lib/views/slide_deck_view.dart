@@ -373,7 +373,11 @@ class _SlideDeckViewState extends State<SlideDeckView> {
                       )),
                 ),
                 const SizedBox(width: 6),
-                Flexible(child: Obx(() => _styleAudiencePill(context, isDark))),
+                // Expanded (not Flexible): tight width forces the inner
+                // ellipsis text to engage. Flexible passes loose width,
+                // so a slightly-long "Style · Audience" label sized to
+                // its intrinsic width and overflowed 0.56px on device.
+                Expanded(child: Obx(() => _styleAudiencePill(context, isDark))),
                 const SizedBox(width: 6),
                 // Fixed-size stepper: never flex it — squeezing below its
                 // ~54px intrinsic width overflowed 4.3px on 360px phones

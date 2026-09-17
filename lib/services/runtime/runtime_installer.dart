@@ -298,6 +298,17 @@ class RuntimeInstaller extends GetxService {
     } catch (_) {}
   }
 
+  /// Extract destination per stack. Core lays down the whole tree —
+  /// `ubuntu/` (rootfs) + `bin/proot` (Android PRoot binary, which must
+  /// live OUTSIDE the rootfs and can never arrive via a rootfs-relative
+  /// extract). Overlays merge into the rootfs. Pure for unit tests.
+  static String extractSubdirFor(ToolchainId id) =>
+      id == ToolchainId.core ? '' : 'ubuntu';
+
+  /// Guest DNS: ubuntu-base ships no resolv.conf, so without this every
+  /// network call inside proot (npm, apt, git) fails.
+  static const _resolvConf = 'nameserver 8.8.8.8\nnameserver 1.1.1.1\n';
+
   Future<String?> _installBundle(ToolchainId id, RuntimeBundle bundle) async {
     final cache = await _cacheDir;
     final dest = File('${cache.path}/${bundle.fileName}');
@@ -315,14 +326,46 @@ class RuntimeInstaller extends GetxService {
     if (sumErr != null) return sumErr;
     if (_cancelRequested) return 'Cancelled.';
 
-    // 3. Extract into the rootfs.
+    // 3. Extract (core → runtime root, overlays → rootfs).
     _set(id,
         state: ToolchainState.extracting,
         line: 'Extracting ${bundle.title}…');
-    final rootfs = await _rootfsDir;
-    await rootfs.create(recursive: true);
-    final exErr = await _extractTarGz(dest, rootfs);
+    final root = await _runtimeRoot;
+    final sub = extractSubdirFor(id);
+    final target = sub.isEmpty ? Directory(root) : await _rootfsDir;
+    await target.create(recursive: true);
+    final exErr = await _extractTarGz(dest, target);
     if (exErr != null) return exErr;
+    // 4. Core post-steps: guest DNS + proot exec bit (best effort —
+    // tar usually preserves modes, toybox chmod is the backstop).
+    if (id == ToolchainId.core) {
+      final finErr = await _finalizeCore(root);
+      if (finErr != null) return finErr;
+    }
+    return null;
+  }
+
+  /// Write resolv.conf + ensure `bin/proot` is executable. Returns an
+  /// error string, or null on success. Never throws.
+  Future<String?> _finalizeCore(String root) async {
+    try {
+      final etc = Directory('$root/ubuntu/etc');
+      await etc.create(recursive: true);
+      await File('${etc.path}/resolv.conf')
+          .writeAsString(_resolvConf, flush: true);
+    } catch (e) {
+      return 'Could not write guest DNS config: $e';
+    }
+    try {
+      final proot = File('$root/bin/proot');
+      if (await proot.exists()) {
+        await Process.run(
+          'chmod',
+          ['0755', proot.path],
+          runInShell: false,
+        ).timeout(const Duration(seconds: 10));
+      }
+    } catch (_) {}
     return null;
   }
 

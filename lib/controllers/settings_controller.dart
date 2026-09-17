@@ -1555,9 +1555,13 @@ class SettingsController extends GetxController {
   }
 
   bool isBookmarked(String url) {
+    // Snapshot FIRST so Obx builders always subscribe — even for empty
+    // urls. The old early-return fired the GetX empty-scope lint every
+    // time the browser ⋮ menu opened on a blank tab.
+    final items = browserBookmarks.toList();
     final u = url.trim();
     if (u.isEmpty) return false;
-    return browserBookmarks.any((b) => b['url'] == u);
+    return items.any((b) => b['url'] == u);
   }
 
   Future<void> addBookmark(String title, String url) async {

@@ -24,12 +24,16 @@ ModelController get _c => Get.find<ModelController>();
 /// amber warns first, red is refused (or asks first with the guard off).
 /// Hidden while RAM/file size is unmeasurable.
 Widget _ramFitDot(BuildContext context, AiModel model) {
-  int fileBytes = 0;
-  try {
-    fileBytes = _c.fileSizes[model.filename] ?? 0;
-  } catch (_) {}
-  if (fileBytes <= 0) return const SizedBox.shrink();
   return Obx(() {
+    // Read INSIDE the builder so this always subscribes: file sizes
+    // arrive async after boot, and the old outside-read + early-return
+    // fired the GetX empty-scope lint on every unmeasured card — plus
+    // the dot now pops in live when the size lands.
+    int fileBytes = 0;
+    try {
+      fileBytes = _c.fileSizes[model.filename] ?? 0;
+    } catch (_) {}
+    if (fileBytes <= 0) return const SizedBox.shrink();
     double availGb = 0;
     int kvBytes = 0;
     try {
