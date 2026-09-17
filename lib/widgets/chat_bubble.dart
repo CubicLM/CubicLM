@@ -24,6 +24,7 @@ import 'thought_disclosure.dart';
 import 'citation_chip.dart';
 import 'chat_branch_timeline.dart';
 import 'suggestion_chips.dart';
+import 'tool_steps_widget.dart';
 import '../views/chat/project_context_view.dart';
 
 class ChatBubble extends StatefulWidget {
@@ -86,15 +87,15 @@ class _ChatBubbleState extends State<ChatBubble> {
   Widget build(BuildContext context) {
     final isUser = widget.message.role == 'user';
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     final visibleContent = widget.message.fileName == null
         ? widget.message.content
         : widget.message.content.split('\n\nAttached file:').first;
-        
+
     final thoughtParts = isUser
         ? const ThoughtParts(thought: '', answer: '', isThinking: false)
         : splitThoughtTags(_cleanAssistantText(visibleContent));
-        
+
     final answerContent = isUser ? visibleContent : thoughtParts.answer.trim();
 
     final displayContent = isUser
@@ -134,7 +135,8 @@ class _ChatBubbleState extends State<ChatBubble> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment:
+              isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             Align(
               alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -142,16 +144,20 @@ class _ChatBubbleState extends State<ChatBubble> {
                 onLongPress: () => _showContextMenu(context, isUser),
                 child: Container(
                   constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * (isUser ? 0.82 : 0.92),
+                    maxWidth: MediaQuery.of(context).size.width *
+                        (isUser ? 0.82 : 0.92),
                   ),
-                  decoration: isUser ? BoxDecoration(
-                    // Claude: user message = soft warm surface pill, flat.
-                    color: isDark ? Dt.pillMutedDark : Dt.pillMuted,
-                    borderRadius: BorderRadius.circular(20),
-                  ) : null,
+                  decoration: isUser
+                      ? BoxDecoration(
+                          // Claude: user message = soft warm surface pill, flat.
+                          color: isDark ? Dt.pillMutedDark : Dt.pillMuted,
+                          borderRadius: BorderRadius.circular(20),
+                        )
+                      : null,
                   child: Padding(
                     padding: isUser
-                        ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
+                        ? const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12)
                         : const EdgeInsets.symmetric(vertical: 4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,7 +169,9 @@ class _ChatBubbleState extends State<ChatBubble> {
                             child: GestureDetector(
                               onTap: () {
                                 final b = widget.message.decodedImageBytes;
-                                if (b != null) ImageViewer.showBytes(context, b);
+                                if (b != null) {
+                                  ImageViewer.showBytes(context, b);
+                                }
                               },
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(16),
@@ -181,10 +189,13 @@ class _ChatBubbleState extends State<ChatBubble> {
                                     decoration: BoxDecoration(
                                       color: isDark
                                           ? Colors.white.withValues(alpha: 0.05)
-                                          : Colors.black.withValues(alpha: 0.05),
+                                          : Colors.black
+                                              .withValues(alpha: 0.05),
                                       borderRadius: BorderRadius.circular(16),
                                     ),
-                                    child: const Center(child: Icon(Icons.broken_image_rounded, size: 28)),
+                                    child: const Center(
+                                        child: Icon(Icons.broken_image_rounded,
+                                            size: 28)),
                                   ),
                                 ),
                               ),
@@ -195,9 +206,10 @@ class _ChatBubbleState extends State<ChatBubble> {
                         if (!isUser && thoughtParts.hasThought)
                           ThoughtDisclosure(
                             thought: thoughtParts.thought,
-                            durationSeconds: widget.message.thoughtDurationSeconds,
-                            styleSheet: _thoughtSheet ??
-                                _thoughtMarkdownStyle(context),
+                            durationSeconds:
+                                widget.message.thoughtDurationSeconds,
+                            styleSheet:
+                                _thoughtSheet ?? _thoughtMarkdownStyle(context),
                           ),
 
                         // Message content
@@ -213,8 +225,7 @@ class _ChatBubbleState extends State<ChatBubble> {
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: isDark
-                                          ? Colors.white
-                                              .withValues(alpha: 0.08)
+                                          ? Colors.white.withValues(alpha: 0.08)
                                           : Colors.black
                                               .withValues(alpha: 0.08),
                                       width: 0.5,
@@ -245,7 +256,8 @@ class _ChatBubbleState extends State<ChatBubble> {
                                     'pre': _codeBuilder ??
                                         CodeBlockBuilder(context),
                                     'a': _citationBuilder ??
-                                        CitationLinkBuilder(context, widget.message.citations),
+                                        CitationLinkBuilder(
+                                            context, widget.message.citations),
                                   },
                                   extensionSet: md.ExtensionSet(
                                     [
@@ -262,12 +274,15 @@ class _ChatBubbleState extends State<ChatBubble> {
                                 )
                         else ...[
                           if (hasAlternatives && preferredIdx == null)
-                            _buildDualResponses(answerContent, alternatives, isDark)
+                            _buildDualResponses(
+                                answerContent, alternatives, isDark)
                           else
                             _buildSingleResponse(
                                 preferredIdx == null
                                     ? answerContent
-                                    : (preferredIdx == 0 ? answerContent : alternatives![preferredIdx - 1]),
+                                    : (preferredIdx == 0
+                                        ? answerContent
+                                        : alternatives![preferredIdx - 1]),
                                 displayContent,
                                 isDark),
                         ],
@@ -304,14 +319,26 @@ class _ChatBubbleState extends State<ChatBubble> {
                                 context, widget.message.webSources!, isDark),
                           ),
 
+                        // Tool call steps visualization
+                        if (!isUser &&
+                            widget.message.toolSteps != null &&
+                            widget.message.toolSteps!.isNotEmpty)
+                          ToolStepsWidget(steps: widget.message.toolSteps!),
+
                         // File attachment
                         if (widget.message.fileName != null) ...[
                           const SizedBox(height: 12),
                           if (widget.message.fileType == 'zip')
                             ProjectContextView(
                               fileName: widget.message.fileName!,
-                              structure: widget.message.fileContent?.split('---').first ?? '',
-                              fileCount: widget.message.fileContent?.split('---').length ?? 0,
+                              structure: widget.message.fileContent
+                                      ?.split('---')
+                                      .first ??
+                                  '',
+                              fileCount: widget.message.fileContent
+                                      ?.split('---')
+                                      .length ??
+                                  0,
                             )
                           else
                             AttachmentPreview(
@@ -335,7 +362,8 @@ class _ChatBubbleState extends State<ChatBubble> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (widget.message.tokensPerSec != null && widget.message.tokensPerSec! > 0)
+                            if (widget.message.tokensPerSec != null &&
+                                widget.message.tokensPerSec! > 0)
                               Padding(
                                 padding: const EdgeInsets.only(right: 10),
                                 child: _infoBadge(
@@ -344,20 +372,24 @@ class _ChatBubbleState extends State<ChatBubble> {
                                   context,
                                 ),
                               ),
-                            if (widget.message.imageGenDurationMs != null && widget.message.imageGenDurationMs! > 0)
+                            if (widget.message.imageGenDurationMs != null &&
+                                widget.message.imageGenDurationMs! > 0)
                               Padding(
                                 padding: const EdgeInsets.only(right: 10),
                                 child: _infoBadge(
-                                  _formatGenTime(widget.message.imageGenDurationMs!),
+                                  _formatGenTime(
+                                      widget.message.imageGenDurationMs!),
                                   isUser,
                                   context,
                                 ),
                               ),
-                            if (widget.message.generationDurationMs != null && widget.message.generationDurationMs! > 0)
+                            if (widget.message.generationDurationMs != null &&
+                                widget.message.generationDurationMs! > 0)
                               Padding(
                                 padding: const EdgeInsets.only(right: 10),
                                 child: _infoBadge(
-                                  _formatGenTime(widget.message.generationDurationMs!),
+                                  _formatGenTime(
+                                      widget.message.generationDurationMs!),
                                   isUser,
                                   context,
                                   icon: Icons.timer_outlined,
@@ -369,7 +401,8 @@ class _ChatBubbleState extends State<ChatBubble> {
                                 fontSize: 10,
                                 color: isUser
                                     ? Dt.textMuted.withValues(alpha: 0.8)
-                                    : AppColors.textMuted.withValues(alpha: 0.7),
+                                    : AppColors.textMuted
+                                        .withValues(alpha: 0.7),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -454,23 +487,32 @@ class _ChatBubbleState extends State<ChatBubble> {
               ),
               'code': _codeBuilder ?? CodeBlockBuilder(context),
               'pre': _codeBuilder ?? CodeBlockBuilder(context),
-              'a': _citationBuilder ?? CitationLinkBuilder(context, widget.message.citations),
+              'a': _citationBuilder ??
+                  CitationLinkBuilder(context, widget.message.citations),
             },
             extensionSet: md.ExtensionSet(
-              [...md.ExtensionSet.gitHubFlavored.blockSyntaxes, LatexBlockSyntax()],
-              [...md.ExtensionSet.gitHubFlavored.inlineSyntaxes, LatexInlineSyntax()],
+              [
+                ...md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+                LatexBlockSyntax()
+              ],
+              [
+                ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+                LatexInlineSyntax()
+              ],
             ),
           );
   }
 
-  Widget _buildDualResponses(String first, List<String> alternatives, bool isDark) {
+  Widget _buildDualResponses(
+      String first, List<String> alternatives, bool isDark) {
     final all = [first, ...alternatives];
     return Column(
       children: [
         const SizedBox(height: 12),
         Row(
           children: [
-            const Icon(LucideIcons.gitCompare, size: 16, color: AppColors.primary),
+            const Icon(LucideIcons.gitCompare,
+                size: 16, color: AppColors.primary),
             const SizedBox(width: 8),
             Text(
               'Which response do you prefer?',
@@ -518,10 +560,14 @@ class _ChatBubbleState extends State<ChatBubble> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.black.withValues(alpha: 0.02),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.03)
+            : Colors.black.withValues(alpha: 0.02),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.05),
         ),
       ),
       child: Column(
@@ -545,10 +591,13 @@ class _ChatBubbleState extends State<ChatBubble> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
-              onPressed: () => Get.find<ChatController>().setPreference(widget.message.id, index),
+              onPressed: () => Get.find<ChatController>()
+                  .setPreference(widget.message.id, index),
               style: OutlinedButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                side:
+                    BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
               ),
               child: Text(
                 'I prefer this',
@@ -567,17 +616,16 @@ class _ChatBubbleState extends State<ChatBubble> {
 
   // ── Inline action bar below message ──
   Widget _buildActionBar(BuildContext context, bool isUser, bool isDark) {
-    final iconColor = isDark
-        ? AppColors.textMuted.withValues(alpha: 0.6)
-        : Dt.textMuted;
-    final mutedColor = isDark
-        ? AppColors.textMuted.withValues(alpha: 0.3)
-        : Dt.toggleTrackOff;
+    final iconColor =
+        isDark ? AppColors.textMuted.withValues(alpha: 0.6) : Dt.textMuted;
+    final mutedColor =
+        isDark ? AppColors.textMuted.withValues(alpha: 0.3) : Dt.toggleTrackOff;
     const double iconSize = 16;
     final revisions = widget.message.revisions;
     final hasRevisions = revisions != null && revisions.isNotEmpty;
     final canPrev = hasRevisions && widget.message.revisionIndex > 0;
-    final canNext = hasRevisions && widget.message.revisionIndex < revisions.length - 1;
+    final canNext =
+        hasRevisions && widget.message.revisionIndex < revisions.length - 1;
 
     return Padding(
       padding: const EdgeInsets.only(top: 4),
@@ -616,12 +664,9 @@ class _ChatBubbleState extends State<ChatBubble> {
           if (isUser) ...[
             // User: View toggle + Edit + Copy + Share (+ .md / PDF in raw mode)
             _actionButton(
-              icon: _rawMode
-                  ? Icons.visibility_outlined
-                  : Icons.code_rounded,
-              tooltip: _rawMode
-                  ? 'prompt_view_rendered'.tr
-                  : 'prompt_view_raw'.tr,
+              icon: _rawMode ? Icons.visibility_outlined : Icons.code_rounded,
+              tooltip:
+                  _rawMode ? 'prompt_view_rendered'.tr : 'prompt_view_raw'.tr,
               onTap: () => setState(() => _rawMode = !_rawMode),
               color: _rawMode ? AppColors.primary : iconColor,
               size: iconSize,
@@ -640,9 +685,7 @@ class _ChatBubbleState extends State<ChatBubble> {
               onTap: () {
                 final visible = widget.message.fileName == null
                     ? widget.message.content
-                    : widget.message.content
-                        .split('\n\nAttached file:')
-                        .first;
+                    : widget.message.content.split('\n\nAttached file:').first;
                 Clipboard.setData(ClipboardData(text: visible));
                 HapticFeedback.selectionClick();
                 setState(() => _copied = true);
@@ -691,12 +734,9 @@ class _ChatBubbleState extends State<ChatBubble> {
             // artifact Code tab). Raw mode shows/copies/exports the exact
             // visible answer (think tags stripped).
             _actionButton(
-              icon: _rawMode
-                  ? Icons.visibility_outlined
-                  : Icons.code_rounded,
-              tooltip: _rawMode
-                  ? 'prompt_view_rendered'.tr
-                  : 'prompt_view_raw'.tr,
+              icon: _rawMode ? Icons.visibility_outlined : Icons.code_rounded,
+              tooltip:
+                  _rawMode ? 'prompt_view_rendered'.tr : 'prompt_view_raw'.tr,
               onTap: () => setState(() => _rawMode = !_rawMode),
               color: _rawMode ? AppColors.primary : iconColor,
               size: iconSize,
@@ -780,17 +820,27 @@ class _ChatBubbleState extends State<ChatBubble> {
             const SizedBox(width: 8),
             // Feedback
             _actionButton(
-              icon: widget.message.feedback == 'helpful' ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
+              icon: widget.message.feedback == 'helpful'
+                  ? Icons.thumb_up_rounded
+                  : Icons.thumb_up_outlined,
               tooltip: 'Helpful',
-              onTap: () => Get.find<ChatController>().setFeedback(widget.message.id, 'helpful'),
-              color: widget.message.feedback == 'helpful' ? AppColors.success : iconColor,
+              onTap: () => Get.find<ChatController>()
+                  .setFeedback(widget.message.id, 'helpful'),
+              color: widget.message.feedback == 'helpful'
+                  ? AppColors.success
+                  : iconColor,
               size: iconSize - 2,
             ),
             _actionButton(
-              icon: widget.message.feedback == 'unhelpful' ? Icons.thumb_down_rounded : Icons.thumb_down_outlined,
+              icon: widget.message.feedback == 'unhelpful'
+                  ? Icons.thumb_down_rounded
+                  : Icons.thumb_down_outlined,
               tooltip: 'Not helpful',
-              onTap: () => Get.find<ChatController>().setFeedback(widget.message.id, 'unhelpful'),
-              color: widget.message.feedback == 'unhelpful' ? AppColors.error : iconColor,
+              onTap: () => Get.find<ChatController>()
+                  .setFeedback(widget.message.id, 'unhelpful'),
+              color: widget.message.feedback == 'unhelpful'
+                  ? AppColors.error
+                  : iconColor,
               size: iconSize - 2,
             ),
           ],
@@ -912,9 +962,14 @@ class _ChatBubbleState extends State<ChatBubble> {
                   if (Get.isRegistered<TtsService>()) {
                     final visible = widget.message.fileName == null
                         ? widget.message.content
-                        : widget.message.content.split('\n\nAttached file:').first;
-                    final parts = splitThoughtTags(_cleanAssistantText(visible));
-                    final text = parts.answer.trim().isEmpty ? widget.message.content : parts.answer.trim();
+                        : widget.message.content
+                            .split('\n\nAttached file:')
+                            .first;
+                    final parts =
+                        splitThoughtTags(_cleanAssistantText(visible));
+                    final text = parts.answer.trim().isEmpty
+                        ? widget.message.content
+                        : parts.answer.trim();
                     Get.find<TtsService>().speak(text);
                   }
                 },
@@ -963,8 +1018,11 @@ class _ChatBubbleState extends State<ChatBubble> {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, size: 22, color: isDark ? AppColors.textPrimary : Dt.textPrimary),
-      title: Text(label, style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w600)),
+      leading: Icon(icon,
+          size: 22, color: isDark ? AppColors.textPrimary : Dt.textPrimary),
+      title: Text(label,
+          style: GoogleFonts.plusJakartaSans(
+              fontSize: 15, fontWeight: FontWeight.w600)),
       onTap: onTap,
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1024,21 +1082,26 @@ class _ChatBubbleState extends State<ChatBubble> {
               final title = art['title'] ?? 'Artifact';
               final type = art['type'] ?? 'code';
               final content = art['content'] ?? '';
-              
+
               IconData icon = LucideIcons.fileText;
               if (type == 'html') icon = LucideIcons.layout;
               if (type == 'code') icon = LucideIcons.code2;
               if (type == 'mermaid') icon = LucideIcons.gitBranch;
 
               return InkWell(
-                onTap: () => controller.openArtifact(id, content, title: title, type: type),
+                onTap: () => controller.openArtifact(id, content,
+                    title: title, type: type),
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.white,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1083,8 +1146,8 @@ class _ChatBubbleState extends State<ChatBubble> {
                 color: Dt.accent.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Icon(LucideIcons.sparkles,
-                  size: 12, color: Dt.accent),
+              child:
+                  const Icon(LucideIcons.sparkles, size: 12, color: Dt.accent),
             ),
             const SizedBox(width: 6),
             Text('Skills used',
@@ -1133,9 +1196,8 @@ class _ChatBubbleState extends State<ChatBubble> {
                               style: GoogleFonts.plusJakartaSans(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
-                                  color: isDark
-                                      ? Colors.white
-                                      : Dt.textPrimary)),
+                                  color:
+                                      isDark ? Colors.white : Dt.textPrimary)),
                         ],
                       ),
                     ))
@@ -1261,8 +1323,7 @@ class _ChatBubbleState extends State<ChatBubble> {
                                     color: isDark
                                         ? Colors.white
                                         : Dt.textPrimary)),
-                            if (src.title.isNotEmpty &&
-                                src.title != src.domain)
+                            if (src.title.isNotEmpty && src.title != src.domain)
                               Text(src.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -1274,8 +1335,7 @@ class _ChatBubbleState extends State<ChatBubble> {
                       ),
                       const SizedBox(width: 4),
                       Icon(LucideIcons.externalLink,
-                          size: 10,
-                          color: Theme.of(context).hintColor),
+                          size: 10, color: Theme.of(context).hintColor),
                     ],
                   ),
                 ),
@@ -1287,7 +1347,8 @@ class _ChatBubbleState extends State<ChatBubble> {
     );
   }
 
-  Widget _infoBadge(String label, bool isUser, BuildContext context, {IconData? icon}) {
+  Widget _infoBadge(String label, bool isUser, BuildContext context,
+      {IconData? icon}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
@@ -1321,12 +1382,14 @@ class _ChatBubbleState extends State<ChatBubble> {
     final color = isDark ? AppColors.textPrimary : Dt.textPrimary;
     final muted = isDark ? AppColors.textSecondary : Dt.textSecondary;
     // Assistant body reads in a serif — Claude's signature editorial voice.
-    final base = GoogleFonts.sourceSerif4(fontSize: 15.5, color: color, height: 1.6);
+    final base =
+        GoogleFonts.sourceSerif4(fontSize: 15.5, color: color, height: 1.6);
 
     return MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
       p: base,
       pPadding: const EdgeInsets.only(bottom: 12),
-      h1: base.copyWith(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+      h1: base.copyWith(
+          fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5),
       h2: base.copyWith(fontSize: 18, fontWeight: FontWeight.w700),
       h3: base.copyWith(fontSize: 16, fontWeight: FontWeight.w700),
       strong: base.copyWith(fontWeight: FontWeight.w700),
@@ -1341,7 +1404,9 @@ class _ChatBubbleState extends State<ChatBubble> {
       codeblockPadding: EdgeInsets.zero,
       blockquote: base.copyWith(color: muted, fontSize: 14),
       blockquoteDecoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.black.withValues(alpha: 0.03),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.03)
+            : Colors.black.withValues(alpha: 0.03),
         border: const Border(
           left: BorderSide(
             color: AppColors.primary,
@@ -1356,7 +1421,8 @@ class _ChatBubbleState extends State<ChatBubble> {
 
   MarkdownStyleSheet _thoughtMarkdownStyle(BuildContext context) {
     final muted = Theme.of(context).hintColor;
-    final base = GoogleFonts.plusJakartaSans(fontSize: 13, color: muted, height: 1.5);
+    final base =
+        GoogleFonts.plusJakartaSans(fontSize: 13, color: muted, height: 1.5);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final codeBg = isDark ? AppColors.surfaceLight : Dt.hairline;
 
@@ -1411,10 +1477,11 @@ class CitationLinkBuilder extends MarkdownElementBuilder {
     final href = element.attributes['href'];
     if (href != null && href.startsWith('cite:')) {
       final index = int.tryParse(href.substring(5)) ?? 0;
-      final citation = (citations != null && index > 0 && index <= citations!.length)
-          ? citations![index - 1]
-          : null;
-      
+      final citation =
+          (citations != null && index > 0 && index <= citations!.length)
+              ? citations![index - 1]
+              : null;
+
       return CitationChip(
         index: index,
         source: citation?['source'] ?? 'Unknown Source',

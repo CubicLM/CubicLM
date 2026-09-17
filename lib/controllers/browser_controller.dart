@@ -1,6 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
+
+import 'settings_controller.dart';
+import '../services/device_info_service.dart';
+import '../services/hive_service.dart';
 
 /// One session-only history entry. Never persisted (privacy by design).
 class BrowserVisit {
@@ -47,14 +53,22 @@ class WebTab {
   final RxInt findActive = 0.obs;
   final RxInt findTotal = 0.obs;
 
+  final RxBool isIncognito = false.obs;
+  final RxList<String> blockedHosts = <String>[].obs;
+  final RxList<String> detectedVideos = <String>[].obs;
+  final RxString groupName = ''.obs;
+  final RxBool isHibernated = false.obs;
+  DateTime lastAccessedAt = DateTime.now();
+
   final List<String> backStack = [];
   final List<String> fwdStack = [];
 
   bool historyNav = false;
   bool historyBack = true;
 
-  WebTab({required this.id, String? initialUrl}) {
+  WebTab({required this.id, String? initialUrl, bool incognito = false}) {
     if (initialUrl != null) url.value = initialUrl;
+    isIncognito.value = incognito;
   }
 
   /// Full reset back to a fresh tab (stacks, counters, error, UA flag).
@@ -65,6 +79,11 @@ class WebTab {
     progress.value = 0.0;
     loading.value = false;
     blockedCount.value = 0;
+    blockedHosts.clear();
+    detectedVideos.clear();
+    groupName.value = '';
+    isHibernated.value = false;
+    lastAccessedAt = DateTime.now();
     errorDesc.value = '';
     desktopMode.value = false;
     findActive.value = 0;
@@ -96,22 +115,127 @@ class BrowserController extends GetxController {
   /// Recently closed tabs (newest first). Session-only.
   final closedTabs = <ClosedTab>[].obs;
 
+  /// Persisted offline pages metadata.
+  final offlinePages = <Map<String, dynamic>>[].obs;
+
   WebTab? get currentTab =>
       tabs.isNotEmpty ? tabs[currentTabIndex.value] : null;
 
   @override
   void onInit() {
     super.onInit();
+    _loadOfflinePages();
     // Start with one empty tab if none exist
     if (tabs.isEmpty) {
       addTab();
     }
+    _startHibernationTimer();
+  }
+
+  Timer? _hibernationTimer;
+  void _startHibernationTimer() {
+    _hibernationTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      _checkHibernation();
+    });
+  }
+
+  void _checkHibernation() {
+    final settings = Get.find<SettingsController>();
+    if (!settings.browserHibernationEnabled.value &&
+        !settings.browserLimiterEnabled.value) {
+      return;
+    }
+
+    final now = DateTime.now();
+
+    // GX Limiter Enforcement
+    if (settings.browserLimiterEnabled.value &&
+        Get.isRegistered<DeviceInfoService>()) {
+      final dev = Get.find<DeviceInfoService>();
+      final usedMb = (dev.totalRamGB.value - dev.availableRamGB.value) * 1024;
+      if (usedMb > settings.browserRamLimit.value) {
+        // If we exceed limit, find the oldest background tab to hibernate
+        WebTab? oldest;
+        for (var i = 0; i < tabs.length; i++) {
+          if (i == currentTabIndex.value) {
+            continue;
+          }
+          final t = tabs[i];
+          if (t.isHibernated.value) {
+            continue;
+          }
+          if (oldest == null ||
+              t.lastAccessedAt.isBefore(oldest.lastAccessedAt)) {
+            oldest = t;
+          }
+        }
+        if (oldest != null) {
+          oldest.isHibernated.value = true;
+        }
+      }
+    }
+
+    if (settings.browserHibernationEnabled.value) {
+      for (var i = 0; i < tabs.length; i++) {
+        if (i == currentTabIndex.value) {
+          continue;
+        }
+        final tab = tabs[i];
+        if (tab.isHibernated.value) {
+          continue;
+        }
+        if (tab.url.value.isEmpty || tab.url.value == 'about:blank') {
+          continue;
+        }
+
+        if (now.difference(tab.lastAccessedAt).inMinutes >= 10) {
+          tab.isHibernated.value = true;
+        }
+      }
+    }
+  }
+
+  @override
+  void onClose() {
+    _hibernationTimer?.cancel();
+    super.onClose();
+  }
+
+  void _loadOfflinePages() {
+    final hive = Get.find<HiveService>();
+    offlinePages.assignAll(hive.getAllOfflinePages().cast<Map<String, dynamic>>());
+  }
+
+  Future<void> saveOfflinePage({
+    required String title,
+    required String url,
+    required String path,
+  }) async {
+    final id = const Uuid().v4();
+    final data = {
+      'id': id,
+      'title': title.trim().isEmpty ? url : title.trim(),
+      'url': url,
+      'path': path,
+      'savedAtMs': DateTime.now().millisecondsSinceEpoch,
+    };
+    await Get.find<HiveService>().saveOfflinePage(id, data);
+    offlinePages.insert(0, data);
+  }
+
+  Future<void> deleteOfflinePage(int index) async {
+    if (index < 0 || index >= offlinePages.length) return;
+    final item = offlinePages[index];
+    final id = item['id']?.toString() ?? '';
+    if (id.isEmpty) return;
+    await Get.find<HiveService>().deleteOfflinePage(id);
+    offlinePages.removeAt(index);
   }
 
   /// Adds a tab. Returns false when the tab cap is reached.
-  bool addTab({String? url}) {
+  bool addTab({String? url, bool incognito = false}) {
     if (tabs.length >= maxTabs) return false;
-    final newTab = WebTab(id: const Uuid().v4(), initialUrl: url);
+    final newTab = WebTab(id: const Uuid().v4(), initialUrl: url, incognito: incognito);
     tabs.add(newTab);
     currentTabIndex.value = tabs.length - 1;
     return true;
@@ -159,12 +283,38 @@ class BrowserController extends GetxController {
   void switchTab(int index) {
     if (index >= 0 && index < tabs.length) {
       currentTabIndex.value = index;
+      tabs[index].lastAccessedAt = DateTime.now();
+      if (tabs[index].isHibernated.value) {
+        tabs[index].isHibernated.value = false;
+        // Re-load will be handled by the view when it sees isHibernated changing
+      }
+    }
+  }
+
+  void setTabGroup(int index, String group) {
+    if (index >= 0 && index < tabs.length) {
+      tabs[index].groupName.value = group.trim();
+    }
+  }
+
+  void moveTab(int oldIndex, int newIndex) {
+    if (oldIndex < 0 || oldIndex >= tabs.length) return;
+    if (newIndex < 0 || newIndex >= tabs.length) return;
+    final tab = tabs.removeAt(oldIndex);
+    tabs.insert(newIndex, tab);
+    if (currentTabIndex.value == oldIndex) {
+      currentTabIndex.value = newIndex;
+    } else if (currentTabIndex.value > oldIndex && currentTabIndex.value <= newIndex) {
+      currentTabIndex.value--;
+    } else if (currentTabIndex.value < oldIndex && currentTabIndex.value >= newIndex) {
+      currentTabIndex.value++;
     }
   }
 
   /// Record a completed main-frame load (session only, capped, consecutive
   /// duplicates collapsed).
-  void recordVisit(String title, String url) {
+  void recordVisit(String title, String url, {bool isIncognito = false}) {
+    if (isIncognito) return;
     final u = url.trim();
     if (u.isEmpty || u == 'about:blank') return;
     if (visits.isNotEmpty && visits.first.url == u) {
@@ -199,4 +349,22 @@ class BrowserController extends GetxController {
   }
 
   void clearVisits() => visits.clear();
+
+  Future<void> privacyBomb() async {
+    // 1. Close all tabs
+    for (var i = tabs.length - 1; i >= 0; i--) {
+      closeTab(i);
+    }
+    // ensure at least one fresh tab
+    if (tabs.isEmpty) addTab();
+
+    // 2. Clear history
+    clearVisits();
+    closedTabs.clear();
+
+    // 3. Clear cookies & storage (handled via WebView but we can trigger it)
+    try {
+      await CookieManager.instance().deleteAllCookies();
+    } catch (_) {}
+  }
 }

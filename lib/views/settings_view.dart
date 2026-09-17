@@ -22,7 +22,11 @@ class SettingsView extends GetView<SettingsController> {
   /// When true, renders just the scrollable config sections without its
   /// own Scaffold — used inside the Nodes page's Config tab.
   final bool embedded;
-  const SettingsView({super.key, this.embedded = false});
+
+  /// When true, the model-parameter sections are omitted (they live in
+  /// the Parameters tab instead).
+  final bool hideParams;
+  const SettingsView({super.key, this.embedded = false, this.hideParams = false});
 
   @override
   Widget build(BuildContext context) {
@@ -148,7 +152,34 @@ class SettingsView extends GetView<SettingsController> {
             const SizedBox(height: 28),
             sectionLabel(context, 'settings_section_mcp'.tr),
             const _McpSection(),
-            const SizedBox(height: 28),
+            if (!hideParams) ...[
+              const SizedBox(height: 28),
+              sectionLabel(context, 'settings_section_local_params'.tr),
+              buildLiteRtCard(context, isDark),
+              const SizedBox(height: 12),
+              buildModelParametersCard(context, isDark),
+              const SizedBox(height: 28),
+              sectionLabel(context, 'settings_section_image_params'.tr),
+              buildImageGenerationCard(context, isDark),
+            ],
+            const SizedBox(height: 50),
+          ],
+        ));
+  }
+}
+
+/// Parameters tab content: local-model + synthetic-imaging parameters.
+/// Shares the same section builders as the Config page.
+class ParametersView extends GetView<SettingsController> {
+  const ParametersView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Obx(() => ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          children: [
+            const SizedBox(height: 16),
             sectionLabel(context, 'settings_section_local_params'.tr),
             buildLiteRtCard(context, isDark),
             const SizedBox(height: 12),

@@ -23,7 +23,6 @@ class HomeController extends GetxController {
     'Chat',
     'Explore',
     'Toolkit',
-    'Nodes',
     'Settings',
   ];
 

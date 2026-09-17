@@ -231,10 +231,10 @@ class ChatView extends GetView<ChatController> {
       backgroundColor:
           (isDark ? Dt.canvasDark : Dt.canvas).withValues(alpha: 0.8),
       flexibleSpace: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Obx(() => BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: AppColors.blurSigma, sigmaY: AppColors.blurSigma),
           child: Container(color: Colors.transparent),
-        ),
+        )),
       ),
       surfaceTintColor: Colors.transparent,
       elevation: 0,

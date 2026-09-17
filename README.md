@@ -269,7 +269,7 @@ Computational Universe for Building Intelligent Learning Machines
 *What makes it powerful*
 
 🧠 [Local AI Inference](#-local-ai-inference)
-🎛️ [Inference Parameters](#️-inference-parameters-nodes--config)
+🎛️ [Inference Parameters](#️-inference-parameters-settings--parameters)
 🚀 [Startup & Onboarding](#-startup-onboarding--splash)
 🌐 [Web Access](#-web-access-independent-chat)
 🧠 [Chat Context Memory](#-chat-context-memory-follow-ups-dont-get-lost)
@@ -326,7 +326,7 @@ Computational Universe for Building Intelligent Learning Machines
 
 *Debug & beautify*
 
-🩺 [System Diagnostics](#-system-diagnostics-nodes--config--system-logs)
+🩺 [System Diagnostics](#-system-diagnostics-settings--config--system-logs)
 🎨 [Theming & UX](#-theming--ux-deep-dive)
 🔮 [Thinking Orbs](#-theming--ux-deep-dive)
 
@@ -525,7 +525,7 @@ Computational Universe for Building Intelligent Learning Machines
 
 ### 🔍 Device Intelligence
 - **Auto-configuration** — context size & max tokens adapt to detected RAM tier
-- **Device specification card** (`Nodes → Config`) — brand, model, OS, CPU cores/ABI, RAM bar, display size, one-tap refresh
+- **Device specification card** (`Settings → Config`) — brand, model, OS, CPU cores/ABI, RAM bar, display size, one-tap refresh
 - **Real hardware identification** — reads `ro.soc.*` system properties to show the actual SoC (Snapdragon 8 Gen 2, Dimensity 9000, Tensor G3…) and probes Vulkan for the GPU renderer name (Adreno, Mali…)
 - **SoC-aware quantization recommendations** based on the detected family
 
@@ -540,13 +540,13 @@ Computational Universe for Building Intelligent Learning Machines
 | Feature | Description |
 | :--- | :--- |
 | 🎚️ **Device-tier auto-configuration** | Adjusts context size and max tokens based on detected RAM |
-| 📊 **Device specification card** | `Nodes → Config` shows brand+model, OS version, CPU cores/ABI, RAM free-space bar, display size, one-tap refresh |
+| 📊 **Device specification card** | `Settings → Config` shows brand+model, OS version, CPU cores/ABI, RAM free-space bar, display size, one-tap refresh |
 | 🔍 **Real hardware identification** | Reads `ro.soc.*` system properties to show the actual processor (Snapdragon 8 Gen 2, Dimensity 9000, Google Tensor G3…) and probes Vulkan for the GPU renderer name (Adreno, Mali…) instead of a generic "Unknown" label |
 | 💡 **SoC-aware recommendations** | Quantization recommendations follow from the detected family |
 
 ---
 
-## 🎛️ Inference Parameters *(Nodes › Config)*
+## 🎛️ Inference Parameters *(Settings › Parameters)*
 
 <table>
 <tr>
@@ -734,7 +734,7 @@ Controlled by `AppConstants.keyAutoLoadLastModel`:
 ### 💡 Tip for Code Follow-Ups
 - Long code answers eat context fast
 - Use a **3B+ model** (or a strong cloud model)
-- Raise **Nodes › Config → Context Size** if the device allows
+- Raise **Settings › Parameters → Context Size** if the device allows
 - Small 0.6B–1B models may still ask "which game?" on their own
 
 </td>
@@ -866,7 +866,7 @@ Controlled by `AppConstants.keyAutoLoadLastModel`:
 
 **📍 Access Points**
 - Dedicated **Explore → Skills** tab (4-way toggle: Local / Online / Skills / MCP)
-- Same card in **Nodes › Config → SKILLS** (next to Global System Prompt) for quick access
+- Same card in **Settings › Config → SKILLS** (next to Global System Prompt) for quick access
 
 </td>
 <td width="50%" valign="top">
@@ -889,7 +889,7 @@ Controlled by `AppConstants.keyAutoLoadLastModel`:
 
 ## 🔌 Custom MCP Server — Single Remote Connection *(no marketplace)*
 
-> A power-user setting in **Nodes › Config** to connect one user-provided **remote** MCP server (Streamable HTTP / SSE). No stdio, no marketplace, no multi-server, no OAuth UI — **intentionally minimal**.
+> A power-user setting in **Settings › Config** to connect one user-provided **remote** MCP server (Streamable HTTP / SSE). No stdio, no marketplace, no multi-server, no OAuth UI — **intentionally minimal**.
 
 <table>
 <tr>
@@ -933,7 +933,7 @@ Controlled by `AppConstants.keyAutoLoadLastModel`:
 
 ### 🖥️ UI
 
-- **Explore → MCP** tab + same form in **Nodes › Config → CUSTOM MCP SERVER** (`_McpSection` + `explore_skills_mcp_tabs.dart`)
+- **Explore → MCP** tab + same form in **Settings › Config → CUSTOM MCP SERVER** (`_McpSection` + `explore_skills_mcp_tabs.dart`)
 - Single form: name, URL, bearer token (eye toggle), transport auto
 - **Save / Test / Enable-Disable** (with pre-enable tool preview dialog) **/ Remove**
 - Live status dot + banner, exposed-tools list (name + description) before enabling
@@ -959,7 +959,7 @@ Controlled by `AppConstants.keyAutoLoadLastModel`:
 | 🔑 **Optional API key authentication** | Toggle on/off |
 | 🚦 **Rate limit** | 120 POSTs/min/IP (429 response), in-memory request ring (see `/v1/server/capabilities`) |
 | ⚠️ **Honest 400** | for `/v1/embeddings` (no on-device embedding mode) |
-| 📋 **Recent-request viewer** | in Nodes → Node (last 10, auto-refresh) |
+| 📋 **Recent-request viewer** | in Settings → Nodes (last 10, auto-refresh) |
 | 🔌 **Compatibility** | Works with any OpenAI-compatible client on your network |
 
 **Example usage:**
@@ -978,13 +978,13 @@ curl http://<device-ip>:8080/v1/chat/completions \
 
 ### 🧭 Navigation
 
-> **Chat · Explore · Nodes · App Settings**
+> **Chat · Explore · Toolkit · Settings**
 
 | Destination | Contents |
 | :--- | :--- |
-| 🔍 **Explore** | Two tabs — **Model Hub** (Local / Online / Skills / MCP scopes) and **Toolkit** (Battle Arena + Slide Maker + CubicWeb Builder widget cards) |
-| 🖥️ **Nodes** | Two tabs — **Node** (local API server) and **Config** (diagnostics, hardware capabilities, inference mode, system prompt, Skills, Custom MCP Server, local model & imaging parameters) |
-| ⚙️ **App Settings** | Theme mode, typography scale, **Thinking Orbs**, **Language** (15 languages), **Startup → Auto-load last model**, app info |
+| 🔍 **Explore** | **Model Hub** (Local / Online / Skills / MCP scopes) |
+| 🧰 **Toolkit** | Battle Arena + Slide Maker + CubicWeb Builder widget cards |
+| ⚙️ **App Settings** | Four tabs — **General** (theme, orbs, language, startup), **Nodes** (local API server), **Config** (diagnostics, hardware, inference mode, system prompt, Skills, Custom MCP Server), **Parameters** (local model & imaging parameters) |
 
 ### 💬 Chat & Sessions
 
@@ -1096,7 +1096,7 @@ curl http://<device-ip>:8080/v1/chat/completions \
 - Open / Verify / Update / Repair / Uninstall with persistent registry
 
 ### 📊 Diagnostics & Cloud Tools
-- **CubicWeb System Logs** — structured `CW-*` diagnostics separate code bugs from missing runtimes / device limits (see Nodes › Config › System Logs + AppBar activity icon); AI skips rewrites for environment failures
+- **CubicWeb System Logs** — structured `CW-*` diagnostics separate code bugs from missing runtimes / device limits (see Settings › Config › System Logs + AppBar activity icon); AI skips rewrites for environment failures
 - **Cloud model tools** — import from `/models` with new-count report, test-all with online/failed dots, auto-hide failed, auto-sync interval (configurable)
 
 </td>
@@ -1197,7 +1197,7 @@ Existing `shared` is Dart (`lib/`), not TS — Tauri would require rewriting `li
 
 ---
 
-## 🩺 System Diagnostics *(Nodes › Config › System Logs)*
+## 🩺 System Diagnostics *(Settings › Config › System Logs)*
 
 <table>
 <tr>
@@ -1379,7 +1379,7 @@ Auto-detects **10 crash patterns**:
 | 🌐 **Networking** | dio, http |
 | 🧠 **Local Inference** | `llama_flutter_android`, `flutter_litert_lm`, `sd_flutter_android` (custom plugins) |
 | ☁️ **Cloud Backend** | Firebase Core, Firebase Messaging, Firebase Crashlytics |
-| 🌍 **Localization** | 15 languages — EN, BN, HI, AR, ZH, ES, FR, JA, KO, PT, DE, TR, ID, RU, UR<br>GetX Translations with Hive persistence<br>90+ keys — `nav_*`, `chat_*`, `model_*`, `nodes_*`, `about_*`, `settings_*`, `onboarding_*`<br>`fallbackLocale EN`<br>App Settings + bottom nav + all 5 views reactive via `'.tr'` |
+| 🌍 **Localization** | 15 languages — EN, BN, HI, AR, ZH, ES, FR, JA, KO, PT, DE, TR, ID, RU, UR<br>GetX Translations with Hive persistence<br>90+ keys — `nav_*`, `chat_*`, `model_*`, `nodes_*`, `about_*`, `settings_*`, `onboarding_*`<br>`fallbackLocale EN`<br>App Settings + bottom nav + all 4 views reactive via `'.tr'` |
 | 📦 **Other Libraries** | `google_fonts` · `flutter_markdown` · `image_picker` · `share_plus` · `permission_handler` · `speech_to_text` · `lucide_icons` · `url_launcher` · `file_picker` · `flutter_secure_storage` · `dart_mcp` · `window_manager` |
 
 <br/>
@@ -1573,11 +1573,11 @@ lib/
 ├── views/
 │   ├── splash_view.dart                   # 1380ms shimmer + 760ms fade-out
 │   ├── onboarding_view.dart               # 3-page PageView + dots + Hive persist
-│   ├── home_view.dart                     # Main navigation scaffold (IndexedStack 5 tabs)
+│   ├── home_view.dart                     # Main navigation scaffold (IndexedStack 4 tabs)
 │   ├── chat_view.dart                     # Chat interface
 │   ├── model_view.dart                    # Model Hub — 4-way toggle (Local/Online/Skills/MCP)
 │   ├── explore_skills_mcp_tabs.dart       # Explore Skills + MCP tabs
-│   ├── server_view.dart                   # Nodes page — Node + Config tabs
+│   ├── server_view.dart                   # Node manager (Settings → Nodes tab)
 │   ├── settings_view.dart                 # Config sections
 │   ├── app_settings_view.dart             # App Settings
 │   ├── language_picker_view.dart          # Full-page language picker
@@ -1929,7 +1929,7 @@ bash scripts/build-all.sh          # Linux/macOS
 
 ### 🌐 Local API Server
 
-> Open the **Nodes** tab › **Node** and flip the switch.
+> Open **Settings → Nodes** and flip the switch.
 
 Once running, point any OpenAI-compatible client at `http://<device-ip>:8080` to use your local models programmatically.
 
@@ -1937,7 +1937,7 @@ Once running, point any OpenAI-compatible client at `http://<device-ip>:8080` to
 
 ### 🧩 Skills
 
-> Manage in **Nodes › Config → SKILLS** (next to Global System Prompt).
+> Manage in **Settings › Config → SKILLS** (next to Global System Prompt).
 
 | Method | Details |
 | :--- | :--- |
@@ -1953,7 +1953,7 @@ Once running, point any OpenAI-compatible client at `http://<device-ip>:8080` to
 
 ### 🔌 Custom MCP Server
 
-> Configure in **Nodes › Config → CUSTOM MCP SERVER**.
+> Configure in **Settings › Config → CUSTOM MCP SERVER**.
 
 - 🌐 Single remote HTTP/SSE URL, optional bearer token (secure storage), transport auto-detected
 - 🎛️ **Save / Test Connection / Enable-Disable** (with tool-preview dialog) **/ Remove** with live status (disconnected / connecting / connected / error)
@@ -1969,7 +1969,7 @@ Once running, point any OpenAI-compatible client at `http://<device-ip>:8080` to
 <tr>
 <td width="50%" valign="top">
 
-#### 🖥️ Nodes › Config
+#### 🖥️ Settings › Config
 - 🔍 Diagnostics
 - 🧮 Hardware capabilities
 - 🎯 Inference mode
@@ -1977,7 +1977,10 @@ Once running, point any OpenAI-compatible client at `http://<device-ip>:8080` to
 - 📝 Global system prompt
 - 🧩 **Skills**
 - 🔌 **Custom MCP Server**
-- 🎨 Local model & imaging parameters
+
+#### 🎚️ Settings › Parameters
+- 🎨 Local model parameters
+- 🖼️ Synthetic imaging parameters
 
 </td>
 <td width="50%" valign="top">
@@ -2109,7 +2112,7 @@ Local inference is CPU/GPU-intensive — expect **~15-25%/hour** of screen-on ch
 
 **Tips:**
 - Use a smaller quantized model (Q3/Q4) for casual chat
-- Enable **GPU acceleration** (Vulkan) in `Nodes → Config` — faster + more efficient than CPU
+- Enable **GPU acceleration** (Vulkan) in `Settings → Config` — faster + more efficient than CPU
 - Use cloud providers for long sessions when plugged in
 
 </details>
@@ -2151,7 +2154,7 @@ If you want to port it: fork `local_plugins/llama_flutter_android` and adapt the
 <br/>
 
 1. Load a model in CubicLM
-2. Go to **Nodes → Node** and flip the server switch
+2. Go to **Settings → Nodes** and flip the server switch
 3. Find your phone's IP (Settings → About → Status)
 4. Point any OpenAI-compatible client at `http://<phone-ip>:8080`
 
@@ -2206,9 +2209,9 @@ Your models, chats, skills, and API keys are all preserved across updates.
 
 Open an issue on [GitHub Issues](https://github.com/abir2afridi/CubicLM/issues) with:
 
-1. **Device info** — copy from `Nodes → Config → Device Specification card`
+1. **Device info** — copy from `Settings → Config → Device Specification card`
 2. **Reproduction steps**
-3. **System Logs** — `Nodes → Config → System Logs` → Export → paste
+3. **System Logs** — `Settings → Config → System Logs` → Export → paste
 4. **Screenshot / video** if visual
 
 The in-app **System Logs** export includes a health dashboard that already tells us a lot — please include it.
@@ -2244,7 +2247,7 @@ There's no donation link — this is a passion project. If you build something c
 
 | Symptom | Likely Cause | Fix |
 | :--- | :--- | :--- |
-| **App crashes on model load** | Model file corrupt or RAM insufficient | Check `Nodes → Config → System Logs` for `ERROR [Model]`; re-download or try a smaller quant |
+| **App crashes on model load** | Model file corrupt or RAM insufficient | Check `Settings → Config → System Logs` for `ERROR [Model]`; re-download or try a smaller quant |
 | **"Restart recommended" after context change** | RAM guard triggered | Lower Context Size or switch to a smaller model |
 | **Streaming jank on long answers** | Large context + big model | Reduce Context Size, or use a smaller model |
 | **Cloud provider returns 401** | Invalid / expired API key | Re-verify the key in Explore; some providers rotate free keys |
@@ -2256,7 +2259,7 @@ There's no donation link — this is a passion project. If you build something c
 | **`RenderFlex overflow` on small screens** | Known layout edge case | Logged as ERROR but harmless; already fixed for 360dp (see `chat_view.dart`) |
 
 > [!TIP]
-> **Before filing a bug:** export `Nodes → Config → System Logs` — the health dashboard + last 500 log entries usually pinpoint the issue instantly.
+> **Before filing a bug:** export `Settings → Config → System Logs` — the health dashboard + last 500 log entries usually pinpoint the issue instantly.
 
 ---
 
@@ -2369,7 +2372,7 @@ Be kind. Be patient. Assume good faith. This is a hobby project — maintainers 
 ### 🐛 Reporting Bugs
 
 Use the [GitHub Issues](https://github.com/abir2afridi/CubicLM/issues) template. Include:
-- Device info (from `Nodes → Config` card)
+- Device info (from `Settings → Config` card)
 - Steps to reproduce
 - System Logs export
 - Screenshots if visual

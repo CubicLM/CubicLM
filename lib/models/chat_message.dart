@@ -52,8 +52,14 @@ class ChatMessage {
   /// Edit history: each entry is {'content': String, 'response': String?}
   /// revisions[0] = first version, revisions[last] = latest version
   final List<Map<String, dynamic>>? revisions;
+
   /// Index into revisions for the currently viewed version
   final int revisionIndex;
+
+  /// Tool call steps for MCP/agent visualization.
+  /// Each entry: {'name': String, 'args': Map, 'output': String,
+  ///              'success': bool, 'durationMs': int, 'modifiedFiles': List}
+  final List<Map<String, dynamic>>? toolSteps;
 
   // Cache decoded bytes to prevent flickering on re-build
   Uint8List? _decodedImageBytes;
@@ -130,6 +136,7 @@ class ChatMessage {
     this.suggestions,
     this.revisions,
     this.revisionIndex = 0,
+    this.toolSteps,
   }) : timestamp = timestamp ?? DateTime.now();
 
   Map<String, dynamic> toMap() => {
@@ -161,7 +168,42 @@ class ChatMessage {
         'suggestions': suggestions,
         'revisions': revisions,
         'revisionIndex': revisionIndex,
+        'toolSteps': toolSteps,
       };
+
+  /// Returns a copy with updated artifacts (for persistence after editing).
+  ChatMessage copyWithArtifacts(List<Map<String, String>> newArtifacts) =>
+      ChatMessage(
+        id: id,
+        chatId: chatId,
+        role: role,
+        content: content,
+        imageBase64: imageBase64,
+        imagePath: imagePath,
+        fileName: fileName,
+        fileContent: fileContent,
+        filePath: filePath,
+        fileType: fileType,
+        fileSize: fileSize,
+        cmdOutput: cmdOutput,
+        isCommand: isCommand,
+        tokensPerSec: tokensPerSec,
+        thoughtDurationSeconds: thoughtDurationSeconds,
+        imageGenDurationMs: imageGenDurationMs,
+        generationDurationMs: generationDurationMs,
+        timestamp: timestamp,
+        webSources: webSources,
+        usedSkills: usedSkills,
+        artifacts: newArtifacts,
+        citations: citations,
+        alternatives: alternatives,
+        preferredIndex: preferredIndex,
+        feedback: feedback,
+        suggestions: suggestions,
+        revisions: revisions,
+        revisionIndex: revisionIndex,
+        toolSteps: toolSteps,
+      );
 
   factory ChatMessage.fromMap(Map<dynamic, dynamic> map) => ChatMessage(
         id: map['id'] ?? '',
@@ -193,7 +235,8 @@ class ChatMessage {
         timestamp: DateTime.tryParse(map['timestamp'] ?? '') ?? DateTime.now(),
         webSources: map['webSources'] != null
             ? (map['webSources'] as List)
-                .map((e) => WebSource.fromMap(Map<dynamic, dynamic>.from(e as Map)))
+                .map((e) =>
+                    WebSource.fromMap(Map<dynamic, dynamic>.from(e as Map)))
                 .toList()
             : null,
         usedSkills: map['usedSkills'] != null
@@ -220,11 +263,15 @@ class ChatMessage {
             ? List<String>.from(map['suggestions'] as List)
             : null,
         revisions: map['revisions'] != null
-            ? List<Map<String, dynamic>>.from(
-                (map['revisions'] as List).map((e) => Map<String, dynamic>.from(e)))
+            ? List<Map<String, dynamic>>.from((map['revisions'] as List)
+                .map((e) => Map<String, dynamic>.from(e)))
             : null,
         revisionIndex: map['revisionIndex'] != null
             ? (map['revisionIndex'] as num).toInt()
             : 0,
+        toolSteps: map['toolSteps'] != null
+            ? List<Map<String, dynamic>>.from((map['toolSteps'] as List)
+                .map((e) => Map<String, dynamic>.from(e)))
+            : null,
       );
 }

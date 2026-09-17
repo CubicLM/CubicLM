@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io' show Directory, File, Platform;
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, ValueNotifier;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -25,6 +25,16 @@ class ExportFile {
 
   static const _androidChannel =
       MethodChannel('com.cubiclm.app/model_import');
+
+  /// Bumped on every successful save — the Saved Files tab listens and
+  /// reloads, so fresh exports appear without pull-to-refresh.
+  static final savedVersion = ValueNotifier<int>(0);
+
+  static void _noteSaved() {
+    try {
+      savedVersion.value++;
+    } catch (_) {}
+  }
 
   /// Saves [bytes] as [fileName]. Returns the saved path (or file name on
   /// web), or null when the user cancels / the platform cannot save.
@@ -192,7 +202,10 @@ class ExportFile {
               'mimeType': mimeType ?? _mimeFor(fileName),
               'treeUri': treeUri,
             });
-            if (path != null && path.isNotEmpty) return path;
+            if (path != null && path.isNotEmpty) {
+              _noteSaved();
+              return path;
+            }
           } else {
             await clearExportTree();
           }
@@ -206,7 +219,9 @@ class ExportFile {
           'mimeType': mimeType ?? _mimeFor(fileName),
           'subfolder': appSubfolder(),
         });
-        return (path == null || path.isEmpty) ? null : path;
+        if (path == null || path.isEmpty) return null;
+        _noteSaved();
+        return path;
       } catch (_) {
         return null;
       }
@@ -215,6 +230,7 @@ class ExportFile {
       final dir = await _desktopExportDir();
       final f = File('${dir.path}${Platform.pathSeparator}$fileName');
       await f.writeAsBytes(bytes, flush: true);
+      _noteSaved();
       return f.path;
     } catch (_) {
       return null;
@@ -403,34 +419,64 @@ class ExportFile {
     }
   }
 
-  /// Android: list .txt/.log files via MediaStore or direct Downloads path.
-  static Future<List<ExportedFile>> _listAndroidLogFiles() async {
+  /// Lists all files in the export directory.
+  static Future<List<ExportedFile>> listAllFiles() async {
+    if (kIsWeb) return [];
     try {
-      final results = await _androidChannel.invokeMethod<List>(
-          'listExportFiles', {'subfolder': appSubfolder()});
+      if (Platform.isAndroid) {
+        return await _listAndroidFiles(all: true);
+      }
+      final dir = await _desktopExportDir();
+      return await _listDirFiles(dir, all: true);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Android: list files via MediaStore or direct Downloads path.
+  static Future<List<ExportedFile>> _listAndroidFiles({bool all = false}) async {
+    // A user-picked SAF folder wins (saves go there).
+    try {
+      final hive = Get.isRegistered<HiveService>() ? Get.find<HiveService>() : null;
+      final treeUri = hive?.getSetting<String>(AppConstants.keyExportTreeUri) ?? '';
+      if (treeUri.isNotEmpty) {
+        final ok = await _androidChannel.invokeMethod<bool>('checkTreeFolderAccess', {'treeUri': treeUri});
+        if (ok == true) {
+          final results = await _androidChannel.invokeMethod<List>('listTreeFiles', {'treeUri': treeUri});
+          if (results != null) {
+            return results
+                .map((m) => ExportedFile.fromMap(Map<String, dynamic>.from(m)))
+                .where((f) => f.name.isNotEmpty && (all || f.name.endsWith('.txt') || f.name.endsWith('.log')))
+                .toList();
+          }
+        }
+      }
+    } catch (_) {}
+    try {
+      final results = await _androidChannel.invokeMethod<List>('listExportFiles', {'subfolder': appSubfolder()});
       if (results != null) {
         return results
             .map((m) => ExportedFile.fromMap(Map<String, dynamic>.from(m)))
+            .where((f) => f.name.isNotEmpty && (all || f.name.endsWith('.txt') || f.name.endsWith('.log')))
             .toList();
       }
     } catch (_) {}
     // Fallback: try listing via the Documents directory
     try {
       final docs = await getApplicationDocumentsDirectory();
-      final sub = Directory(
-          '${docs.path}${Platform.pathSeparator}${appSubfolder()}');
-      if (await sub.exists()) return await _listDirFiles(sub);
+      final sub = Directory('${docs.path}${Platform.pathSeparator}${appSubfolder()}');
+      if (await sub.exists()) return await _listDirFiles(sub, all: all);
     } catch (_) {}
     return [];
   }
 
-  /// Lists .txt/.log files in a directory (desktop + fallback).
-  static Future<List<ExportedFile>> _listDirFiles(Directory dir) async {
+  /// Lists files in a directory.
+  static Future<List<ExportedFile>> _listDirFiles(Directory dir, {bool all = false}) async {
     final files = <ExportedFile>[];
     await for (final f in dir.list(followLinks: false)) {
       if (f is File) {
         final name = f.path.split(Platform.pathSeparator).last;
-        if (name.endsWith('.txt') || name.endsWith('.log')) {
+        if (all || name.endsWith('.txt') || name.endsWith('.log')) {
           final stat = await f.stat();
           files.add(ExportedFile(
             name: name,
@@ -445,9 +491,21 @@ class ExportFile {
     return files;
   }
 
-  /// Deletes a saved file by path.
+  /// Android: list .txt/.log files via MediaStore or direct Downloads path.
+  static Future<List<ExportedFile>> _listAndroidLogFiles() => _listAndroidFiles(all: false);
+
+  /// Deletes a saved file by path. Content/tree URIs (MediaStore, SAF)
+  /// go through the native side — direct File access can't touch them
+  /// under scoped storage.
   static Future<bool> deleteFile(String path) async {
     try {
+      if (!kIsWeb &&
+          Platform.isAndroid &&
+          (path.startsWith('content://'))) {
+        final ok = await _androidChannel.invokeMethod<bool>(
+            'deleteExportFile', {'uri': path});
+        return ok == true;
+      }
       final f = File(path);
       if (await f.exists()) {
         await f.delete();
@@ -455,6 +513,24 @@ class ExportFile {
       }
     } catch (_) {}
     return false;
+  }
+
+  /// Reads a saved export file. Content/tree URIs go through the native
+  /// side; plain paths read directly. Returns null on failure.
+  static Future<Uint8List?> readExportFile(String path) async {
+    try {
+      if (!kIsWeb &&
+          Platform.isAndroid &&
+          (path.startsWith('content://'))) {
+        final bytes = await _androidChannel.invokeMethod<List>(
+            'readExportFile', {'uri': path});
+        if (bytes == null) return null;
+        return Uint8List.fromList(bytes.cast<int>());
+      }
+      final f = File(path);
+      if (await f.exists()) return await f.readAsBytes();
+    } catch (_) {}
+    return null;
   }
 
 
@@ -476,13 +552,19 @@ class ExportedFile {
 
   factory ExportedFile.fromMap(Map<String, dynamic> m) {
     final mod = m['modified'];
+    DateTime parsed;
+    if (mod is DateTime) {
+      parsed = mod;
+    } else if (mod is int) {
+      parsed = DateTime.fromMillisecondsSinceEpoch(mod);
+    } else {
+      parsed = DateTime.tryParse(mod?.toString() ?? '') ?? DateTime.now();
+    }
     return ExportedFile(
       name: m['name']?.toString() ?? '',
-      path: m['path']?.toString() ?? '',
+      path: m['uri']?.toString() ?? m['path']?.toString() ?? '',
       sizeBytes: m['size'] is int ? m['size'] : 0,
-      modified: mod is DateTime
-          ? mod
-          : DateTime.tryParse(mod?.toString() ?? '') ?? DateTime.now(),
+      modified: parsed,
     );
   }
 

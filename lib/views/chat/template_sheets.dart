@@ -9,6 +9,7 @@ import '../../services/local_image_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/model_switcher_sheet.dart';
+import '../prompt_library_view.dart';
 import 'chat_widgets.dart';
 
 /// Prompt template + add-to-chat sheets.
@@ -103,16 +104,30 @@ void showTemplateSheet(BuildContext context, bool isDark) {
                 }),
               ),
               const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('New template'),
-                  onPressed: () {
-                    Navigator.pop(sheetCtx);
-                    showTemplateEditor(context, isDark);
-                  },
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('New'),
+                      onPressed: () {
+                        Navigator.pop(sheetCtx);
+                        showTemplateEditor(context, isDark);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      icon: const Icon(LucideIcons.library, size: 16),
+                      label: const Text('Browse Library'),
+                      onPressed: () {
+                        Navigator.pop(sheetCtx);
+                        Get.to(() => const PromptLibraryView());
+                      },
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -227,8 +242,7 @@ void showAddToChatSheet(
               ),
               const SizedBox(height: 10),
               AppSheetRowCard(
-                leading:
-                    const AppIconCircle(icon: LucideIcons.layoutTemplate),
+                leading: const AppIconCircle(icon: LucideIcons.layoutTemplate),
                 title: 'Prompt templates',
                 subtitle: 'Insert a saved prompt into the composer',
                 onTap: () {

@@ -45,16 +45,19 @@ class BrowserSearchEngines {
 
   /// Search URL for [query] using engine [engineId].
   /// Unknown ids fall back to DuckDuckGo.
-  static String searchUrl(String engineId, String query) {
-    final engine = engines.firstWhere(
+  static String searchUrl(String engineId, String query, {List<BrowserEngine>? custom}) {
+    final all = [...engines, ...?custom];
+    final engine = all.firstWhere(
       (e) => e.id == engineId,
       orElse: () => engines.first,
     );
     return engine.template.replaceFirst('%s', Uri.encodeQueryComponent(query));
   }
 
-  static bool isKnown(String engineId) =>
-      engines.any((e) => e.id == engineId);
+  static bool isKnown(String engineId, {List<BrowserEngine>? custom}) {
+    final all = [...engines, ...?custom];
+    return all.any((e) => e.id == engineId);
+  }
 }
 
 /// URL-bar indicator kind, derived from the current URL's scheme.

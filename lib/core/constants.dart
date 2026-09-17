@@ -12,6 +12,7 @@ class AppConstants {
   static const String projectsBox = 'chat_projects';
   static const String foldersBox = 'chat_folders';
   static const String imageHistoryBox = 'image_history';
+  static const String offlinePagesBox = 'offline_pages';
 
   // Settings Keys
   static const String keyInferenceMode = 'inference_mode'; // 'local' or 'cloud'
@@ -81,7 +82,43 @@ class AppConstants {
   static const String keyBrowserDntEnabled = 'browser_dnt_enabled';
   static const String keyBrowserBlockThirdPartyCookies =
       'browser_block_third_party_cookies';
-  static const String keyComposerUpsellDismissed =
+  static const String keyBrowserDataSaver = 'browser_data_saver';
+  static const String keyBrowserSpeedDial = 'browser_speed_dial';
+  static const String keyBrowserSidebarEnabled = 'browser_sidebar_enabled';
+  static const String keyBrowserNightModeIntensity =
+      'browser_night_mode_intensity';
+  static const String keyBrowserResourceMonitor = 'browser_resource_monitor';
+  static const String keyBrowserWallpaperPath = 'browser_wallpaper_path';
+  static const String keyBrowserNightIntensity = 'browser_night_intensity';
+  static const String keyBrowserHapticsEnabled = 'browser_haptics_enabled';
+  static const String keyBrowserSidebarShortcuts = 'browser_sidebar_shortcuts';
+  static const String keyBrowserNewsLastFetch = 'browser_news_last_fetch';
+  static const String keyBrowserExtremeTextMode = 'browser_extreme_text_mode';
+  static const String keyBrowserSearchEnhancer = 'browser_search_enhancer';
+  static const String keyBrowserGesturesEnabled = 'browser_gestures_enabled';
+  static const String keyBrowserSpeedDialCustom = 'browser_speed_dial_custom';
+  static const String keyBrowserPerformanceProfile = 'browser_performance_profile';
+  static const String keyBrowserAmbientMusic = 'browser_ambient_music';
+  static const String keyBrowserCustomEngines = 'browser_custom_engines';
+  static const String keyBrowserTotalDataSaved = 'browser_total_data_saved';
+  static const String keyBrowserToolbarConfig = 'browser_toolbar_config';
+  static const String keyBrowserNewsCategories = 'browser_news_categories';
+  static const String keyBrowserPipEnabled = 'browser_pip_enabled';
+  static const String keyBrowserIdentity = 'browser_identity';
+  static const String keyBrowserVoiceEnabled = 'browser_voice_enabled';
+  static const String keyBrowserAiThemeColors = 'browser_ai_theme_colors';
+  static const String keyBrowserAiNotes = 'browser_ai_notes';
+  static const String keyBrowserBlockedSelectors = 'browser_blocked_selectors';
+  static const String keyBrowserSplitEnabled = 'browser_split_enabled';
+  static const String keyBrowserHibernationEnabled = 'browser_hibernation_enabled';
+  static const String keyBrowserSiteAiRules = 'browser_site_ai_rules';
+  static const String keyBrowserAutoRenameDownloads = 'browser_auto_rename_downloads';
+  static const String keyBrowserRamLimit = 'browser_ram_limit';
+  static const String keyBrowserCpuLimit = 'browser_cpu_limit';
+  static const String keyBrowserLimiterEnabled = 'browser_limiter_enabled';
+  static const String keyBrowserHomepage = 'browser_homepage';
+  static const String keyBrowserTextZoom = 'browser_text_zoom';
+  static const String keyBrowserDownloads = 'browser_downloads';  static const String keyComposerUpsellDismissed =
       'composer_upsell_dismissed';
   static const String keyLocalModelPath = 'local_model_path';
   static const String keyLocalModelName = 'local_model_name';
@@ -124,6 +161,13 @@ class AppConstants {
 
   // Language
   static const String keyLanguage = 'app_language';
+
+  // Personalization
+  static const String keySelectedTheme = 'selected_theme';
+  static const String keyCustomAccentColor = 'custom_accent_color';
+  static const String keyDynamicColorEnabled = 'dynamic_color_enabled';
+  static const String keyGlassIntensity = 'glass_intensity';
+  static const String keySelectedFont = 'selected_font_family';
 
   // TTS
   static const String keyReadAloud = 'read_aloud_enabled';

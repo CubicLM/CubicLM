@@ -15,7 +15,6 @@ import '../utils/app_snackbar.dart';
 import 'chat_view.dart';
 import 'model_view.dart';
 import 'toolkit_view.dart';
-import 'server_view.dart';
 import 'app_settings_view.dart';
 
 class HomeView extends StatefulWidget {
@@ -75,10 +74,6 @@ class _HomeViewState extends State<HomeView> {
             activeIcon: LucideIcons.wrench,
             label: 'nav_toolkit'.tr),
         _NavItem(
-            icon: LucideIcons.server,
-            activeIcon: LucideIcons.server,
-            label: 'nav_nodes'.tr),
-        _NavItem(
             icon: LucideIcons.settings,
             activeIcon: LucideIcons.settings,
             label: 'nav_settings'.tr),
@@ -101,7 +96,6 @@ class _HomeViewState extends State<HomeView> {
             ChatView(),
             ModelView(),
             ToolkitView(),
-            ServerView(),
             AppSettingsView()
           ],
         );
@@ -118,7 +112,7 @@ class _HomeViewState extends State<HomeView> {
         return content;
       }),
       bottomNavigationBar:
-          _isWide ? null : Obx(() => _buildBottomNav(context, isDark)),
+          _isWide ? null : _buildBottomNav(context, isDark),
     );
     // Desktop keyboard shortcuts: Ctrl+N new chat, Ctrl+F history search,
     // Ctrl+, settings, Ctrl+1..5 switch tabs. Invisible, zero visual risk.
@@ -142,8 +136,6 @@ class _HomeViewState extends State<HomeView> {
               _shortcutTab2,
           const SingleActivator(LogicalKeyboardKey.digit4, control: true):
               _shortcutTab3,
-          const SingleActivator(LogicalKeyboardKey.digit5, control: true):
-              _shortcutTab4,
         },
         child: scaffold,
       );
@@ -163,12 +155,11 @@ class _HomeViewState extends State<HomeView> {
     } catch (_) {}
   }
 
-  void _shortcutSettings() => controller.changeTab(4);
+  void _shortcutSettings() => controller.changeTab(3);
   void _shortcutTab0() => controller.changeTab(0);
   void _shortcutTab1() => controller.changeTab(1);
   void _shortcutTab2() => controller.changeTab(2);
   void _shortcutTab3() => controller.changeTab(3);
-  void _shortcutTab4() => controller.changeTab(4);
 
   Widget _buildBottomNav(BuildContext context, bool isDark) {
     return Container(
@@ -183,8 +174,8 @@ class _HomeViewState extends State<HomeView> {
         ),
       ),
       child: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Obx(() => BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: AppColors.blurSigma, sigmaY: AppColors.blurSigma),
           child: BottomNavigationBar(
             currentIndex: controller.currentTab.value,
             onTap: controller.changeTab,
@@ -212,7 +203,7 @@ class _HomeViewState extends State<HomeView> {
                 ),
             ],
           ),
-        ),
+        )),
       ),
     );
   }

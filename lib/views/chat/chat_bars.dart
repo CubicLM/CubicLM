@@ -165,7 +165,7 @@ Widget modelLoadingBar(BuildContext context, bool isDark) {
     final pct = (inf.modelLoadProgress.value * 100).toStringAsFixed(0);
     return ClipRect(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        filter: ImageFilter.blur(sigmaX: AppColors.blurSigma, sigmaY: AppColors.blurSigma),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),

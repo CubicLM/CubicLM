@@ -11,6 +11,7 @@ import '../../models/project_model.dart';
 import '../../models/folder_model.dart';
 import '../../services/hive_service.dart';
 import '../../theme/design_tokens.dart';
+import '../prompt_library_view.dart';
 import 'chat_dialogs.dart';
 import 'chat_format.dart';
 
@@ -390,12 +391,40 @@ class _ChatSidebarState extends State<ChatSidebar> {
             );
           }),
         ),
+        // ── Prompt Library tile ──
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              Navigator.pop(context);
+              Get.to(() => const PromptLibraryView());
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(children: [
+                Icon(LucideIcons.library,
+                    size: 18, color: isDark ? AppColors.primary : Dt.accent),
+                const SizedBox(width: 14),
+                Text('Prompt Library',
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.textPrimary : Dt.textPrimary)),
+                const Spacer(),
+                const Icon(LucideIcons.chevronRight,
+                    size: 16, color: Dt.textSecondary),
+              ]),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
         const Divider(height: 1),
         // ── Pinned footer: identity + settings gear ──
         InkWell(
           onTap: () {
             Navigator.pop(context);
-            Get.find<HomeController>().changeTab(4);
+            Get.find<HomeController>().changeTab(3);
           },
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 12, 14),
@@ -425,7 +454,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
                 tooltip: 'App Settings',
                 onPressed: () {
                   Navigator.pop(context);
-                  Get.find<HomeController>().changeTab(4);
+                  Get.find<HomeController>().changeTab(3);
                 },
                 icon: Icon(LucideIcons.settings,
                     size: 20,

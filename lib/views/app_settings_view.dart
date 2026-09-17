@@ -10,6 +10,7 @@ import '../controllers/chat_controller.dart';
 import '../services/chat_backup.dart';
 import '../services/device_info_service.dart';
 import '../services/hive_service.dart';
+import '../services/memory_service.dart';
 import '../services/stats_service.dart';
 import '../core/routes.dart';
 import '../core/colors.dart';
@@ -18,6 +19,9 @@ import '../utils/app_snackbar.dart';
 import '../utils/export_file.dart';
 import 'about_view.dart';
 import 'language_picker_view.dart';
+import 'memory_view.dart';
+import 'server_view.dart';
+import 'settings_view.dart';
 import 'setup_recommendations_view.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../theme/design_tokens.dart';
@@ -228,8 +232,7 @@ class AppSettingsView extends GetView<SettingsController> {
         avail = dev.availableRamGB.value;
       }
     } catch (_) {}
-    final roomMb =
-        avail > 0 ? ((avail - 0.25) / 1.25 * 1024).round() : 0;
+    final roomMb = avail > 0 ? ((avail - 0.25) / 1.25 * 1024).round() : 0;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -261,6 +264,35 @@ class AppSettingsView extends GetView<SettingsController> {
     );
   }
 
+  void _showCodeEditorInfo(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Code Editor Comparison'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _infoRow('Canvas Split Editor (Recommended)',
+                  'Custom TextField with dynamic line-number gutter, auto-closing brackets (), {}, [], <>, side-by-side live preview (HTML / Mermaid), AI iteration loop, and JavaScript console output without external bloat.'),
+              _infoRow('Lightweight Plain Editor',
+                  'Clean TextField with line numbers only. Best if you just want to edit raw text quickly without rendering previews or executing scripts.'),
+              _infoRow('Dependency vs Performance',
+                  'Heavy external packages (e.g. re_editor or flutter_code_editor) add extra APK size and memory overhead. CubicLM gives you high performance with zero extra dependencies so the app stays lightning-fast.'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _infoRow(String title, String body) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -272,8 +304,7 @@ class AppSettingsView extends GetView<SettingsController> {
                   fontSize: 13, fontWeight: FontWeight.w800)),
           const SizedBox(height: 2),
           Text(body,
-              style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12.5, height: 1.45)),
+              style: GoogleFonts.plusJakartaSans(fontSize: 12.5, height: 1.45)),
         ],
       ),
     );
@@ -361,8 +392,7 @@ class AppSettingsView extends GetView<SettingsController> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Export folder'),
         content: SingleChildScrollView(
           child: Column(
@@ -379,11 +409,9 @@ class AppSettingsView extends GetView<SettingsController> {
                     icon: const Icon(LucideIcons.folderOpen, size: 16),
                     label: const Text('Choose folder…'),
                     onPressed: () async {
-                      final picked =
-                          await ExportFile.pickExportFolder();
+                      final picked = await ExportFile.pickExportFolder();
                       if (picked != null) {
-                        await s.setExportTree(
-                            picked['uri']!, picked['name']!);
+                        await s.setExportTree(picked['uri']!, picked['name']!);
                       }
                       if (context.mounted) Navigator.pop(context);
                     },
@@ -565,16 +593,18 @@ class AppSettingsView extends GetView<SettingsController> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
       backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
       appBar: AppBar(
         backgroundColor:
             (isDark ? Dt.canvasDark : Dt.canvas).withValues(alpha: 0.8),
         flexibleSpace: ClipRRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Obx(() => BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: AppColors.blurSigma, sigmaY: AppColors.blurSigma),
             child: Container(color: Colors.transparent),
-          ),
+          )),
         ),
         leading: IconButton(
           icon: const Icon(LucideIcons.arrowLeft),
@@ -585,13 +615,44 @@ class AppSettingsView extends GetView<SettingsController> {
                 fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -1)),
         toolbarHeight: 70,
         centerTitle: false,
+        bottom: TabBar(
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          indicatorColor: Dt.accent,
+          indicatorSize: TabBarIndicatorSize.label,
+          labelColor: Dt.accent,
+          unselectedLabelColor: Theme.of(context).hintColor,
+          dividerColor: Colors.transparent,
+          labelStyle: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w800, fontSize: 13),
+          unselectedLabelStyle: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w700, fontSize: 13),
+          tabs: [
+            Tab(text: 'settings_tab_general'.tr),
+            Tab(text: 'nodes_node'.tr),
+            Tab(text: 'nodes_config'.tr),
+            Tab(text: 'settings_tab_parameters'.tr),
+          ],
+        ),
       ),
-      body: Obx(() => ListView(
+      body: TabBarView(
+        children: [
+          Obx(() => ListView(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             children: [
               const SizedBox(height: 12),
               _sectionLabel(context, 'settings_appearance'.tr),
               _appleGroupedCard(context, isDark, children: [
+                _appleListTile(
+                  context,
+                  isDark,
+                  leading: const Icon(LucideIcons.palette,
+                      size: 20, color: Dt.accent),
+                  title: 'settings_personalize'.tr,
+                  subtitle: 'settings_personalize_desc'.tr,
+                  trailing: const Icon(LucideIcons.chevronRight, size: 20),
+                  onTap: () => Get.toNamed(AppRoutes.personalization),
+                ),
                 for (final mode in [
                   ThemeMode.light,
                   ThemeMode.dark,
@@ -663,6 +724,68 @@ class AppSettingsView extends GetView<SettingsController> {
                     )),
               ]),
               const SizedBox(height: 28),
+              _sectionLabel(context, 'MEMORY'),
+              _appleGroupedCard(context, isDark, children: [
+                Obx(() {
+                  final mem = Get.find<MemoryService>();
+                  return _appleListTile(
+                    context,
+                    isDark,
+                    leading: const Icon(LucideIcons.brain,
+                        size: 20, color: Dt.accent),
+                    title: 'Memory',
+                    subtitle: mem.isEnabled.value
+                        ? '${mem.memoryCount} fact${mem.memoryCount == 1 ? '' : 's'} stored'
+                        : 'Disabled — CubicLM won\'t remember facts',
+                    trailing: const Icon(LucideIcons.chevronRight, size: 20),
+                    showDivider: false,
+                    onTap: () => Get.to(() => const MemoryView()),
+                  );
+                }),
+              ]),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  _sectionLabel(context, 'CODE EDITOR'),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(LucideIcons.info, size: 16, color: Dt.accent),
+                    tooltip: 'Editor Information',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => _showCodeEditorInfo(context),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+              ),
+              _appleGroupedCard(context, isDark, children: [
+                Obx(() => _appleListTile(
+                      context,
+                      isDark,
+                      leading: const Icon(LucideIcons.layout,
+                          size: 20, color: Dt.accent),
+                      title: 'Canvas Split Editor',
+                      subtitle: 'Side-by-side code editor + live preview with auto-close',
+                      trailing: controller.codeEditorType.value == 'split'
+                          ? const Icon(LucideIcons.check, size: 20, color: Dt.accent)
+                          : null,
+                      showDivider: true,
+                      onTap: () => controller.setCodeEditorType('split'),
+                    )),
+                Obx(() => _appleListTile(
+                      context,
+                      isDark,
+                      leading: const Icon(LucideIcons.code,
+                          size: 20, color: Dt.accent),
+                      title: 'Lightweight Editor',
+                      subtitle: 'Plain TextField + line numbers (zero overhead)',
+                      trailing: controller.codeEditorType.value == 'plain'
+                          ? const Icon(LucideIcons.check, size: 20, color: Dt.accent)
+                          : null,
+                      showDivider: false,
+                      onTap: () => controller.setCodeEditorType('plain'),
+                    )),
+              ]),
+              const SizedBox(height: 28),
               _sectionLabel(context, 'settings_startup'.tr),
               _appleGroupedCard(context, isDark, children: [
                 Obx(() => _appleSwitchTile(
@@ -691,8 +814,7 @@ class AppSettingsView extends GetView<SettingsController> {
                       'Notifications, battery, runtime, keys — all optional',
                   trailing: const Icon(LucideIcons.chevronRight, size: 20),
                   showDivider: false,
-                  onTap: () =>
-                      Get.to(() => const SetupRecommendationsView()),
+                  onTap: () => Get.to(() => const SetupRecommendationsView()),
                 ),
               ]),
               const SizedBox(height: 28),
@@ -842,14 +964,12 @@ class AppSettingsView extends GetView<SettingsController> {
                             IconButton(
                               tooltip: 'How this works',
                               icon: const Icon(LucideIcons.info, size: 19),
-                              onPressed: () =>
-                                  _showRamGuardInfo(context),
+                              onPressed: () => _showRamGuardInfo(context),
                             ),
                             Switch.adaptive(
                               value: controller.strictRamGuard.value,
                               activeThumbColor: Dt.accent,
-                              onChanged: (v) =>
-                                  _setStrictRamGuard(context, v),
+                              onChanged: (v) => _setStrictRamGuard(context, v),
                             ),
                           ],
                         ),
@@ -873,8 +993,7 @@ class AppSettingsView extends GetView<SettingsController> {
                       trailing: IconButton(
                         tooltip: 'How this works',
                         icon: const Icon(LucideIcons.info, size: 19),
-                        onPressed: () =>
-                            _showExportFolderInfo(context),
+                        onPressed: () => _showExportFolderInfo(context),
                       ),
                       onTap: () => _pickExportFolder(context, isDark),
                     );
@@ -1019,7 +1138,12 @@ class AppSettingsView extends GetView<SettingsController> {
               const SizedBox(height: 50),
             ],
           )),
-    );
+          const ServerView(embedded: true),
+          const SettingsView(embedded: true, hideParams: true),
+          const ParametersView(),
+        ],
+      ),
+    ));
   }
 
   // ── Typography ──

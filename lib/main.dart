@@ -58,6 +58,9 @@ import 'services/runtime/cli_manager.dart';
 import 'services/runtime/dev_server_manager.dart';
 import 'services/runtime/runtime_manager.dart';
 import 'services/runtime/runtime_installer.dart';
+import 'services/browser/news_service.dart';
+import 'services/browser/browser_download_service.dart';
+import 'services/browser/browser_sound_service.dart';
 import 'services/deploy_service.dart';
 import 'services/update_service.dart';
 import 'services/vector_service.dart';
@@ -272,6 +275,9 @@ void main() {
       unawaited(
           Get.find<CubicWebLogger>().init().then((_) {}, onError: (_) {}));
       Get.put(BrowserController());
+      Get.put(NewsService());
+      Get.put(BrowserDownloadService());
+      Get.put(BrowserSoundService());
       Get.put(DownloadService());
       Get.put(LocalImageService());
       Get.put(VisionLiveController());
@@ -688,19 +694,28 @@ class CubicLMApp extends StatelessWidget {
     }
     final settings = Get.find<SettingsController>();
     return DynamicColorBuilder(builder: (lightDynamic, dark) {
-      return Obx(() {
-        final themeMode = settings.themeMode.value;
-        final scale = settings.fontScale.value;
-        final currentLocale = settings.locale.value.locale;
+        return Obx(() {
+          final themeMode = settings.themeMode.value;
+          final scale = settings.fontScale.value;
+          final currentLocale = settings.locale.value.locale;
+          final accent = settings.customAccentColor.value;
+          final family = settings.selectedFontFamily.value;
+          final dynamicColor = settings.dynamicColorEnabled.value;
 
-        final lightTheme = AppTheme.lightTheme.copyWith(
-          colorScheme: lightDynamic?.harmonized(),
-        );
-        final darkTheme = AppTheme.darkTheme.copyWith(
-          colorScheme: dark?.harmonized(),
-        );
+          final lightTheme = AppTheme.buildTheme(
+            Brightness.light,
+            accentColor: accent,
+            fontFamily: family,
+            colorScheme: dynamicColor ? lightDynamic?.harmonized() : null,
+          );
+          final darkTheme = AppTheme.buildTheme(
+            Brightness.dark,
+            accentColor: accent,
+            fontFamily: family,
+            colorScheme: dynamicColor ? dark?.harmonized() : null,
+          );
 
-        return GetMaterialApp(
+          return GetMaterialApp(
           title: 'CubicLM',
           debugShowCheckedModeBanner: false,
           theme: lightTheme,

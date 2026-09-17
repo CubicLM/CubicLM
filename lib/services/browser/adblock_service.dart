@@ -139,4 +139,53 @@ class AdblockService {
   if (style) style.remove();
 })();
 ''';
+
+  /// Video Detection: finds video sources on the page.
+  static const String videoDetectJs = r'''
+(function(){
+  try {
+    var urls = [];
+    var videos = document.querySelectorAll('video');
+    for (var i = 0; i < videos.length; i++) {
+      if (videos[i].src) urls.push(videos[i].src);
+      var sources = videos[i].querySelectorAll('source');
+      for (var j = 0; j < sources.length; j++) {
+        if (sources[j].src) urls.push(sources[j].src);
+      }
+    }
+    var links = document.querySelectorAll('a[href*=".mp4"], a[href*=".mkv"], a[href*=".webm"], a[href*=".mov"]');
+    for (var i = 0; i < links.length; i++) {
+      urls.push(links[i].href);
+    }
+    return JSON.stringify([...new Set(urls.filter(u => u.startsWith('http')))]);
+  } catch (e) { return '[]'; }
+})();
+''';
+
+  /// Element Picker: highlights and allows clicking elements to block them.
+  static const String elementPickerJs = r'''
+(function(){
+  var style = document.createElement('style');
+  style.id = 'cubic-picker-style';
+  style.innerHTML = '*:hover { outline: 2px solid #FF4D00 !important; cursor: crosshair !important; }';
+  document.head.appendChild(style);
+
+  var handler = function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    var el = e.target;
+    var selector = el.tagName.toLowerCase();
+    if (el.id) selector += '#' + el.id;
+    if (el.className) selector += '.' + el.className.split(' ').join('.');
+    
+    window.flutter_inappwebview.callHandler('onElementSelected', selector);
+    
+    document.getElementById('cubic-picker-style').remove();
+    document.removeEventListener('click', handler, true);
+  };
+  
+  document.addEventListener('click', handler, true);
+})();
+''';
 }

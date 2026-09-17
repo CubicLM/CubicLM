@@ -187,6 +187,7 @@ class HiveService extends GetxService {
   late Box _projectsBox;
   late Box _foldersBox;
   late Box _imageHistoryBox;
+  late Box _offlinePagesBox;
 
   bool _isFallback = false;
   bool get isFallback => _isFallback;
@@ -203,6 +204,7 @@ class HiveService extends GetxService {
   Box get projectsBox => _projectsBox;
   Box get foldersBox => _foldersBox;
   Box get imageHistoryBox => _imageHistoryBox;
+  Box get offlinePagesBox => _offlinePagesBox;
 
   /// Pure memory fallback — no Hive disk access.
   HiveService.fallback() {
@@ -217,6 +219,7 @@ class HiveService extends GetxService {
     _projectsBox = _MemoryBox();
     _foldersBox = _MemoryBox();
     _imageHistoryBox = _MemoryBox();
+    _offlinePagesBox = _MemoryBox();
   }
 
   HiveService();
@@ -302,6 +305,7 @@ class HiveService extends GetxService {
       _openBoxWithFallback(AppConstants.projectsBox),
       _openBoxWithFallback(AppConstants.foldersBox),
       _openBoxWithFallback(AppConstants.imageHistoryBox),
+      _openBoxWithFallback(AppConstants.offlinePagesBox),
     ]);
     _sessionsBox = results[0];
     _messagesBox = results[1];
@@ -313,6 +317,7 @@ class HiveService extends GetxService {
     _projectsBox = results[7];
     _foldersBox = results[8];
     _imageHistoryBox = results[9];
+    _offlinePagesBox = results[10];
 
     // One-time migration: prefix message keys with chatId for O(1) lookup.
     try {
@@ -842,6 +847,55 @@ class HiveService extends GetxService {
     try {
       final f = File(path);
       if (f.existsSync()) f.deleteSync();
+    } catch (_) {}
+  }
+
+  // ─── Offline Pages ─────────────────────────────
+
+  List<Map<dynamic, dynamic>> getAllOfflinePages() {
+    try {
+      if (!_isBoxUsable(_offlinePagesBox)) return [];
+      final list = _offlinePagesBox.values
+          .map((v) => Map<dynamic, dynamic>.from(v as Map))
+          .toList();
+      list.sort((a, b) {
+        final at = (a['savedAtMs'] as num?)?.toInt() ?? 0;
+        final bt = (b['savedAtMs'] as num?)?.toInt() ?? 0;
+        return bt.compareTo(at); // Newest first
+      });
+      return list;
+    } on HiveError {
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> saveOfflinePage(String id, Map<String, dynamic> data) async {
+    try {
+      if (!_isBoxUsable(_offlinePagesBox)) return;
+      await _offlinePagesBox.put(id, data);
+    } on HiveError {
+      // Ignore
+    } catch (_) {}
+  }
+
+  Future<void> deleteOfflinePage(String id) async {
+    try {
+      if (!_isBoxUsable(_offlinePagesBox)) return;
+      final existing = _offlinePagesBox.get(id);
+      if (existing is Map) {
+        final path = existing['path'] as String?;
+        if (path != null && path.isNotEmpty) {
+          try {
+            final f = File(path);
+            if (f.existsSync()) f.deleteSync();
+          } catch (_) {}
+        }
+      }
+      await _offlinePagesBox.delete(id);
+    } on HiveError {
+      // Ignore
     } catch (_) {}
   }
 

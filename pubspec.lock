@@ -33,6 +33,62 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.1"
+  audioplayers:
+    dependency: "direct main"
+    description:
+      name: audioplayers
+      sha256: f16640453cc47487b7de72a2b28d37c7df1ac97999849f4a46d92b1d2b0f093d
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.7.1"
+  audioplayers_android:
+    dependency: transitive
+    description:
+      name: audioplayers_android
+      sha256: "60a6728277228413a85755bd3ffd6fab98f6555608923813ce383b190a360605"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.2.1"
+  audioplayers_darwin:
+    dependency: transitive
+    description:
+      name: audioplayers_darwin
+      sha256: c994b3bb3a921e4904ac40e013fbc94488e824fd7c1de6326f549943b0b44a91
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.4.0"
+  audioplayers_linux:
+    dependency: transitive
+    description:
+      name: audioplayers_linux
+      sha256: f75bce1ce864170ef5e6a2c6a61cd3339e1a17ce11e99a25bae4474ea491d001
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.2.1"
+  audioplayers_platform_interface:
+    dependency: transitive
+    description:
+      name: audioplayers_platform_interface
+      sha256: "0e2f6a919ab56d0fec272e801abc07b26ae7f31980f912f24af4748763e5a656"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.1.1"
+  audioplayers_web:
+    dependency: transitive
+    description:
+      name: audioplayers_web
+      sha256: "24a6f258062bd7da8cb2157e83fccb9816a08dd306cbaaa24f9813d071470545"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.2.1"
+  audioplayers_windows:
+    dependency: transitive
+    description:
+      name: audioplayers_windows
+      sha256: "95f875a96c88c3dbbcb608d4f8288e300b0113d256a81d0b3197fcc18f0dc91a"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.3.1"
   boolean_selector:
     dependency: transitive
     description:
@@ -917,6 +973,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
+  mobile_scanner:
+    dependency: "direct main"
+    description:
+      name: mobile_scanner
+      sha256: "0b466a0a8a211b366c2e87f3345715faef9b6011c7147556ad22f37de6ba3173"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.0.11"
   native_toolchain_c:
     dependency: transitive
     description:
@@ -1197,6 +1261,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
+  qr:
+    dependency: transitive
+    description:
+      name: qr
+      sha256: "5a1d2586170e172b8a8c8470bbbffd5eb0cd38a66c0d77155ea138d3af3a4445"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.2"
+  qr_flutter:
+    dependency: "direct main"
+    description:
+      name: qr_flutter
+      sha256: "5095f0fc6e3f71d08adef8feccc8cea4f12eec18a2e31c2e8d82cb6019f4b097"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.1.0"
   screen_retriever:
     dependency: transitive
     description:
@@ -1368,6 +1448,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "33.2.6"
+  synchronized:
+    dependency: transitive
+    description:
+      name: synchronized
+      sha256: c254ade258ec8282947a0acbbc90b9575b4f19673533ee46f2f6e9b3aeefd7c0
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.4.0"
   term_glyph:
     dependency: transitive
     description:

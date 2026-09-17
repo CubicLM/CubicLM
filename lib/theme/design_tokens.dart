@@ -38,6 +38,7 @@ abstract class Dt {
 
   // Brand accent — Claude Orange.
   static const Color accent = Color(0xFFD97757);
+  static const Color accentGx = Color(0xFFFF4D00); // Neon Orange for Gaming Mode
   static const Color accentMuted = Color(0xFFE8E0D2); // idle send/mic surface
   static const Color link = Color(0xFF6D5FE8); // upsell/indigo links
   static const Color selected = Color(0xFF0A3B7B); // selected row (deep navy)

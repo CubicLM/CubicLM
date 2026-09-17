@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../controllers/settings_controller.dart';
+import 'package:get/get.dart';
+
 class AppColors {
   AppColors._();
 
@@ -54,10 +57,15 @@ class AppColors {
   static const Color borderLightMode = Color(0xFFDDD2BD); // hairline
 
   // Glass Styles
-  static BoxDecoration glassDecoration(BuildContext context) {
+  static BoxDecoration glassDecoration(BuildContext context, {double? intensity}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final double alpha = intensity ?? 
+        (Get.isRegistered<SettingsController>() 
+            ? Get.find<SettingsController>().glassIntensity.value 
+            : 0.7);
+
     return BoxDecoration(
-      color: isDark ? bg.withValues(alpha: 0.7) : bgLight.withValues(alpha: 0.7),
+      color: isDark ? bg.withValues(alpha: alpha) : bgLight.withValues(alpha: alpha),
       border: Border(
         top: BorderSide(
           color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05),
@@ -65,5 +73,10 @@ class AppColors {
         ),
       ),
     );
+  }
+
+  static double get blurSigma {
+    if (!Get.isRegistered<SettingsController>()) return 12.0;
+    return Get.find<SettingsController>().glassIntensity.value * 20.0;
   }
 }

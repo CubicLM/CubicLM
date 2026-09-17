@@ -10,12 +10,18 @@ import '../theme/design_tokens.dart';
 import 'settings_view.dart';
 
 class ServerView extends GetView<ServerController> {
-  const ServerView({super.key});
+  /// When true, renders only the Node tab body (no Scaffold/AppBar/tabs)
+  /// so App Settings can host it as its own tab.
+  final bool embedded;
+  const ServerView({super.key, this.embedded = false});
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     const accent = Dt.accent;
+
+    final nodeTab = _nodeTab(context, isDark, accent);
+    if (embedded) return nodeTab;
 
     return DefaultTabController(
       length: 2,
@@ -49,7 +55,18 @@ class ServerView extends GetView<ServerController> {
       ),
       body: TabBarView(
         children: [
-          ClipRect(
+          nodeTab,
+          const SettingsView(embedded: true),
+        ],
+      ),
+      ),
+    );
+  }
+
+  /// The full Node management UI (status, model, security, endpoints,
+  /// requests, snippets). Shared by the standalone page and embedding.
+  Widget _nodeTab(BuildContext context, bool isDark, Color accent) {
+    return ClipRect(
             child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 96),
             children: [
@@ -173,7 +190,7 @@ class ServerView extends GetView<ServerController> {
                     IconButton(
                         tooltip: 'nodes_rotate_key'.tr,
                         onPressed: controller.generateApiKey,
-                        icon: const Icon(LucideIcons.refreshCw,
+                        icon: Icon(LucideIcons.refreshCw,
                             size: 22, color: accent)),
                     IconButton(
                         tooltip: 'nodes_copy'.tr,
@@ -322,12 +339,7 @@ class ServerView extends GetView<ServerController> {
           }),
             ],
           ),
-          ),
-          const SettingsView(embedded: true),
-        ],
-      ),
-      ),
-    );
+          );
   }
 
   // ── Helpers ──

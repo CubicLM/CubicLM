@@ -1055,6 +1055,17 @@ class _SavedFilesTabState extends State<_SavedFilesTab> {
   void initState() {
     super.initState();
     _load();
+    ExportFile.savedVersion.addListener(_onSaved);
+  }
+
+  @override
+  void dispose() {
+    ExportFile.savedVersion.removeListener(_onSaved);
+    super.dispose();
+  }
+
+  void _onSaved() {
+    if (mounted) _load();
   }
 
   Future<void> _load() async {
@@ -1214,8 +1225,14 @@ class _SavedFilesTabState extends State<_SavedFilesTab> {
 
   Future<void> _viewFile(ExportedFile f) async {
     try {
-      final text = await File(f.path).readAsString();
-      if (!mounted) return;
+      String? text;
+      if (f.path.startsWith('content://')) {
+        final bytes = await ExportFile.readExportFile(f.path);
+        if (bytes != null) text = String.fromCharCodes(bytes);
+      } else {
+        text = await File(f.path).readAsString();
+      }
+      if (!mounted || text == null) return;
       await showDialog(
         context: context,
         builder: (ctx) => Dialog(
@@ -1254,7 +1271,7 @@ class _SavedFilesTabState extends State<_SavedFilesTab> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: SingleChildScrollView(
-                      child: SelectableText(text,
+                      child: SelectableText(text ?? '',
                           style: GoogleFonts.firaCode(
                               fontSize: 11, height: 1.5, color: const Color(0xFFE2E8F0))),
                     ),
@@ -1275,7 +1292,18 @@ class _SavedFilesTabState extends State<_SavedFilesTab> {
 
   Future<void> _shareFile(ExportedFile f) async {
     try {
-      final bytes = await File(f.path).readAsBytes();
+      Uint8List bytes;
+      if (f.path.startsWith('content://')) {
+        final b = await ExportFile.readExportFile(f.path);
+        if (b == null) {
+          AppSnackbar.showTop('Share failed', 'Could not read file',
+              icon: LucideIcons.alertTriangle, type: 'error', iconName: 'alert');
+          return;
+        }
+        bytes = b;
+      } else {
+        bytes = await File(f.path).readAsBytes();
+      }
       await ExportFile.shareBytes(bytes: bytes, fileName: f.name);
     } catch (e) {
       AppSnackbar.showTop('Share failed', '$e',

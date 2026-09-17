@@ -147,6 +147,66 @@ abstract class OpenAICompatibleProvider extends CloudProvider {
     }
   }
 
+  /// Normalizes raw tool calls from a first response into OpenAI shape
+  /// with a guaranteed non-empty id per call. Streaming deltas often
+  /// arrive with `id: ''`, and strict providers (NVIDIA et al.) 400 on
+  /// missing ids — and on tool results that don't match them exactly.
+  /// Pure — unit tested.
+  static List<Map<String, dynamic>> normalizeToolCalls(
+      List<dynamic> toolCalls) {
+    final out = <Map<String, dynamic>>[];
+    var i = 0;
+    for (final tc in toolCalls) {
+      if (tc is! Map) continue;
+      var id = tc['id']?.toString() ?? '';
+      if (id.isEmpty) {
+        id = 'call_${DateTime.now().microsecondsSinceEpoch}_$i';
+      }
+      final fn = tc['function'] is Map
+          ? Map<String, dynamic>.from(tc['function'] as Map)
+          : <String, dynamic>{};
+      out.add({
+        'id': id,
+        'type': tc['type']?.toString() ?? 'function',
+        'function': {
+          'name': fn['name']?.toString() ?? '',
+          'arguments': fn['arguments']?.toString() ?? '{}',
+        },
+      });
+      i++;
+    }
+    return out;
+  }
+
+  /// Builds the tool-follow-up message list: prior messages, the
+  /// assistant message carrying the NORMALIZED tool_calls, then one
+  /// tool message per result — each keeping its tool_call_id.
+  /// Pure — unit tested.
+  static List<Map<String, dynamic>> buildFollowUpMessages({
+    required List<Map<String, String>> messages,
+    required String assistantContent,
+    required List<Map<String, dynamic>> normalizedCalls,
+    required List<Map<String, String>> toolResults,
+  }) {
+    final apiMessages = <Map<String, dynamic>>[];
+    for (final m in messages) {
+      apiMessages.add({'role': m['role'], 'content': m['content']});
+    }
+    apiMessages.add({
+      'role': 'assistant',
+      'content': assistantContent,
+      'tool_calls': normalizedCalls,
+    });
+    for (final r in toolResults) {
+      apiMessages.add({
+        'role': 'tool',
+        'tool_call_id': r['id'],
+        'content': r['text'],
+      });
+    }
+    return apiMessages;
+  }
+
   Future<String> _handleToolCalls(
     List<Map<String, String>> messages,
     String apiKey,
@@ -154,11 +214,12 @@ abstract class OpenAICompatibleProvider extends CloudProvider {
     Map<String, dynamic> firstMessage,
     List<dynamic> toolCalls,
   ) async {
-    final toolResults = <Map<String, dynamic>>[];
-    for (final tc in toolCalls) {
-      if (tc is! Map) continue;
-      final id = tc['id']?.toString() ?? 'call_${DateTime.now().microsecondsSinceEpoch}';
-      final fn = tc['function'] is Map ? tc['function'] as Map : {};
+    final normalized = normalizeToolCalls(toolCalls);
+    final toolResults = <Map<String, String>>[];
+    for (final ntc in normalized) {
+      final id = ntc['id'] as String;
+      final fn =
+          ntc['function'] is Map ? ntc['function'] as Map : <String, dynamic>{};
       final name = fn['name']?.toString() ?? '';
       final argsRaw = fn['arguments']?.toString() ?? '{}';
       Map<String, dynamic> args;
@@ -246,40 +307,20 @@ abstract class OpenAICompatibleProvider extends CloudProvider {
       } catch (_) {
         resultText = result.toString();
       }
-      toolResults.add({
-        'role': 'tool',
-        'tool_call_id': id,
-        'content': resultText,
-      });
+      toolResults.add({'id': id, 'text': resultText});
     }
 
-    // Second request with tool results appended.
+    // Second request with tool results appended. The assistant message
+    // carries the NORMALIZED tool_calls (same ids as the results) and
+    // every tool message keeps its tool_call_id — strict providers
+    // (NVIDIA et al.) 400 when either is missing or mismatched.
+    final apiMessages2 = buildFollowUpMessages(
+      messages: messages,
+      assistantContent: firstMessage['content']?.toString() ?? '',
+      normalizedCalls: normalized,
+      toolResults: toolResults,
+    );
     final mcpTools = _mcpToolsPayload();
-    final extendedMessages = [
-      ...messages,
-      {
-        'role': 'assistant',
-        'content': firstMessage['content']?.toString() ?? '',
-        'tool_calls': toolCalls,
-      },
-      ...toolResults.map((r) => {'role': r['role'] as String, 'tool_call_id': r['tool_call_id'] as String, 'content': r['content'] as String}),
-    ];
-
-    // Preserve original tool_calls structure in second request by re-injecting raw.
-    // For OpenAI, we need the assistant message with tool_calls as is.
-    // Rebuild apiMessages manually to keep tool_calls.
-    final apiMessages2 = <Map<String, dynamic>>[];
-    for (final m in extendedMessages) {
-      if (m.containsKey('tool_calls')) {
-        apiMessages2.add({
-          'role': 'assistant',
-          'content': m['content'],
-          'tool_calls': m['tool_calls'],
-        });
-      } else {
-        apiMessages2.add({'role': m['role'], 'content': m['content']});
-      }
-    }
     final body2Fixed = {
       'model': model,
       if (mcpTools != null) 'tools': mcpTools,

@@ -200,6 +200,100 @@ class MainActivity : FlutterFragmentActivity() {
                         }
                     }
                 }
+                "listExportFiles" -> {
+                    val subfolder = sanitizeFilename(call.argument<String>("subfolder") ?: "CubicLM")
+                        .ifBlank { "CubicLM" }
+                    thread(name = "list-exports") {
+                        try {
+                            val files = listExportFiles(subfolder)
+                            mainHandler.post { result.success(files) }
+                        } catch (e: Exception) {
+                            mainHandler.post {
+                                result.success(emptyList<Map<String, Any?>>())
+                            }
+                        }
+                    }
+                }
+                "listTreeFiles" -> {
+                    val treeUri = call.argument<String>("treeUri")
+                    if (treeUri.isNullOrBlank()) {
+                        result.success(emptyList<Map<String, Any?>>())
+                        return@setMethodCallHandler
+                    }
+                    thread(name = "list-exports-tree") {
+                        try {
+                            val files = listTreeFiles(Uri.parse(treeUri))
+                            mainHandler.post { result.success(files) }
+                        } catch (e: Exception) {
+                            mainHandler.post {
+                                result.success(emptyList<Map<String, Any?>>())
+                            }
+                        }
+                    }
+                }
+                "readExportFile" -> {
+                    val uri = call.argument<String>("uri")
+                    if (uri.isNullOrBlank()) {
+                        result.error("INVALID_READ", "File URI is missing.", null)
+                        return@setMethodCallHandler
+                    }
+                    thread(name = "read-export") {
+                        try {
+                            val bytes = contentResolver
+                                .openInputStream(Uri.parse(uri))
+                                ?.use { it.readBytes() }
+                            mainHandler.post {
+                                if (bytes != null) {
+                                    result.success(bytes)
+                                } else {
+                                    result.error(
+                                        "READ_FAILED", "Could not open file.", null)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            mainHandler.post {
+                                result.error(
+                                    "READ_FAILED", e.message ?: e.toString(), null)
+                            }
+                        }
+                    }
+                }
+                "deleteExportFile" -> {
+                    val uri = call.argument<String>("uri")
+                    if (uri.isNullOrBlank()) {
+                        result.error("INVALID_DELETE", "File URI is missing.", null)
+                        return@setMethodCallHandler
+                    }
+                    thread(name = "delete-export") {
+                        val rows = try {
+                            contentResolver.delete(Uri.parse(uri), null, null)
+                        } catch (_: Exception) {
+                            0
+                        }
+                        mainHandler.post { result.success(rows > 0) }
+                    }
+                }
+                "getDownloadsPath" -> {
+                    try {
+                        val dl = Environment.getExternalStoragePublicDirectory(
+                            Environment.DIRECTORY_DOWNLOADS)
+                        result.success(dl.absolutePath)
+                    } catch (_: Exception) {
+                        result.success("")
+                    }
+                }
+                "getTreeFolderPath" -> {
+                    val treeUri = call.argument<String>("treeUri")
+                    if (treeUri.isNullOrBlank()) {
+                        result.success("")
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        result.success(treeDisplayName(Uri.parse(treeUri)))
+                    } catch (_: Exception) {
+                        result.success("")
+                    }
+                }
                 "readVaultFile" -> {
                     val name = call.argument<String>("name")
                     val subfolder = sanitizeFilename(call.argument<String>("subfolder") ?: "DataSheet")
@@ -908,6 +1002,129 @@ class MainActivity : FlutterFragmentActivity() {
             ?.substringAfterLast('/')
             ?.ifBlank { "Picked folder" }
             ?: "Picked folder"
+    }
+
+    /// Saved `.txt`/`.log` exports in Download/<subfolder> via MediaStore.
+    /// Returns [{name, uri, size, modified}] with content URIs (direct
+    /// file paths don't work under scoped storage) and millis timestamps.
+    /// Newest first. Never throws (empty list on any failure).
+    private fun listExportFiles(subfolder: String): List<Map<String, Any?>> {
+        val out = mutableListOf<Map<String, Any?>>()
+        try {
+            val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } else {
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            }
+            val selection = "${MediaStore.Downloads.RELATIVE_PATH} LIKE ?"
+            val args = arrayOf("%${Environment.DIRECTORY_DOWNLOADS}/$subfolder%")
+            contentResolver.query(
+                collection,
+                arrayOf(
+                    MediaStore.Downloads._ID,
+                    MediaStore.Downloads.DISPLAY_NAME,
+                    MediaStore.Downloads.SIZE,
+                    MediaStore.Downloads.DATE_MODIFIED,
+                    MediaStore.Downloads.MIME_TYPE,
+                ),
+                selection, args,
+                "${MediaStore.Downloads.DATE_MODIFIED} DESC",
+            )?.use { c ->
+                val idCol = c.getColumnIndexOrThrow(MediaStore.Downloads._ID)
+                val nameCol = c.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
+                val sizeCol = c.getColumnIndex(MediaStore.Downloads.SIZE)
+                val modCol = c.getColumnIndex(MediaStore.Downloads.DATE_MODIFIED)
+                val mimeCol = c.getColumnIndex(MediaStore.Downloads.MIME_TYPE)
+                while (c.moveToNext()) {
+                    try {
+                        val name = c.getString(nameCol) ?: continue
+                        if (!name.endsWith(".txt", true) &&
+                            !name.endsWith(".log", true)) continue
+                        val id = c.getLong(idCol)
+                        val uri = android.content.ContentUris.withAppendedId(
+                            collection, id)
+                        val size =
+                            if (sizeCol >= 0 && !c.isNull(sizeCol)) c.getLong(sizeCol) else 0L
+                        val modSec =
+                            if (modCol >= 0 && !c.isNull(modCol)) c.getLong(modCol) else 0L
+                        val mime = if (mimeCol >= 0) c.getString(mimeCol) else null
+                        out.add(mapOf(
+                            "name" to name,
+                            "uri" to uri.toString(),
+                            "size" to size,
+                            "modified" to modSec * 1000L,
+                            "mime" to mime,
+                        ))
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+        return out
+    }
+
+    /// Same listing inside a user-picked Storage Access Framework folder
+    /// (DocumentsContract child query — no extra dependency). Newest
+    /// first. Never throws.
+    private fun listTreeFiles(treeUri: android.net.Uri): List<Map<String, Any?>> {
+        val out = mutableListOf<Map<String, Any?>>()
+        try {
+            val children = android.provider.DocumentsContract
+                .buildChildDocumentsUriUsingTree(
+                    treeUri,
+                    android.provider.DocumentsContract.getTreeDocumentId(treeUri))
+            contentResolver.query(
+                children,
+                arrayOf(
+                    android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    android.provider.DocumentsContract.Document.COLUMN_SIZE,
+                    android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+                    android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE,
+                ),
+                null, null, null,
+            )?.use { c ->
+                val idCol = c.getColumnIndexOrThrow(
+                    android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameCol = c.getColumnIndexOrThrow(
+                    android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val sizeCol = c.getColumnIndex(
+                    android.provider.DocumentsContract.Document.COLUMN_SIZE)
+                val modCol = c.getColumnIndex(
+                    android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                val mimeCol = c.getColumnIndex(
+                    android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE)
+                while (c.moveToNext()) {
+                    try {
+                        val name = c.getString(nameCol) ?: continue
+                        if (!name.endsWith(".txt", true) &&
+                            !name.endsWith(".log", true)) continue
+                        val docId = c.getString(idCol) ?: continue
+                        val uri = android.provider.DocumentsContract
+                            .buildDocumentUriUsingTree(treeUri, docId)
+                        val size =
+                            if (sizeCol >= 0 && !c.isNull(sizeCol)) c.getLong(sizeCol) else 0L
+                        val modMs =
+                            if (modCol >= 0 && !c.isNull(modCol)) c.getLong(modCol) else 0L
+                        val mime = if (mimeCol >= 0) c.getString(mimeCol) else null
+                        out.add(mapOf(
+                            "name" to name,
+                            "uri" to uri.toString(),
+                            "size" to size,
+                            "modified" to modMs,
+                            "mime" to mime,
+                        ))
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+        out.sortByDescending {
+            (it["modified"] as? Number)?.toLong() ?: 0L
+        }
+        return out
     }
 
     /// CubicDataSheet vault file in Download/<subfolder> (MediaStore).

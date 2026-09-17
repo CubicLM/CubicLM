@@ -111,8 +111,8 @@ class SettingsController extends GetxController {
   final xaiModel = 'grok-4-fast'.obs;
   final perplexityModel = 'sonar-pro'.obs;
   final cerebrasModel = 'llama-3.3-70b'.obs;
-  final fireworksModel = 'accounts/fireworks/models/llama-v3p3-70b-instruct'
-      .obs;
+  final fireworksModel =
+      'accounts/fireworks/models/llama-v3p3-70b-instruct'.obs;
   final cohereModel = 'command-a-03-2025'.obs;
   final huggingfaceModel = 'meta-llama/Llama-3.3-70B-Instruct'.obs;
   final xkiroModel = 'openai/gpt-5.2'.obs;
@@ -131,30 +131,79 @@ class SettingsController extends GetxController {
   final repeatPenalty = 1.1.obs;
   final maxTokens = 512.obs;
   final contextSize = 2048.obs;
+
   /// Auto Tune (recommended): derive context & output limits from the
   /// device RAM tier, and let cloud models use their full native output.
   final autoTuneParams = true.obs;
+
   /// Web access: when on, URLs found in the user's message are fetched
   /// and their readable text is added to the model's context.
   final webFetchEnabled = true.obs;
+
   /// Privacy ad-block for the CubicWeb Browser (static host list,
   /// in-memory only). Persisted as a plain bool pref — no history DB.
   final adblockEnabled = true.obs;
+
   /// Browser search engine id (see [BrowserSearchEngines]). Plain pref.
   final browserSearchEngine = 'duckduckgo'.obs;
+
   /// Browser forced-dark overlay. Plain bool pref (survives view dispose).
   final browserForcedDark = false.obs;
+
   /// Per-site ad-block allowlist (hosts). Plain JSON-string pref.
   final browserAllowlist = <String>[].obs;
+
   /// Browser bookmarks (explicit user saves only — never auto-recorded).
   /// Each entry: {title, url, addedAt}. Plain JSON-string pref.
   final browserBookmarks = <Map<String, String>>[].obs;
+
   /// Block HTTP sites entirely (HTTPS-only mode). Plain bool pref.
   final browserHttpsOnly = false.obs;
+
   /// Send Do-Not-Track / Global Privacy Control headers. Plain bool pref.
   final browserDntEnabled = true.obs;
+
   /// Block third-party cookies. Plain bool pref.
   final browserBlockThirdPartyCookies = false.obs;
+  final browserDataSaver = false.obs;
+  final browserSpeedDial = <Map<String, String>>[].obs;
+  final browserSidebarEnabled = true.obs;
+  final browserNightModeIntensity = 0.5.obs;
+  final browserResourceMonitor = true.obs;
+  final browserWallpaperPath = ''.obs;
+  final browserNightIntensity = 0.0.obs;
+  final browserHapticsEnabled = true.obs;
+  final browserSidebarShortcuts = <Map<String, String>>[].obs;
+  final browserExtremeTextMode = false.obs;
+  final browserSearchEnhancer = true.obs;
+  final browserGesturesEnabled = true.obs;
+  final browserPerformanceProfile =
+      'balanced'.obs; // 'eco', 'balanced', 'beast'
+  final browserAmbientMusicEnabled = false.obs;
+  final browserTotalDataSaved = 0.obs; // bytes
+  final browserCustomEngines = <Map<String, String>>[].obs;
+  final browserToolbarTools = <String>[].obs;
+  final browserNewsCategories = <String>[].obs;
+  final browserPipEnabled = true.obs;
+  final browserIdentity = <String, String>{}.obs;
+  final browserCustomTheme = <String, String>{}.obs;
+  final browserVoiceEnabled = true.obs;
+  final browserAiNotes = <Map<String, String>>[].obs;
+  final browserBlockedSelectors = <String, List<String>>{}.obs;
+  final browserSplitEnabled = false.obs;
+  final browserHibernationEnabled = true.obs;
+  final browserSiteAiRules = <String, String>{}.obs;
+  final browserAutoRenameDownloads = true.obs;
+
+  /// Custom homepage URL (empty = blank new-tab page). Plain string pref.
+  final browserHomepage = ''.obs;
+
+  /// Page text zoom percent (50–200, Android textZoom). Plain int pref.
+  final browserTextZoom = 100.obs;
+  final browserRamLimit = 1024.obs; // MB
+  final browserCpuLimit = 0.5.obs; // 0.0 to 1.0
+  final browserLimiterEnabled = false.obs;
+
   /// Dismissible upsell pill shown inside the composer card.
   final composerUpsellDismissed = false.obs;
   final liteRtPerformanceMode = AppConstants.defaultLiteRtPerformanceMode.obs;
@@ -171,12 +220,19 @@ class SettingsController extends GetxController {
   final locale = AppLanguage.fromCode('en').obs;
   final appVersion = ''.obs;
 
+  // Personalization
+  final selectedThemeName = 'CubicLM'.obs;
+  final customAccentColor = Rxn<Color>();
+  final dynamicColorEnabled = true.obs;
+  final glassIntensity = 0.7.obs;
+  final selectedFontFamily = 'Plus Jakarta Sans'.obs;
+
   // Smart RAM & Performance
   final autoAdjustThreads = true.obs;
 
   int get recommendedThreads {
     if (!autoAdjustThreads.value) return 4; // Default fallback
-    
+
     if (Get.isRegistered<DeviceInfoService>()) {
       final deviceInfo = Get.find<DeviceInfoService>();
       final cores = deviceInfo.totalRamGB.value > 8 ? 6 : 4; // Simple heuristic
@@ -204,6 +260,9 @@ class SettingsController extends GetxController {
 
   // TTS — read aloud assistant messages.
   final readAloudEnabled = true.obs;
+
+  // Code editor preference: 'split' (Split Canvas + Live Preview) or 'plain' (Lightweight Plain)
+  final codeEditorType = 'split'.obs;
 
   // App Lock — require device biometrics/PIN to open the app.
   final appLockEnabled = false.obs;
@@ -343,16 +402,14 @@ class SettingsController extends GetxController {
     inferenceMode.value = _hive.getSetting(AppConstants.keyInferenceMode,
             defaultValue: 'local') ??
         'local';
-    exportSubfolder.value = _hive.getSetting(
-            AppConstants.keyExportSubfolder,
+    exportSubfolder.value = _hive.getSetting(AppConstants.keyExportSubfolder,
             defaultValue: AppConstants.defaultExportSubfolder) ??
         AppConstants.defaultExportSubfolder;
     exportCustomDir.value =
         _hive.getSetting(AppConstants.keyExportCustomDir, defaultValue: '') ??
             '';
     exportTreeUri.value =
-        _hive.getSetting(AppConstants.keyExportTreeUri, defaultValue: '') ??
-            '';
+        _hive.getSetting(AppConstants.keyExportTreeUri, defaultValue: '') ?? '';
     exportTreeName.value =
         _hive.getSetting(AppConstants.keyExportTreeName, defaultValue: '') ??
             '';
@@ -506,6 +563,125 @@ class SettingsController extends GetxController {
             AppConstants.keyBrowserBlockThirdPartyCookies,
             defaultValue: false) ??
         false;
+    browserDataSaver.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserDataSaver,
+            defaultValue: false) ??
+        false;
+    browserSpeedDial.assignAll(_decodeBookmarks(
+        _hive.getSetting<String>(AppConstants.keyBrowserSpeedDial)));
+    browserSidebarEnabled.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserSidebarEnabled,
+            defaultValue: true) ??
+        true;
+    browserNightModeIntensity.value = _hive.getSetting<double>(
+            AppConstants.keyBrowserNightModeIntensity,
+            defaultValue: 0.5) ??
+        0.5;
+    browserResourceMonitor.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserResourceMonitor,
+            defaultValue: true) ??
+        true;
+    _loadSpeedDial();
+    browserWallpaperPath.value = _hive.getSetting<String>(
+            AppConstants.keyBrowserWallpaperPath,
+            defaultValue: '') ??
+        '';
+    browserNightIntensity.value = _hive.getSetting<double>(
+            AppConstants.keyBrowserNightIntensity,
+            defaultValue: 0.0) ??
+        0.0;
+    browserHapticsEnabled.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserHapticsEnabled,
+            defaultValue: true) ??
+        true;
+    browserSidebarShortcuts.assignAll(_decodeBookmarks(
+        _hive.getSetting<String>(AppConstants.keyBrowserSidebarShortcuts)));
+    browserExtremeTextMode.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserExtremeTextMode,
+            defaultValue: false) ??
+        false;
+    browserSearchEnhancer.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserSearchEnhancer,
+            defaultValue: true) ??
+        true;
+    browserGesturesEnabled.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserGesturesEnabled,
+            defaultValue: true) ??
+        true;
+    browserPerformanceProfile.value = _hive.getSetting<String>(
+            AppConstants.keyBrowserPerformanceProfile,
+            defaultValue: 'balanced') ??
+        'balanced';
+    browserAmbientMusicEnabled.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserAmbientMusic,
+            defaultValue: false) ??
+        false;
+    browserTotalDataSaved.value = _hive.getSetting<int>(
+            AppConstants.keyBrowserTotalDataSaved,
+            defaultValue: 0) ??
+        0;
+    browserCustomEngines.assignAll(_decodeBookmarks(
+        _hive.getSetting<String>(AppConstants.keyBrowserCustomEngines)));
+    _loadToolbarConfig();
+    browserNewsCategories.assignAll(_decodeStringList(
+        _hive.getSetting<String>(AppConstants.keyBrowserNewsCategories)));
+    if (browserNewsCategories.isEmpty) {
+      browserNewsCategories
+          .assignAll(['artificial intelligence', 'technology', 'science']);
+    }
+    browserPipEnabled.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserPipEnabled,
+            defaultValue: true) ??
+        true;
+    browserIdentity.assignAll(Map<String, String>.from(_hive.getSetting<Map>(
+            AppConstants.keyBrowserIdentity,
+            defaultValue: {}) ??
+        {}));
+    browserCustomTheme.assignAll(Map<String, String>.from(_hive.getSetting<Map>(
+            AppConstants.keyBrowserAiThemeColors,
+            defaultValue: {}) ??
+        {}));
+    browserVoiceEnabled.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserVoiceEnabled,
+            defaultValue: true) ??
+        true;
+    browserAiNotes.assignAll((_hive.getSetting<List>(
+                AppConstants.keyBrowserAiNotes,
+                defaultValue: []) ??
+            [])
+        .map((e) => Map<String, String>.from(e as Map)));
+    browserBlockedSelectors.assignAll((_hive.getSetting<Map>(
+                AppConstants.keyBrowserBlockedSelectors,
+                defaultValue: {}) ??
+            {})
+        .map((k, v) => MapEntry(k.toString(), List<String>.from(v as List))));
+    browserSplitEnabled.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserSplitEnabled,
+            defaultValue: false) ??
+        false;
+    browserHibernationEnabled.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserHibernationEnabled,
+            defaultValue: true) ??
+        true;
+    browserSiteAiRules.assignAll(Map<String, String>.from(_hive.getSetting<Map>(
+            AppConstants.keyBrowserSiteAiRules,
+            defaultValue: {}) ??
+        {}));
+    browserAutoRenameDownloads.value = _hive.getSetting<bool>(
+            AppConstants.keyBrowserAutoRenameDownloads,
+            defaultValue: true) ??
+        true;
+    browserRamLimit.value = _hive.getSetting<int>(AppConstants.keyBrowserRamLimit, defaultValue: 1024) ?? 1024;
+    browserCpuLimit.value = _hive.getSetting<double>(AppConstants.keyBrowserCpuLimit, defaultValue: 0.5) ?? 0.5;
+    browserLimiterEnabled.value = _hive.getSetting<bool>(AppConstants.keyBrowserLimiterEnabled, defaultValue: false) ?? false;
+    browserHomepage.value = _hive.getSetting<String>(
+            AppConstants.keyBrowserHomepage,
+            defaultValue: '') ??
+        '';
+    browserTextZoom.value = _hive.getSetting<int>(
+            AppConstants.keyBrowserTextZoom,
+            defaultValue: 100) ??
+        100;
     composerUpsellDismissed.value = _hive.getSetting<bool>(
             AppConstants.keyComposerUpsellDismissed,
             defaultValue: false) ??
@@ -534,8 +710,7 @@ class SettingsController extends GetxController {
     imageGenSize.value = _hive.getSetting(AppConstants.keyImageGenSize,
             defaultValue: AppConstants.defaultImageGenSize) ??
         AppConstants.defaultImageGenSize;
-    imageGenNegative.value = _hive.getSetting(
-            AppConstants.keyImageGenNegative,
+    imageGenNegative.value = _hive.getSetting(AppConstants.keyImageGenNegative,
             defaultValue: AppConstants.defaultImageGenNegative) ??
         AppConstants.defaultImageGenNegative;
     imageGenSeed.value = _hive.getSetting(AppConstants.keyImageGenSeed,
@@ -563,23 +738,51 @@ class SettingsController extends GetxController {
             defaultValue: 'en') ??
         'en';
     locale.value = AppLanguage.fromCode(savedLang);
-    orbChatAnim.value = _hive.getSetting(AppConstants.keyOrbChat,
-            defaultValue: 'random') ??
-        'random';
-    orbImageAnim.value = _hive.getSetting(AppConstants.keyOrbImage,
-            defaultValue: 'composing') ??
-        'composing';
-    orbAnalysisAnim.value = _hive.getSetting(AppConstants.keyOrbAnalysis,
-            defaultValue: 'random') ??
-        'random';
+
+    // Personalization
+    selectedThemeName.value = _hive.getSetting<String>(AppConstants.keySelectedTheme,
+            defaultValue: 'CubicLM') ??
+        'CubicLM';
+    final savedColor = _hive.getSetting<int>(AppConstants.keyCustomAccentColor);
+    if (savedColor != null) {
+      customAccentColor.value = Color(savedColor);
+    }
+    dynamicColorEnabled.value = _hive.getSetting<bool>(AppConstants.keyDynamicColorEnabled,
+            defaultValue: true) ??
+        true;
+    glassIntensity.value = _hive.getSetting<double>(AppConstants.keyGlassIntensity,
+            defaultValue: 0.7) ??
+        0.7;
+    selectedFontFamily.value = _hive.getSetting<String>(AppConstants.keySelectedFont,
+            defaultValue: 'Plus Jakarta Sans') ??
+        'Plus Jakarta Sans';
+    // 'Source Sans Pro' was renamed upstream ('Source Sans 3' now) and
+    // crashes GoogleFonts.getFont — migrate stale persisted values.
+    if (selectedFontFamily.value == 'Source Sans Pro') {
+      selectedFontFamily.value = 'Source Sans 3';
+      unawaited(_hive.setSetting(
+          AppConstants.keySelectedFont, selectedFontFamily.value));
+    }
+
+    orbChatAnim.value =
+        _hive.getSetting(AppConstants.keyOrbChat, defaultValue: 'random') ??
+            'random';
+    orbImageAnim.value =
+        _hive.getSetting(AppConstants.keyOrbImage, defaultValue: 'composing') ??
+            'composing';
+    orbAnalysisAnim.value =
+        _hive.getSetting(AppConstants.keyOrbAnalysis, defaultValue: 'random') ??
+            'random';
     autoLoadLastModel.value = _hive.getSetting<bool>(
             AppConstants.keyAutoLoadLastModel,
             defaultValue: false) ??
         false;
-    readAloudEnabled.value = _hive.getSetting<bool>(
-            AppConstants.keyReadAloud,
-            defaultValue: true) ??
-        true;
+    readAloudEnabled.value =
+        _hive.getSetting<bool>(AppConstants.keyReadAloud, defaultValue: true) ??
+            true;
+    codeEditorType.value =
+        _hive.getSetting<String>('code_editor_type', defaultValue: 'split') ??
+            'split';
     appLockEnabled.value = _hive.getSetting<bool>(
             AppConstants.keyAppLockEnabled,
             defaultValue: false) ??
@@ -1295,7 +1498,8 @@ class SettingsController extends GetxController {
       }
     }
     if (customCloudProfiles.isEmpty && customCloudBaseUrl.value.isNotEmpty) {
-      final hiveKey = '${AppConstants.keyCustomCloudKey}_p${customCloudProfiles.length}';
+      final hiveKey =
+          '${AppConstants.keyCustomCloudKey}_p${customCloudProfiles.length}';
       customCloudProfiles.add({
         'name': customCloudName.value,
         'baseUrl': customCloudBaseUrl.value,
@@ -1330,8 +1534,7 @@ class SettingsController extends GetxController {
       p['apiKey'] = '';
       sanitized.add(p);
     }
-    await _hive.setSetting(
-        AppConstants.keyCustomCloudProfiles, sanitized);
+    await _hive.setSetting(AppConstants.keyCustomCloudProfiles, sanitized);
     await _hive.setSetting(
         AppConstants.keyCustomCloudProfileIndex, customCloudProfileIndex.value);
   }
@@ -1361,8 +1564,7 @@ class SettingsController extends GetxController {
 
   /// Per-prompt selective skill injection — returns the system prompt
   /// with only the skills relevant to [userPrompt] appended.
-  String effectiveSystemPromptForPrompt(
-      String modelName, String userPrompt) {
+  String effectiveSystemPromptForPrompt(String modelName, String userPrompt) {
     final base = baseSystemPromptForModel(modelName);
     final relevant = SkillInjector.selectRelevantSkills(userPrompt);
     if (relevant.isEmpty) return base;
@@ -1392,8 +1594,8 @@ class SettingsController extends GetxController {
           .whereType<String>()
           .toList();
     } catch (e) {
-      Get.find<AppLogService>()
-          .warning('NVIDIA model list request failed', details: e, category: LogCategory.cloud);
+      Get.find<AppLogService>().warning('NVIDIA model list request failed',
+          details: e, category: LogCategory.cloud);
     } finally {
       isLoadingNvidiaModels.value = false;
     }
@@ -1441,12 +1643,14 @@ class SettingsController extends GetxController {
       final dev = Get.find<DeviceInfoService>();
       if (clamped > dev.maxSafeContextSize) {
         clamped = dev.maxSafeContextSize;
-        Get.snackbar('RAM Guard', 'Clamped to ${dev.maxSafeContextSize} for ${dev.deviceTier.value} tier',
+        Get.snackbar('RAM Guard',
+            'Clamped to ${dev.maxSafeContextSize} for ${dev.deviceTier.value} tier',
             snackPosition: SnackPosition.BOTTOM);
       }
       if (!dev.canAllocateContextSize(clamped)) {
         clamped = dev.recommendedContextSize;
-        Get.snackbar('RAM Guard', 'Not enough RAM — using ${dev.recommendedContextSize}',
+        Get.snackbar(
+            'RAM Guard', 'Not enough RAM — using ${dev.recommendedContextSize}',
             snackPosition: SnackPosition.BOTTOM);
       }
     }
@@ -1504,8 +1708,7 @@ class SettingsController extends GetxController {
   }
 
   Future<void> setBrowserSearchEngine(String engineId) async {
-    final id =
-        BrowserSearchEngines.isKnown(engineId) ? engineId : 'duckduckgo';
+    final id = BrowserSearchEngines.isKnown(engineId) ? engineId : 'duckduckgo';
     browserSearchEngine.value = id;
     await _hive.setSetting(AppConstants.keyBrowserSearchEngine, id);
   }
@@ -1527,7 +1730,299 @@ class SettingsController extends GetxController {
 
   Future<void> setBrowserBlockThirdPartyCookies(bool enabled) async {
     browserBlockThirdPartyCookies.value = enabled;
-    await _hive.setSetting(AppConstants.keyBrowserBlockThirdPartyCookies, enabled);
+    await _hive.setSetting(
+        AppConstants.keyBrowserBlockThirdPartyCookies, enabled);
+  }
+
+  Future<void> setBrowserDataSaver(bool enabled) async {
+    browserDataSaver.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserDataSaver, enabled);
+  }
+
+  Future<void> setBrowserHomepage(String url) async {
+    browserHomepage.value = url.trim();
+    await _hive.setSetting(
+        AppConstants.keyBrowserHomepage, browserHomepage.value);
+  }
+
+  Future<void> setBrowserTextZoom(int zoom) async {
+    browserTextZoom.value = zoom.clamp(50, 200);
+    await _hive.setSetting(
+        AppConstants.keyBrowserTextZoom, browserTextZoom.value);
+  }
+
+  Future<void> setBrowserSidebarEnabled(bool enabled) async {
+    browserSidebarEnabled.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserSidebarEnabled, enabled);
+  }
+
+  Future<void> setBrowserNightModeIntensity(double value) async {
+    browserNightModeIntensity.value = value;
+    await _hive.setSetting(AppConstants.keyBrowserNightModeIntensity, value);
+  }
+
+  void _loadSpeedDial() {
+    final saved = _decodeBookmarks(
+        _hive.getSetting<String>(AppConstants.keyBrowserSpeedDial));
+    if (saved.isEmpty) {
+      // Seed defaults
+      browserSpeedDial.assignAll([
+        {'title': 'Wikipedia', 'url': 'https://wikipedia.org'},
+        {'title': 'DuckDuckGo', 'url': 'https://duckduckgo.com'},
+        {'title': 'arXiv', 'url': 'https://arxiv.org'},
+        {'title': 'MDN Docs', 'url': 'https://developer.mozilla.org'},
+        {'title': 'GitHub', 'url': 'https://github.com'},
+        {'title': 'Flutter', 'url': 'https://flutter.dev'},
+      ]);
+    } else {
+      browserSpeedDial.assignAll(saved);
+    }
+  }
+
+  Future<void> setBrowserResourceMonitor(bool enabled) async {
+    browserResourceMonitor.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserResourceMonitor, enabled);
+  }
+
+  Future<void> setBrowserWallpaper(String path) async {
+    browserWallpaperPath.value = path;
+    await _hive.setSetting(AppConstants.keyBrowserWallpaperPath, path);
+  }
+
+  Future<void> setBrowserNightIntensity(double value) async {
+    browserNightIntensity.value = value.clamp(0.0, 0.8);
+    await _hive.setSetting(
+        AppConstants.keyBrowserNightIntensity, browserNightIntensity.value);
+  }
+
+  Future<void> setBrowserHapticsEnabled(bool enabled) async {
+    browserHapticsEnabled.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserHapticsEnabled, enabled);
+  }
+
+  Future<void> addBrowserSidebarShortcut(String title, String url) async {
+    final u = url.trim();
+    if (u.isEmpty) return;
+    if (browserSidebarShortcuts.any((s) => s['url'] == u)) return;
+    browserSidebarShortcuts.add({
+      'title': title.trim().isEmpty ? u : title.trim(),
+      'url': u,
+    });
+    await _persistSidebarShortcuts();
+  }
+
+  Future<void> removeBrowserSidebarShortcut(String url) async {
+    browserSidebarShortcuts.removeWhere((s) => s['url'] == url.trim());
+    await _persistSidebarShortcuts();
+  }
+
+  Future<void> _persistSidebarShortcuts() async {
+    browserSidebarShortcuts.refresh();
+    await _hive.setSetting(AppConstants.keyBrowserSidebarShortcuts,
+        jsonEncode(browserSidebarShortcuts));
+  }
+
+  Future<void> setBrowserExtremeTextMode(bool enabled) async {
+    browserExtremeTextMode.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserExtremeTextMode, enabled);
+  }
+
+  Future<void> setBrowserSearchEnhancer(bool enabled) async {
+    browserSearchEnhancer.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserSearchEnhancer, enabled);
+  }
+
+  Future<void> setBrowserGesturesEnabled(bool enabled) async {
+    browserGesturesEnabled.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserGesturesEnabled, enabled);
+  }
+
+  Future<void> setBrowserPerformanceProfile(String profile) async {
+    browserPerformanceProfile.value = profile;
+    await _hive.setSetting(AppConstants.keyBrowserPerformanceProfile, profile);
+    // Apply profile-specific logic
+    if (profile == 'eco') {
+      await setOrbAnim('chat', 'breathing'); // Low-impact animation
+    } else if (profile == 'beast') {
+      await setOrbAnim('chat', 'shaping'); // High-impact animation
+    }
+  }
+
+  Future<void> setBrowserAmbientMusicEnabled(bool enabled) async {
+    browserAmbientMusicEnabled.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserAmbientMusic, enabled);
+  }
+
+  Future<void> addBrowserDataSaved(int bytes) async {
+    browserTotalDataSaved.value += bytes;
+    await _hive.setSetting(
+        AppConstants.keyBrowserTotalDataSaved, browserTotalDataSaved.value);
+  }
+
+  Future<void> addCustomSearchEngine(String name, String template) async {
+    if (name.trim().isEmpty || template.trim().isEmpty) return;
+    browserCustomEngines
+        .add({'name': name.trim(), 'template': template.trim()});
+    await _persistCustomEngines();
+  }
+
+  Future<void> removeCustomSearchEngine(int index) async {
+    if (index < 0 || index >= browserCustomEngines.length) return;
+    browserCustomEngines.removeAt(index);
+    await _persistCustomEngines();
+  }
+
+  Future<void> _persistCustomEngines() async {
+    browserCustomEngines.refresh();
+    await _hive.setSetting(
+        AppConstants.keyBrowserCustomEngines, jsonEncode(browserCustomEngines));
+  }
+
+  void _loadToolbarConfig() {
+    final saved = _decodeStringList(
+        _hive.getSetting<String>(AppConstants.keyBrowserToolbarConfig));
+    if (saved.isEmpty) {
+      browserToolbarTools
+          .assignAll(['back', 'forward', 'home', 'tabs', 'menu']);
+    } else {
+      browserToolbarTools.assignAll(saved);
+    }
+  }
+
+  Future<void> setBrowserToolbarConfig(List<String> tools) async {
+    browserToolbarTools.assignAll(tools);
+    await _hive.setSetting(
+        AppConstants.keyBrowserToolbarConfig, jsonEncode(tools));
+  }
+
+  Future<void> toggleNewsCategory(String category) async {
+    if (browserNewsCategories.contains(category)) {
+      browserNewsCategories.remove(category);
+    } else {
+      browserNewsCategories.add(category);
+    }
+    await _hive.setSetting(AppConstants.keyBrowserNewsCategories,
+        jsonEncode(browserNewsCategories));
+  }
+
+  Future<void> setBrowserPipEnabled(bool enabled) async {
+    browserPipEnabled.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserPipEnabled, enabled);
+  }
+
+  Future<void> setBrowserIdentity(Map<String, String> identity) async {
+    browserIdentity.assignAll(identity);
+    await _hive.setSetting(AppConstants.keyBrowserIdentity, identity);
+  }
+
+  Future<void> applyAiTheme(Map<String, String> theme) async {
+    browserCustomTheme.assignAll(theme);
+    await _hive.setSetting(AppConstants.keyBrowserAiThemeColors, theme);
+  }
+
+  Future<void> setBrowserVoiceEnabled(bool enabled) async {
+    browserVoiceEnabled.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserVoiceEnabled, enabled);
+  }
+
+  Future<void> addAiNote(String title, String content, String url) async {
+    browserAiNotes.insert(0, {
+      'title': title,
+      'content': content,
+      'url': url,
+      'at': DateTime.now().toIso8601String(),
+    });
+    await _hive.setSetting(
+        AppConstants.keyBrowserAiNotes, browserAiNotes.toList());
+  }
+
+  Future<void> removeAiNote(int index) async {
+    if (index < 0 || index >= browserAiNotes.length) return;
+    browserAiNotes.removeAt(index);
+    await _hive.setSetting(
+        AppConstants.keyBrowserAiNotes, browserAiNotes.toList());
+  }
+
+  Future<void> addBlockedSelector(String host, String selector) async {
+    final list = browserBlockedSelectors[host] ?? [];
+    if (!list.contains(selector)) {
+      list.add(selector);
+      browserBlockedSelectors[host] = list;
+      await _hive.setSetting(AppConstants.keyBrowserBlockedSelectors,
+          Map<String, List<String>>.from(browserBlockedSelectors));
+    }
+  }
+
+  Future<void> setBrowserSplitEnabled(bool enabled) async {
+    browserSplitEnabled.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserSplitEnabled, enabled);
+  }
+
+  Future<void> setBrowserHibernationEnabled(bool enabled) async {
+    browserHibernationEnabled.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserHibernationEnabled, enabled);
+  }
+
+  Future<void> setBrowserAutoRenameDownloads(bool enabled) async {
+    browserAutoRenameDownloads.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserAutoRenameDownloads, enabled);
+  }
+
+  Future<void> addSiteAiRule(String host, String action) async {
+    browserSiteAiRules[host] = action;
+    await _hive.setSetting(AppConstants.keyBrowserSiteAiRules,
+        Map<String, String>.from(browserSiteAiRules));
+  }
+
+  Future<void> removeSiteAiRule(String host) async {
+    browserSiteAiRules.remove(host);
+    await _hive.setSetting(AppConstants.keyBrowserSiteAiRules,
+        Map<String, String>.from(browserSiteAiRules));
+  }
+
+  Future<void> setBrowserRamLimit(int mb) async {
+    browserRamLimit.value = mb;
+    await _hive.setSetting(AppConstants.keyBrowserRamLimit, mb);
+  }
+
+  Future<void> setBrowserCpuLimit(double pct) async {
+    browserCpuLimit.value = pct;
+    await _hive.setSetting(AppConstants.keyBrowserCpuLimit, pct);
+  }
+
+  Future<void> setBrowserLimiterEnabled(bool enabled) async {
+    browserLimiterEnabled.value = enabled;
+    await _hive.setSetting(AppConstants.keyBrowserLimiterEnabled, enabled);
+  }
+
+  Future<void> addBrowserSpeedDialItem(String title, String url) async {
+    final u = url.trim();
+    if (u.isEmpty) return;
+    if (browserSpeedDial.any((item) => item['url'] == u)) return;
+    browserSpeedDial.add({
+      'title': title.trim().isEmpty ? u : title.trim(),
+      'url': u,
+      'addedAt': DateTime.now().toIso8601String(),
+    });
+    await _persistSpeedDial();
+  }
+
+  Future<void> removeBrowserSpeedDialItem(String url) async {
+    browserSpeedDial.removeWhere((item) => item['url'] == url.trim());
+    await _persistSpeedDial();
+  }
+
+  Future<void> reorderBrowserSpeedDial(int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex -= 1;
+    final item = browserSpeedDial.removeAt(oldIndex);
+    browserSpeedDial.insert(newIndex, item);
+    await _persistSpeedDial();
+  }
+
+  Future<void> _persistSpeedDial() async {
+    browserSpeedDial.refresh();
+    await _hive.setSetting(
+        AppConstants.keyBrowserSpeedDial, jsonEncode(browserSpeedDial));
   }
 
   /// True when [url]'s host (or any parent domain) is allowlisted.
@@ -1606,13 +2101,17 @@ class SettingsController extends GetxController {
     try {
       final decoded = jsonDecode(raw);
       if (decoded is List) {
-        return decoded.whereType<Map>().map((m) {
-          return {
-            'title': '${m['title'] ?? ''}',
-            'url': '${m['url'] ?? ''}',
-            'addedAt': '${m['addedAt'] ?? ''}',
-          };
-        }).where((b) => b['url']!.isNotEmpty).toList();
+        return decoded
+            .whereType<Map>()
+            .map((m) {
+              return {
+                'title': '${m['title'] ?? ''}',
+                'url': '${m['url'] ?? ''}',
+                'addedAt': '${m['addedAt'] ?? ''}',
+              };
+            })
+            .where((b) => b['url']!.isNotEmpty)
+            .toList();
       }
     } catch (_) {}
     return [];
@@ -1817,8 +2316,8 @@ class SettingsController extends GetxController {
         if (Get.isRegistered<DownloadService>() &&
             await Get.find<DownloadService>()
                 .isModelDownloaded('taesd.safetensors')) {
-          taesdPath = await Get.find<DownloadService>()
-              .modelPath('taesd.safetensors');
+          taesdPath =
+              await Get.find<DownloadService>().modelPath('taesd.safetensors');
         }
       } catch (_) {}
       await image.unloadModel();
@@ -1850,6 +2349,43 @@ class SettingsController extends GetxController {
     locale.value = lang;
     await _hive.setSetting(AppConstants.keyLanguage, lang.code);
     Get.updateLocale(lang.locale);
+  }
+
+  // ── Personalization ──
+
+  Future<void> setTheme(String name, Color? color) async {
+    selectedThemeName.value = name;
+    customAccentColor.value = color;
+    await _hive.setSetting(AppConstants.keySelectedTheme, name);
+    if (color != null) {
+      await _hive.setSetting(AppConstants.keyCustomAccentColor, color.toARGB32());
+    } else {
+      await _hive.deleteSetting(AppConstants.keyCustomAccentColor);
+    }
+    // Automatically turn off Dynamic Color if a manual theme is picked
+    if (name != 'Material You') {
+      await setDynamicColorEnabled(false);
+    }
+    _updateSystemUI();
+  }
+
+  Future<void> setDynamicColorEnabled(bool enabled) async {
+    dynamicColorEnabled.value = enabled;
+    await _hive.setSetting(AppConstants.keyDynamicColorEnabled, enabled);
+    if (enabled) {
+      selectedThemeName.value = 'Material You';
+      await _hive.setSetting(AppConstants.keySelectedTheme, 'Material You');
+    }
+  }
+
+  Future<void> setGlassIntensity(double value) async {
+    glassIntensity.value = value;
+    await _hive.setSetting(AppConstants.keyGlassIntensity, value);
+  }
+
+  Future<void> setFontFamily(String family) async {
+    selectedFontFamily.value = family;
+    await _hive.setSetting(AppConstants.keySelectedFont, family);
   }
 
   /// Persist a thinking-orb animation choice ('random' | OrbState name).
@@ -1884,6 +2420,11 @@ class SettingsController extends GetxController {
   Future<void> setReadAloudEnabled(bool enabled) async {
     readAloudEnabled.value = enabled;
     await _hive.setSetting(AppConstants.keyReadAloud, enabled);
+  }
+
+  Future<void> setCodeEditorType(String type) async {
+    codeEditorType.value = type;
+    await _hive.setSetting('code_editor_type', type);
   }
 
   // ─── App Lock (biometric gate) ──────────────────
