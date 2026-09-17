@@ -2,10 +2,9 @@
 ///
 /// One session per scope (`default` + one per agent project), each with its
 /// own transcript, history, and working directory, persisted across
-/// restarts. Commands route through [SandboxManager] (PRoot Ubuntu when
-/// the native runtime is installed, host shell otherwise) after
-/// [SandboxService] screening. Full PRoot/Ubuntu isolation is deferred
-/// native work (roadmap Phase 6).
+/// restarts. Commands route through [SandboxManager] (isolated PRoot
+/// Ubuntu when the runtime is installed, screened host shell otherwise)
+/// after [SandboxService] screening.
 library;
 
 import 'dart:async';
@@ -19,6 +18,7 @@ import '../app_log_service.dart';
 import '../sandbox/sandbox_manager.dart';
 import '../security/sandbox_service.dart';
 import '../../utils/preview_guard.dart';
+import '../../utils/text_sanitize.dart';
 
 /// One terminal output line. Public for the view + tests.
 class TerminalLine {
@@ -48,6 +48,68 @@ List<String> buildShellParts(String command) {
   if (Platform.isWindows) return ['cmd.exe', '/c', command];
   return ['/bin/sh', '-c', command];
 }
+
+/// Compact a working directory for the prompt line (Mobile-Harness
+/// parity: the guest root shows as `~`). Empty stays empty (the view
+/// shows the default `$` prompt then). Pure for unit tests.
+String compactPromptPath(String cwd, {String? home}) {
+  if (cwd.isEmpty) return '';
+  final h = home ??
+      Platform.environment['HOME'] ??
+      Platform.environment['USERPROFILE'] ??
+      '';
+  if (h.isNotEmpty && (cwd == h || cwd.startsWith('$h/'))) {
+    return '~${cwd.substring(h.length)}';
+  }
+  return cwd;
+}
+
+/// POSIX single-quote a shell word (Mobile-Harness `shellQuote` parity).
+/// Pure for unit tests.
+String shellQuote(String value) =>
+    "'${value.replaceAll("'", "'\\''")}'";
+
+/// Marker prefix for CWD tracking (random suffix per run, like the
+/// reference app's `__POCKETDEV_CWD_<uuid>__`, so command output can
+/// never collide with it).
+const cwdMarkerPrefix = '__CLM_CWD__';
+
+/// Wrap [command] so the shell reports its real working directory when
+/// done: `cd` into [cwd], run, print `<marker><$PWD>`, preserve the exit
+/// code. POSIX only — the caller keeps the legacy `cd` parser on
+/// Windows. Pure for unit tests.
+String wrapWithCwdTracking(String command, String cwd, String marker) {
+  // Note: every shell `$` below is Dart-escaped (`\$`) — only
+  // ${shellQuote(cwd)} and $marker interpolate.
+  return 'cd -- ${shellQuote(cwd)} || exit 1\n'
+      '$command\n'
+      '__CLM_EXIT=\$?\n'
+      "printf '\\n$marker%s\\n' \"\$PWD\"\n"
+      'exit \$__CLM_EXIT';
+}
+
+/// Split tracked output into display text + reported cwd. Marker lines
+/// are dropped from display; the LAST marker wins. Pure for unit tests.
+({String clean, String cwd}) parseCwdMarker(String output, String marker) {
+  String? cwd;
+  final kept = <String>[];
+  for (final line in const LineSplitter().convert(output)) {
+    if (line.startsWith(marker)) {
+      final rest = line.substring(marker.length).trim();
+      if (rest.isNotEmpty) cwd = rest;
+    } else {
+      kept.add(line);
+    }
+  }
+  return (clean: kept.join('\n'), cwd: cwd ?? '');
+}
+
+/// Live-output `[Y/n]` prompt sniff (Mobile-Harness `shouldAutoConfirm…`
+/// parity): answered once with `y` while package commands run.
+bool looksLikeConfirmPrompt(String tail) => RegExp(
+      r'\[Y/n\]|Do you want to continue',
+      caseSensitive: false,
+    ).hasMatch(tail);
 
 /// Make `apt`/`apt-get` non-interactive (Mobile-Harness parity).
 ///
@@ -244,6 +306,11 @@ class TerminalService extends GetxService {
 
   /// Run [command], streaming output into [lines]. Blocked commands are
   /// rejected without spawning a process. Returns the exit code.
+  ///
+  /// On POSIX shells with a known working directory the command runs
+  /// wrapped in CWD tracking (Mobile-Harness marker protocol), so `cd`,
+  /// `pushd`, subshells and scripts all update the prompt correctly —
+  /// no fragile client-side `cd` parsing. Windows keeps the legacy path.
   Future<int> runCommand(String command, {Duration? timeout}) async {
     final raw = command.trim();
     if (raw.isEmpty) return -1;
@@ -259,11 +326,20 @@ class TerminalService extends GetxService {
 
     // Package installs never stall on interactive prompts.
     final cmd = withAutoConfirm(raw);
-    // Fresh detection scope per command.
-    previewUrl.value = null;
+    // Fresh detection scope per command; pre-seed from well-known
+    // dev-server invocations (reference-app parity).
+    previewUrl.value = findServerUrlFromCommand(cmd);
 
-    // CWD tracking for cd commands
-    if (_isCdCommand(cmd)) {
+    // Marker-tracked runs (POSIX + known cwd). Everything else keeps the
+    // legacy `cd` parser below.
+    final tracked = !Platform.isWindows && workingDir.value.isNotEmpty;
+    final marker =
+        '${cwdMarkerPrefix}_${DateTime.now().microsecondsSinceEpoch}_${lines.length}_';
+    final shellCmd =
+        tracked ? wrapWithCwdTracking(cmd, workingDir.value, marker) : cmd;
+
+    // CWD tracking for cd commands (legacy path: Windows, or no cwd yet).
+    if (!tracked && _isCdCommand(cmd)) {
       final newDir = _resolveCdTarget(cmd);
       if (newDir != null) {
         final ok = await setWorkingDir(newDir);
@@ -283,17 +359,29 @@ class TerminalService extends GetxService {
     isRunning.value = true;
     try {
       int exitCode;
+      var shownChars = 0;
       if (Get.isRegistered<SandboxManager>()) {
-        // Sandboxed run (PRoot when installed): output lands at once.
+        // Sandboxed run (isolated PRoot when installed): output lands
+        // at once.
         final result = await Get.find<SandboxManager>().run(
-          cmd,
+          shellCmd,
           workDir: workingDir.value.isEmpty ? null : workingDir.value,
           timeout: timeout ?? const Duration(seconds: 60),
         );
-        for (final line in const LineSplitter().convert(result.stdout)) {
+        final parsed = tracked
+            ? parseCwdMarker(result.stdout, marker)
+            : (clean: result.stdout, cwd: '');
+        final parsedErr = tracked
+            ? parseCwdMarker(result.stderr, marker)
+            : (clean: result.stderr, cwd: '');
+        for (final line in const LineSplitter().convert(parsed.clean)) {
+          if (line.isEmpty) continue;
+          shownChars += line.length;
           _append(TerminalLine(SandboxService.redactSecrets(line)));
         }
-        for (final line in const LineSplitter().convert(result.stderr)) {
+        for (final line in const LineSplitter().convert(parsedErr.clean)) {
+          if (line.isEmpty) continue;
+          shownChars += line.length;
           _append(TerminalLine(SandboxService.redactSecrets(line),
               isError: true));
         }
@@ -301,9 +389,18 @@ class TerminalService extends GetxService {
           _append(const TerminalLine('(timed out)', isError: true));
         }
         exitCode = result.exitCode;
+        _adoptCwd(parsed.cwd);
       } else {
         // Direct host run with live streaming (tests + fallback).
-        exitCode = await _runDirect(cmd, timeout: timeout);
+        final out = await _runDirect(
+          shellCmd,
+          rawCmd: raw,
+          timeout: timeout,
+          tracked: tracked,
+          marker: marker,
+        );
+        exitCode = out.exitCode;
+        shownChars = out.shownChars;
       }
       lastExitCode.value = exitCode;
       // Terminal lane: first token only, secrets scrubbed — never the
@@ -312,6 +409,10 @@ class TerminalService extends GetxService {
           cmd.split(RegExp(r'\s+')).firstWhere((t) => t.isNotEmpty,
               orElse: () => 'cmd'));
       AppLogService.trailAction('terminal $head exit $exitCode');
+      if (shownChars == 0 && exitCode != 0) {
+        _append(TerminalLine('Process exited with code $exitCode',
+            isError: true));
+      }
       _append(TerminalLine('[exit $exitCode]', isError: exitCode != 0));
       return exitCode;
     } finally {
@@ -366,8 +467,72 @@ class TerminalService extends GetxService {
     }
   }
 
-  Future<int> _runDirect(String cmd, {Duration? timeout}) async {
+  /// Adopt a marker-reported cwd: host paths must exist (validated);
+  /// guest paths (sandboxed runs) are trusted when absolute — the marker
+  /// carries a per-run random suffix, like the reference app. The legacy
+  /// `cd` parser stays as the fallback. Never throws.
+  Future<void> _adoptCwd(String cwd) async {
+    try {
+      if (cwd.isEmpty || cwd == workingDir.value) return;
+      if (await setWorkingDir(cwd)) return;
+      if (!cwd.startsWith('/')) return;
+      workingDir.value = cwd;
+      _stateFor(activeSessionId.value).workingDir = cwd;
+      _persist(activeSessionId.value, _stateFor(activeSessionId.value));
+    } catch (_) {}
+  }
+
+  /// Send a line to the running process's stdin (reference-app `onInput`
+  /// parity). True when delivered — only possible on direct host runs;
+  /// sandboxed one-shot runs have no live stdin.
+  bool sendInput(String text) {
+    try {
+      final proc = _process;
+      if (proc == null) return false;
+      proc.stdin.writeln(text);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<({int exitCode, int shownChars})> _runDirect(
+    String cmd, {
+    required String rawCmd,
+    Duration? timeout,
+    bool tracked = false,
+    String marker = '',
+  }) async {
     final parts = buildShellParts(cmd);
+    // Watch apt-family commands for interactive [Y/n] prompts (the static
+    // -y injection covers most cases; this is the live backstop).
+    final lowerRaw = rawCmd.toLowerCase();
+    final watchConfirm = !Platform.isWindows &&
+        RegExp(r'(^|[;&|]\s*)(sudo\s+)?(apt|apt-get|dpkg)\b')
+            .hasMatch(lowerRaw);
+    var autoConfirmed = false;
+    var tail = '';
+    var shownChars = 0;
+    final rawBuf = StringBuffer();
+    void handleLine(String line, {required bool isError}) {
+      rawBuf.writeln(line);
+      if (tracked && marker.isNotEmpty && line.startsWith(marker)) return;
+      if (line.isEmpty) return;
+      shownChars += line.length;
+      _append(TerminalLine(SandboxService.redactSecrets(line),
+          isError: isError));
+      if (watchConfirm && !autoConfirmed) {
+        tail = '$tail\n$line';
+        if (tail.length > 500) tail = tail.substring(tail.length - 500);
+        if (looksLikeConfirmPrompt(tail)) {
+          autoConfirmed = true;
+          try {
+            _process?.stdin.writeln('y');
+          } catch (_) {}
+        }
+      }
+    }
+
     try {
       _process = await Process.start(
         parts[0],
@@ -380,40 +545,57 @@ class TerminalService extends GetxService {
       final stdoutSub = proc.stdout
           .transform(utf8.decoder)
           .transform(const LineSplitter())
-          .listen((line) => _append(TerminalLine(
-              SandboxService.redactSecrets(line))));
+          .listen((line) => handleLine(line, isError: false));
       final stderrSub = proc.stderr
           .transform(utf8.decoder)
           .transform(const LineSplitter())
-          .listen((line) => _append(TerminalLine(
-              SandboxService.redactSecrets(line),
-              isError: true)));
+          .listen((line) => handleLine(line, isError: true));
+      int exitCode;
       try {
-        if (timeout == null) return await proc.exitCode;
-        return await proc.exitCode.timeout(timeout, onTimeout: () {
-          kill();
-          return -1;
-        });
+        if (timeout == null) {
+          exitCode = await proc.exitCode;
+        } else {
+          exitCode = await proc.exitCode.timeout(timeout, onTimeout: () {
+            kill();
+            return -1;
+          });
+        }
       } finally {
         await stdoutSub.cancel();
         await stderrSub.cancel();
       }
+      if (tracked && marker.isNotEmpty) {
+        final parsed = parseCwdMarker(rawBuf.toString(), marker);
+        await _adoptCwd(parsed.cwd);
+      }
+      return (exitCode: exitCode, shownChars: shownChars);
     } on ProcessException catch (e) {
       _append(TerminalLine('Failed to start: ${e.message}', isError: true));
-      return -1;
+      return (exitCode: -1, shownChars: shownChars);
     } catch (e) {
       _append(TerminalLine('Error: $e', isError: true));
-      return -1;
+      return (exitCode: -1, shownChars: shownChars);
     } finally {
       _process = null;
     }
   }
 
-  /// Kill the running process (if any).
+  /// Kill the running process: SIGTERM first, SIGKILL after 400 ms
+  /// (reference-app destroy → destroyForcibly parity). No-op for
+  /// sandboxed one-shot runs (no live process handle).
   void kill() {
+    final proc = _process;
+    if (proc == null) return;
     try {
-      _process?.kill();
-    } catch (_) {}
+      proc.kill();
+    } catch (_) {
+      return;
+    }
+    Future.delayed(const Duration(milliseconds: 400), () {
+      try {
+        if (_process == proc) proc.kill(ProcessSignal.sigkill);
+      } catch (_) {}
+    });
   }
 
   /// Clear the active session's output.
@@ -423,8 +605,30 @@ class TerminalService extends GetxService {
     _stashActive();
   }
 
+  /// Clear every session transcript (reference-app "Clear terminal
+  /// history" parity): output lines go, command history stays — exactly
+  /// like the reference app, which keeps its 50-command history.
+  /// Never throws.
+  void clearAll() {
+    try {
+      for (final entry in _sessions.entries) {
+        entry.value.lines.clear();
+      }
+      lines.clear();
+      previewUrl.value = null;
+      _stashActive();
+    } catch (_) {}
+  }
+
   void _append(TerminalLine line) {
-    lines.add(line);
+    // Strip ANSI escapes + control chars first (reference-app parity):
+    // colored output must never render as raw glyph soup. The sniff
+    // below then sees clean text.
+    final clean = line.isCommand
+        ? line
+        : TerminalLine(sanitizeAnsi(line.text),
+            isError: line.isError, isCommand: false);
+    lines.add(clean);
     if (lines.length > maxLines) {
       lines.removeRange(0, lines.length - maxLines);
     }
@@ -438,11 +642,11 @@ class TerminalService extends GetxService {
     }
     // Sniff loopback dev-server URLs for the preview chip. Cheap gate
     // first; full regex only on matching lines.
-    if (!line.isCommand &&
+    if (!clean.isCommand &&
         previewUrl.value == null &&
-        (line.text.contains('localhost') ||
-            line.text.contains('127.0.0.1'))) {
-      previewUrl.value = findPreviewUrl(line.text);
+        (clean.text.contains('localhost') ||
+            clean.text.contains('127.0.0.1'))) {
+      previewUrl.value = findPreviewUrl(clean.text);
     }
   }
 

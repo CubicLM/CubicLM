@@ -49,3 +49,22 @@ String? findPreviewUrl(String text) {
     return null;
   }
 }
+
+final _httpServerCmdRe = RegExp(
+  r'python(?:3)?\s+-m\s+http\.server(?:\s+(\d{2,5}))?',
+);
+
+/// Detect `python -m http.server [port]` invocations (reference-app
+/// `detectServerUrl` parity): the preview chip appears the moment the
+/// server starts, without waiting for its output. Pure for unit tests.
+String? findServerUrlFromCommand(String command) {
+  try {
+    final m = _httpServerCmdRe.firstMatch(command);
+    if (m == null) return null;
+    final port = int.tryParse(m.group(1) ?? '') ?? 8000;
+    if (port < 1 || port > 65535) return null;
+    return 'http://127.0.0.1:$port/';
+  } catch (_) {
+    return null;
+  }
+}

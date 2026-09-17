@@ -40,6 +40,10 @@ class SetupChecklist {
   static bool get isAndroid =>
       !kIsWeb && Platform.isAndroid;
 
+  /// Isolated-runtime installs need Android (PRoot + ARM64 rootfs).
+  /// Config-page install buttons honor this instead of failing.
+  static bool get supportsRuntimeInstall => isAndroid;
+
   /// Notifications row needs a working permission surface: Android
   /// runtime permission or the Web Notification API. Windows/macOS/Linux
   /// builds use a notification stub, so the row would be dead UI there.
@@ -112,6 +116,22 @@ class SetupChecklist {
     try {
       final ok = await _powerChannel
           .invokeMethod<bool>('openBatterySettings')
+          .timeout(const Duration(seconds: 5));
+      return ok == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Open Android Developer options (reference-app "Advanced runtime
+  /// reliability" parity): some devices gate child-process execution
+  /// behind a developer toggle that kills large builds. Falls back to
+  /// the main Settings page. Android only. Never throws.
+  static Future<bool> openDeveloperOptions() async {
+    if (!isAndroid) return false;
+    try {
+      final ok = await _powerChannel
+          .invokeMethod<bool>('openDeveloperOptions')
           .timeout(const Duration(seconds: 5));
       return ok == true;
     } catch (_) {

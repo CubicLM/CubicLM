@@ -92,7 +92,7 @@ class ToolchainCatalog {
           bundles: [
             RuntimeBundle(
               fileName: 'cubiclm-node-arm64.tar.gz',
-              version: 'node-24-arm64',
+              version: 'node-24.21.0-arm64',
               title: 'Node.js overlay',
             ),
           ],

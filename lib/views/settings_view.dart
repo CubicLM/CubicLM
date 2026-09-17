@@ -15,6 +15,7 @@ import 'log_view.dart';
 import 'settings/apple_widgets.dart';
 import 'settings/device_card.dart';
 import 'settings/model_params.dart';
+import 'settings/runtime_sections.dart';
 import 'settings/skills_section.dart';
 
 class SettingsView extends GetView<SettingsController> {
@@ -99,8 +100,11 @@ class SettingsView extends GetView<SettingsController> {
               ),
             ]),
             const SizedBox(height: 28),
-            sectionLabel(context, 'settings_section_system_prompt'.tr),
-            appleGroupedCard(context, isDark, children: [
+            buildDeveloperToolsSection(context, isDark),
+            const SizedBox(height: 28),
+            LinuxRuntimeSection(isDark: isDark),
+            const SizedBox(height: 28),
+            sectionLabel(context, 'settings_section_system_prompt'.tr),            appleGroupedCard(context, isDark, children: [
               Padding(
                 padding: const EdgeInsets.all(18),
                 child: Column(

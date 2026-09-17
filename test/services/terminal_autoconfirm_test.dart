@@ -37,4 +37,48 @@ void main() {
       expect(withAutoConfirm(''), '');
     });
   });
+
+  group('compactPromptPath', () {
+    test('maps home to tilde, keeps the rest', () {
+      expect(compactPromptPath('', home: '/h'), '');
+      expect(compactPromptPath('/h', home: '/h'), '~');
+      expect(compactPromptPath('/h/proj', home: '/h'), '~/proj');
+      expect(compactPromptPath('/other/x', home: '/h'), '/other/x');
+    });
+  });
+
+  group('shellQuote', () {
+    test('single-quotes with embedded quote escape', () {
+      expect(shellQuote('a b'), "'a b'");
+      expect(shellQuote("it's"), "'it'\\''s'");
+    });
+  });
+
+  group('CWD marker protocol', () {
+    test('wrap then parse round-trips the directory', () {
+      const marker = '__CLM_CWD_123_';
+      final script = wrapWithCwdTracking('npm test', '/w/proj', marker);
+      expect(script, contains("cd -- '/w/proj'"));
+      expect(script, contains('npm test'));
+      expect(script, contains(marker));
+      final parsed = parseCwdMarker(
+          'ok\n$marker/w/proj\nmore', marker);
+      expect(parsed.cwd, '/w/proj');
+      expect(parsed.clean, 'ok\nmore');
+    });
+
+    test('missing marker yields empty cwd, output kept', () {
+      final parsed = parseCwdMarker('hello', '__CLM_CWD_x_');
+      expect(parsed.cwd, '');
+      expect(parsed.clean, 'hello');
+    });
+  });
+
+  group('looksLikeConfirmPrompt', () {
+    test('spots Y/n prompts case-insensitively', () {
+      expect(looksLikeConfirmPrompt('Do you want to continue? [Y/n]'),
+          isTrue);
+      expect(looksLikeConfirmPrompt('done'), isFalse);
+    });
+  });
 }

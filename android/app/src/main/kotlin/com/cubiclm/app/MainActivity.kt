@@ -427,6 +427,9 @@ class MainActivity : FlutterFragmentActivity() {
                 "openBatterySettings" -> {
                     result.success(openBatterySettingsPage())
                 }
+                "openDeveloperOptions" -> {
+                    result.success(openDeveloperOptionsPage())
+                }
                 else -> result.notImplemented()
             }
         }
@@ -607,6 +610,25 @@ class MainActivity : FlutterFragmentActivity() {
         return false
     }
 
+    /// Open Android Developer options (reference-app reliability parity):
+    /// some devices gate child-process execution behind a developer
+    /// toggle. Falls back to the main Settings page. Never throws.
+    private fun openDeveloperOptionsPage(): Boolean {
+        val intents = listOf(
+            Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+        for (intent in intents) {
+            try {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+                return true
+            } catch (_: Exception) {
+            }
+        }
+        return false
+    }
+
     // ── Isolated Ubuntu runtime (PRoot) ──────────────────────────────
 
     private fun runtimeRoot(): File? {
@@ -628,11 +650,12 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     /// True when the Core toolchain can execute: rootfs bash + ready
-    /// marker + executable proot binary.
+    /// marker + executable proot binary + loader + bundled libs.
     private fun isProotReady(): Boolean {
         val root = runtimeRoot() ?: return false
         if (!File(root, ".ready-core").isFile) return false
         if (!File(root, "ubuntu/usr/bin/bash").isFile) return false
+        if (!File(root, "libexec/proot/loader").isFile) return false
         return prootBinary() != null
     }
 
@@ -666,6 +689,11 @@ class MainActivity : FlutterFragmentActivity() {
         }
         if (!hostDir.isDirectory) hostDir.mkdirs()
         val tmpDir = File(cacheDir, "proot-tmp").apply { mkdirs() }
+        // Device-verified on Redmi (PRoot 5.1.107.92): the loader is found
+        // via PROOT_LOADER (never rely on Termux-prefix fallbacks), and the
+        // bundled libtalloc/libandroid-shmem via LD_LIBRARY_PATH.
+        val libDir = File(root, "lib")
+        val loaderDir = File(root, "libexec/proot")
 
         val argv = listOf(
             proot.absolutePath,
@@ -686,6 +714,9 @@ class MainActivity : FlutterFragmentActivity() {
             "TERM" to "xterm-256color",
             "PROOT_NO_SECCOMP" to "1",
             "PROOT_TMP_DIR" to tmpDir.absolutePath,
+            "PROOT_LOADER" to File(loaderDir, "loader").absolutePath,
+            "PROOT_LOADER_32" to File(loaderDir, "loader32").absolutePath,
+            "LD_LIBRARY_PATH" to libDir.absolutePath,
         )
         return try {
             val proc = ProcessBuilder(argv)

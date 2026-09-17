@@ -27,3 +27,26 @@ String sanitizeUtf16(String s) {
   }
   return buf.toString();
 }
+
+/// ANSI escape sequences: OSC (`ESC]…BEL`), CSI (`ESC[31m`), charset
+/// switches (`ESC(B`), lone single-char escapes. Order matters: the OSC
+/// branch must precede the single-char class or `]` matches alone.
+final _ansiEscapeRe = RegExp(
+    '\x1B(?:\\][^\\x07]*(?:\\x07|\x1B\\\\)|\\[[0-?]*[ -/]*[@-~]|[()][A-Z0-9]|[@-Z\\\\-_])');
+
+/// Strip ANSI escapes and non-printable control chars (keeps `\n`, `\r`,
+/// `\t` — same rule as the reference app). Pure for unit tests.
+String sanitizeAnsi(String s) {
+  final stripped = s.replaceAll(_ansiEscapeRe, '');
+  final buf = StringBuffer();
+  for (var i = 0; i < stripped.length; i++) {
+    final c = stripped[i];
+    if (c == '\n' || c == '\r' || c == '\t') {
+      buf.write(c);
+      continue;
+    }
+    if (stripped.codeUnitAt(i) < 0x20) continue;
+    buf.write(c);
+  }
+  return buf.toString();
+}

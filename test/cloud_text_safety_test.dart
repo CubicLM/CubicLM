@@ -50,4 +50,21 @@ void main() {
       expect(sanitizeUtf16(''), '');
     });
   });
+
+  group('sanitizeAnsi', () {
+    test('strips CSI color codes', () {
+      expect(sanitizeAnsi('\x1B[32mok\x1B[0m'), 'ok');
+      expect(sanitizeAnsi('\x1B[1;31mfail\x1B[0m'), 'fail');
+    });
+
+    test('strips OSC sequences and drops control chars', () {
+      expect(sanitizeAnsi('\x1B]0;title\x07hi'), 'hi');
+      expect(sanitizeAnsi('a\x00b\x07c'), 'abc');
+    });
+
+    test('keeps newlines, tabs and plain text', () {
+      expect(sanitizeAnsi('a\nb\rc\td'), 'a\nb\rc\td');
+      expect(sanitizeAnsi('plain'), 'plain');
+    });
+  });
 }

@@ -2,8 +2,8 @@
 ///
 /// One session per scope (default + per agent project), each with its own
 /// transcript, history, and working directory. Every command passes
-/// through [SandboxService] before spawning. Full PRoot/Ubuntu isolation
-/// is deferred native work (roadmap Phase 6).
+/// through [SandboxService] before spawning (isolated PRoot Ubuntu when
+/// the runtime is installed, screened host shell otherwise).
 library;
 
 import 'package:flutter/material.dart';
@@ -14,6 +14,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/colors.dart';
 import '../../services/agent_workspace.dart';
+import '../../services/sandbox/sandbox_manager.dart';
+import '../../services/security/sandbox_service.dart';
 import '../../services/terminal/terminal_service.dart';
 import '../../theme/design_tokens.dart';
 
@@ -51,7 +53,26 @@ class _TerminalViewState extends State<TerminalView> {
 
   void run() {
     final cmd = input.text.trim();
-    if (cmd.isEmpty || term.isRunning.value) return;
+    if (cmd.isEmpty) return;
+    // Live stdin (reference-app parity): typing while a host process runs
+    // sends to it instead of starting a second command.
+    if (term.isRunning.value) {
+      term.sendInput(cmd);
+      input.clear();
+      _histIndex = -1;
+      return;
+    }
+    // Destructive commands need one explicit tap (reference-app confirm
+    // dialog parity — the service still hard-blocks the catastrophic set).
+    final verdict = SandboxService.classifyCommand(cmd);
+    if (verdict.risk == CommandRisk.high) {
+      _confirmRun(cmd);
+      return;
+    }
+    _launch(cmd);
+  }
+
+  void _launch(String cmd) {
     input.clear();
     _histIndex = -1;
     term.runCommand(cmd).then((_) {
@@ -59,6 +80,76 @@ class _TerminalViewState extends State<TerminalView> {
         scroll.jumpTo(scroll.position.maxScrollExtent);
       } catch (_) {}
     });
+  }
+
+  /// Explicit go-ahead for high-risk commands. Shows the exact command
+  /// (ellipsized) with Run/Cancel — nothing executes on dismiss.
+  void _confirmRun(String cmd) {
+    final preview = cmd.length > 300 ? '${cmd.substring(0, 300)}…' : cmd;
+    Get.dialog(
+      AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Run this command?',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Theme.of(context).hintColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                preview,
+                maxLines: 8,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.firaCode(fontSize: 11.5),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'High-risk commands always ask first. Catastrophic ones stay blocked.',
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11.5,
+                  color: Theme.of(context).hintColor),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () {
+              Get.back();
+              _launch(cmd);
+            },
+            child: const Text('Run'),
+          ),
+        ],
+      ),
+      name: 'terminal-confirm-run',
+    );
+  }
+
+  /// Backend label for the status bar (`Host shell` / `PRoot`).
+  String _backendLabel() {
+    try {
+      if (!Get.isRegistered<SandboxManager>()) return '';
+      final n = Get.find<SandboxManager>().activeBackendName.value;
+      if (n.isEmpty) return '';
+      return ' · $n';
+    } catch (_) {
+      return '';
+    }
   }
 
   /// Insert [text] at the cursor (helper keys below the transcript).
@@ -136,21 +227,60 @@ class _TerminalViewState extends State<TerminalView> {
       body: Column(
         children: [
           _sessionBar(context, term),
-          Obx(() => Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.03)
-                    : Colors.grey.withValues(alpha: 0.08),
-                child: Text(
-                  term.workingDir.value.isEmpty
-                      ? 'sandboxed shell — destructive commands blocked'
-                      : term.workingDir.value,
-                  style: GoogleFonts.firaCode(
-                      fontSize: 10.5,
-                      color: Theme.of(context).hintColor),
-                  overflow: TextOverflow.ellipsis,
+          Obx(() {
+            final cwd = term.workingDir.value;
+            final label = cwd.isEmpty
+                ? 'sandboxed shell — destructive commands blocked'
+                : cwd;
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 6),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.03)
+                  : Colors.grey.withValues(alpha: 0.08),
+              child: Text(
+                '$label${_backendLabel()}',
+                style: GoogleFonts.firaCode(
+                    fontSize: 10.5,
+                    color: Theme.of(context).hintColor),
+                overflow: TextOverflow.ellipsis,
+              ),
+            );
+          }),
+          // Quick commands (reference-app parity): one tap runs.
+          Obx(() => SizedBox(
+                height: 36,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 4),
+                  children: [
+                    for (final cmd in _quickCommands)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(0, 28),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10),
+                            tapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          onPressed: term.isRunning.value
+                              ? null
+                              : () {
+                                  input.text = cmd;
+                                  run();
+                                },
+                          child: Text(
+                            cmd,
+                            style: GoogleFonts.firaCode(fontSize: 11),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               )),
           Expanded(
@@ -160,7 +290,7 @@ class _TerminalViewState extends State<TerminalView> {
                   itemCount: term.lines.length,
                   itemBuilder: (context, i) {
                     final line = term.lines[i];
-                    return SelectableText(
+                    final text = SelectableText(
                       line.text.isEmpty ? ' ' : line.text,
                       style: GoogleFonts.firaCode(
                         fontSize: 12,
@@ -174,6 +304,13 @@ class _TerminalViewState extends State<TerminalView> {
                                 ? AppColors.error
                                 : null,
                       ),
+                    );
+                    // Output lines indent under their command
+                    // (reference-app console parity).
+                    if (line.isCommand) return text;
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: text,
                     );
                   },
                 )),
@@ -246,16 +383,55 @@ class _TerminalViewState extends State<TerminalView> {
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: input,
-                    style: GoogleFonts.firaCode(fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: 'whoami / git status / npm test…',
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      prefixText: '\$ ',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: Theme.of(context).hintColor.withValues(
+                              alpha: 0.35)),
                     ),
-                    onSubmitted: (_) => run(),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Inline cwd-aware prompt (reference-app parity:
+                        // green `user@host`-style head instead of `$ `).
+                        Obx(() {
+                          final cwd = term.workingDir.value;
+                          final short = cwd.isEmpty
+                              ? '~'
+                              : compactPromptPath(cwd);
+                          return Flexible(
+                            child: Text(
+                              '\$ $short ',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.firaCode(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: Dt.accent,
+                              ),
+                            ),
+                          );
+                        }),
+                        Expanded(
+                          child: TextField(
+                            controller: input,
+                            style:
+                                GoogleFonts.firaCode(fontSize: 13),
+                            decoration: const InputDecoration(
+                              hintText: 'command…',
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(
+                                  vertical: 10),
+                            ),
+                            onSubmitted: (_) => run(),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -282,21 +458,40 @@ class _TerminalViewState extends State<TerminalView> {
     );
   }
 
+  /// Quick commands (reference-app parity).
+  static const _quickCommands = [
+    'uname -a',
+    'ls -la',
+    'pwd',
+    'whoami',
+    'node -v',
+    'python3 --version',
+    'df -h',
+    'free -m',
+  ];
+
   /// One-tap keys: ESC/TAB/CTRL-C, history ↑ ↓, cursor ← →, and common
-  /// shell metacharacters.
+  /// shell metacharacters. ESC clears the line and idle ^C clears it too
+  /// (reference-app parity); running ^C kills the process.
   Widget _keyRow() {
     final keys = <({String label, String? insert, VoidCallback? action})>[
-      (label: 'ESC', insert: '\x1B', action: null),
+      (label: 'ESC', insert: null, action: () => input.clear()),
       (label: 'TAB', insert: '\t', action: null),
       (
         label: '^C',
         insert: null,
         action: () {
-          if (term.isRunning.value) term.kill();
+          if (term.isRunning.value) {
+            term.kill();
+          } else {
+            input.clear();
+          }
         }
       ),
       (label: '↑', insert: null, action: () => _walkHistory(true)),
       (label: '↓', insert: null, action: () => _walkHistory(false)),
+      (label: '←', insert: null, action: () => _moveCursor(-1)),
+      (label: '→', insert: null, action: () => _moveCursor(1)),
       (label: '|', insert: '|', action: null),
       (label: '~', insert: '~', action: null),
       (label: '&&', insert: ' && ', action: null),
@@ -312,37 +507,38 @@ class _TerminalViewState extends State<TerminalView> {
         separatorBuilder: (_, __) => const SizedBox(width: 6),
         itemBuilder: (context, i) {
           final k = keys[i];
-          final enabled = k.action != null || k.insert != null;
-          // ^C only does something while a command runs.
-          final active = k.label != '^C' || term.isRunning.value;
-          return Obx(() {
-            final running = term.isRunning.value;
-            final on = k.label == '^C' ? running : enabled && active;
-            return OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(44, 30),
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
-              ),
-              onPressed: !on
-                  ? null
-                  : () {
-                      if (k.insert != null) {
-                        _insert(k.insert!);
-                      } else {
-                        k.action?.call();
-                      }
-                    },
-              child: Text(
-                k.label,
-                style: GoogleFonts.firaCode(fontSize: 12),
-              ),
-            );
-          });
+          return OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(44, 30),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
+            onPressed: () {
+              if (k.insert != null) {
+                _insert(k.insert!);
+              } else {
+                k.action?.call();
+              }
+            },
+            child: Text(
+              k.label,
+              style: GoogleFonts.firaCode(fontSize: 12),
+            ),
+          );
         },
       ),
     );
+  }
+
+  /// Move the text cursor by [delta] code units, clamped to the input.
+  void _moveCursor(int delta) {
+    final value = input.value;
+    final pos = value.selection.start < 0
+        ? value.text.length
+        : value.selection.start;
+    final next = (pos + delta).clamp(0, value.text.length);
+    input.selection = TextSelection.collapsed(offset: next);
   }
 
   /// Session picker: default shell plus one session per agent project.

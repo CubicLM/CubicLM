@@ -50,4 +50,16 @@ void main() {
       expect(findPreviewUrl(''), isNull);
     });
   });
+
+  group('findServerUrlFromCommand', () {
+    test('detects python http.server with and without port', () {
+      expect(findServerUrlFromCommand('python3 -m http.server'),
+          'http://127.0.0.1:8000/');
+      expect(findServerUrlFromCommand('python -m http.server 3000'),
+          'http://127.0.0.1:3000/');
+      expect(findServerUrlFromCommand('ls -la'), isNull);
+      expect(findServerUrlFromCommand('python -m http.server 99999'),
+          isNull);
+    });
+  });
 }
