@@ -31,10 +31,15 @@ class _TerminalViewState extends State<TerminalView> {
   late final TerminalService term;
   final input = TextEditingController();
   final scroll = ScrollController();
+  late final Worker _scrollWorker;
 
   /// -1 = fresh line; otherwise an index into [TerminalService.history]
   /// (0 = newest). The ↑ ↓ helper keys walk it.
   int _histIndex = -1;
+
+  /// CTRL modifier armed (reference-app parity): the next `c` typed or
+  /// tapped interrupts a running process, or clears the line when idle.
+  bool _ctrlActive = false;
 
   @override
   void initState() {
@@ -42,14 +47,81 @@ class _TerminalViewState extends State<TerminalView> {
     term = Get.isRegistered<TerminalService>()
         ? Get.find<TerminalService>()
         : Get.put(TerminalService());
+    // Auto-scroll on every new line (reference-app parity) — posted
+    // post-frame so layout has settled.
+    _scrollWorker = ever<List<TerminalLine>>(term.lines, (_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        try {
+          if (scroll.hasClients) {
+            scroll.jumpTo(scroll.position.maxScrollExtent);
+          }
+        } catch (_) {}
+      });
+    });
   }
 
   @override
   void dispose() {
+    _scrollWorker.dispose();
     input.dispose();
     scroll.dispose();
     super.dispose();
   }
+
+  /// Shared CTRL+C handling (key button, CTRL-armed `c` keypress):
+  /// interrupt the foreground process, or clear the line when idle.
+  void _ctrlC() {
+    _ctrlActive = false;
+    if (term.isRunning.value) {
+      term.interrupt();
+    } else {
+      input.clear();
+    }
+  }
+
+  /// Feed a typed key through the CTRL modifier (reference-app parity):
+  /// with CTRL armed, `c`/`C` interrupts (running) or clears (idle) and
+  /// disarms; any other key just disarms.
+  void _onInputChanged(String next) {
+    final prev = _lastInputText;
+    _lastInputText = next;
+    if (!_ctrlActive) return;
+    // Diff for the inserted segment (handles mid-line typing/paste).
+    var i = 0;
+    while (i < prev.length &&
+        i < next.length &&
+        prev.codeUnitAt(i) == next.codeUnitAt(i)) {
+      i++;
+    }
+    var j = 0;
+    while (j < prev.length - i &&
+        j < next.length - i &&
+        prev.codeUnitAt(prev.length - 1 - j) ==
+            next.codeUnitAt(next.length - 1 - j)) {
+      j++;
+    }
+    final inserted = next.substring(i, next.length - j);
+    if (inserted.contains(RegExp(r'[cC]'))) {
+      _ctrlActive = false;
+      // Drop the trigger character, keep the rest.
+      final kept =
+          '${next.substring(0, i)}${inserted.replaceAll(RegExp(r'[cC]'), '')}${next.substring(next.length - j)}';
+      input.value = TextEditingValue(
+        text: kept,
+        selection: TextSelection.collapsed(
+            offset: (i + inserted.replaceAll(RegExp(r'[cC]'), '').length)
+                .clamp(0, kept.length)),
+      );
+      _lastInputText = kept;
+      _ctrlC();
+    } else {
+      _ctrlActive = false;
+    }
+    setState(() {});
+  }
+
+  String _lastInputText = '';
 
   void run() {
     final cmd = input.text.trim();
@@ -284,7 +356,39 @@ class _TerminalViewState extends State<TerminalView> {
                 ),
               )),
           Expanded(
-            child: Obx(() => ListView.builder(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                // Terminal console (reference-app parity): bordered
+                // rounded surface, near-black in dark mode.
+                color: isDark
+                    ? const Color(0xFF090D14)
+                    : Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : Colors.grey.withValues(alpha: 0.3),
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Obx(() {
+                if (term.lines.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Text(
+                      'CubicLM Terminal ready.\nType a shell command below or tap a quick command above.',
+                      style: GoogleFonts.firaCode(
+                        fontSize: 12,
+                        height: 1.5,
+                        color: isDark
+                            ? const Color(0xFF6E7681)
+                            : Theme.of(context).hintColor,
+                      ),
+                    ),
+                  );
+                }
+                return ListView.builder(
                   controller: scroll,
                   padding: const EdgeInsets.all(12),
                   itemCount: term.lines.length,
@@ -302,7 +406,9 @@ class _TerminalViewState extends State<TerminalView> {
                             ? Dt.accent
                             : line.isError
                                 ? AppColors.error
-                                : null,
+                                : isDark
+                                    ? const Color(0xFFC9D1D9)
+                                    : null,
                       ),
                     );
                     // Output lines indent under their command
@@ -313,7 +419,9 @@ class _TerminalViewState extends State<TerminalView> {
                       child: text,
                     );
                   },
-                )),
+                );
+              }),
+            ),
           ),
           // Dev-server preview chip (Mobile-Harness parity): a loopback
           // URL in the output becomes an openable chip.
@@ -427,6 +535,7 @@ class _TerminalViewState extends State<TerminalView> {
                               contentPadding: EdgeInsets.symmetric(
                                   vertical: 10),
                             ),
+                            onChanged: _onInputChanged,
                             onSubmitted: (_) => run(),
                           ),
                         ),
@@ -472,31 +581,41 @@ class _TerminalViewState extends State<TerminalView> {
 
   /// One-tap keys: ESC/TAB/CTRL-C, history ↑ ↓, cursor ← →, and common
   /// shell metacharacters. ESC clears the line and idle ^C clears it too
-  /// (reference-app parity); running ^C kills the process.
+  /// (reference-app parity); running ^C interrupts the process. CTRL arms
+  /// the modifier so the next typed `c` behaves like ^C.
   Widget _keyRow() {
-    final keys = <({String label, String? insert, VoidCallback? action})>[
-      (label: 'ESC', insert: null, action: () => input.clear()),
-      (label: 'TAB', insert: '\t', action: null),
+    final keys = <({
+      String label,
+      String? insert,
+      VoidCallback? action,
+      bool highlight
+    })>[
+      (label: 'ESC', insert: null, action: () => input.clear(), highlight: false),
+      (label: 'TAB', insert: '\t', action: null, highlight: false),
       (
         label: '^C',
         insert: null,
-        action: () {
-          if (term.isRunning.value) {
-            term.kill();
-          } else {
-            input.clear();
-          }
-        }
+        action: _ctrlC,
+        highlight: false,
       ),
-      (label: '↑', insert: null, action: () => _walkHistory(true)),
-      (label: '↓', insert: null, action: () => _walkHistory(false)),
-      (label: '←', insert: null, action: () => _moveCursor(-1)),
-      (label: '→', insert: null, action: () => _moveCursor(1)),
-      (label: '|', insert: '|', action: null),
-      (label: '~', insert: '~', action: null),
-      (label: '&&', insert: ' && ', action: null),
-      (label: '/', insert: '/', action: null),
-      (label: '-', insert: '-', action: null),
+      (
+        label: 'CTRL',
+        insert: null,
+        action: () {
+          _ctrlActive = !_ctrlActive;
+          setState(() {});
+        },
+        highlight: _ctrlActive,
+      ),
+      (label: '↑', insert: null, action: () => _walkHistory(true), highlight: false),
+      (label: '↓', insert: null, action: () => _walkHistory(false), highlight: false),
+      (label: '←', insert: null, action: () => _moveCursor(-1), highlight: false),
+      (label: '→', insert: null, action: () => _moveCursor(1), highlight: false),
+      (label: '|', insert: '|', action: null, highlight: false),
+      (label: '~', insert: '~', action: null, highlight: false),
+      (label: '&&', insert: ' && ', action: null, highlight: false),
+      (label: '/', insert: '/', action: null, highlight: false),
+      (label: '-', insert: '-', action: null, highlight: false),
     ];
     return SizedBox(
       height: 34,
@@ -513,6 +632,12 @@ class _TerminalViewState extends State<TerminalView> {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
+              backgroundColor: k.highlight
+                  ? Dt.accent.withValues(alpha: 0.18)
+                  : null,
+              side: k.highlight
+                  ? const BorderSide(color: Dt.accent)
+                  : null,
             ),
             onPressed: () {
               if (k.insert != null) {
@@ -522,8 +647,11 @@ class _TerminalViewState extends State<TerminalView> {
               }
             },
             child: Text(
-              k.label,
-              style: GoogleFonts.firaCode(fontSize: 12),
+              k.highlight ? '${k.label} ✓' : k.label,
+              style: GoogleFonts.firaCode(
+                fontSize: 12,
+                color: k.highlight ? Dt.accent : null,
+              ),
             ),
           );
         },

@@ -59,5 +59,62 @@ void main() {
         expect(RuntimeInstaller.extractSubdirFor(id), 'ubuntu');
       }
     });
+
+    test('splitTarMember separates symlink targets', () {
+      expect(ToolchainCatalog.splitTarMember('ubuntu/a/b').path,
+          'ubuntu/a/b');
+      expect(ToolchainCatalog.splitTarMember('ubuntu/a/b').target, isNull);
+      final link = ToolchainCatalog.splitTarMember(
+          'ubuntu/a/b -> ../../c/d');
+      expect(link.path, 'ubuntu/a/b');
+      expect(link.target, '../../c/d');
+    });
+
+    test('resolveInside pops in-root dotdots, rejects escapes', () {
+      expect(ToolchainCatalog.resolveInside('/r', 'a/b'), '/r/a/b');
+      expect(ToolchainCatalog.resolveInside('/r', 'a/./b'), '/r/a/b');
+      expect(ToolchainCatalog.resolveInside('/r', 'a/x/../b'), '/r/a/b');
+      expect(ToolchainCatalog.resolveInside('/r', '../evil'), isNull);
+      expect(ToolchainCatalog.resolveInside('/r', 'a/../../evil'), isNull);
+      // Leading slashes map inside (same as safeJoin; absolute symlink
+      // targets resolve against the guest root at runtime).
+      expect(ToolchainCatalog.resolveInside('/r', '/absolute'),
+          '/r/absolute');
+      expect(ToolchainCatalog.resolveInside('/r', 'C:/win'), isNull);
+      expect(ToolchainCatalog.resolveInside('/r', ''), isNull);
+    });
+
+    test('unsafeMemberReason allows the real Ubuntu fstab link', () {
+      // Exact device failure (Redmi, core install): legit in-root link.
+      expect(
+          ToolchainCatalog.unsafeMemberReason('/r',
+              'ubuntu/usr/share/doc/mount/examples/fstab -> ../../util-linux/examples/fstab'),
+          isNull);
+      // Distro absolute links resolve inside the guest.
+      expect(
+          ToolchainCatalog.unsafeMemberReason(
+              '/r', 'ubuntu/etc/alternatives/awk -> /usr/bin/mawk'),
+          isNull);
+      expect(
+          ToolchainCatalog.unsafeMemberReason(
+              '/r', 'ubuntu/etc/os-release -> ../usr/lib/os-release'),
+          isNull);
+      // True escapes still blocked.
+      expect(
+          ToolchainCatalog.unsafeMemberReason('/r', '../evil'),
+          isNotNull);
+      expect(
+          ToolchainCatalog.unsafeMemberReason(
+              '/r', 'ubuntu/x -> ../../../etc/passwd'),
+          isNotNull);
+      expect(
+          ToolchainCatalog.unsafeMemberReason('/r', 'ubuntu/../../evil'),
+          isNotNull);
+      // …but in-root dotdots are fine (lexical containment is enough).
+      expect(
+          ToolchainCatalog.unsafeMemberReason(
+              '/r', 'ubuntu/a/../../evil'),
+          isNull);
+    });
   });
 }

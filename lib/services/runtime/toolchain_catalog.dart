@@ -168,6 +168,8 @@ class ToolchainCatalog {
 
   /// Join [entry] (tar member) under [root]. Returns null when the member
   /// would escape the root (absolute path, `..`, drive letter). Pure.
+  /// Strict variant (rejects ANY `..`): kept for jail checks. Tar
+  /// validation uses [unsafeMemberReason], which understands symlinks.
   static String? safeJoin(String root, String entry) {
     var p = entry.replaceAll('\\', '/');
     while (p.startsWith('/')) {
@@ -199,5 +201,74 @@ class ToolchainCatalog {
       u++;
     }
     return '${v.toStringAsFixed(v >= 100 ? 0 : 1)} ${units[u]}';
+  }
+
+  /// Split a `tar -t` member line into path + link target. Toybox and GNU
+  /// list symlinks as `<path> -> <target>` — the old guard fed the whole
+  /// line to [safeJoin] and blocked legit distro links (e.g. Ubuntu's
+  /// `doc/mount/examples/fstab -> ../../util-linux/…`). Pure.
+  static ({String path, String? target}) splitTarMember(String raw) {
+    final i = raw.indexOf(' -> ');
+    if (i < 0) return (path: raw.trim(), target: null);
+    return (
+      path: raw.substring(0, i).trim(),
+      target: raw.substring(i + 4).trim(),
+    );
+  }
+
+  /// Lexically resolve [path] under [root], popping `..` segments.
+  /// Returns null on escape (leading/`..`-past-root), absolute paths and
+  /// drive letters. No I/O — dangling links are fine. Pure.
+  static String? resolveInside(String root, String path) {
+    var p = path.replaceAll('\\', '/');
+    while (p.startsWith('/')) {
+      p = p.substring(1);
+    }
+    if (p.isEmpty) return null;
+    if (RegExp(r'^[A-Za-z]:').hasMatch(p)) return null;
+    final parts = <String>[];
+    for (final seg in p.split('/')) {
+      final s = seg.trim();
+      if (s.isEmpty || s == '.') continue;
+      if (s == '..') {
+        if (parts.isEmpty) return null;
+        parts.removeLast();
+        continue;
+      }
+      parts.add(s);
+    }
+    if (parts.isEmpty) return null;
+    final sep = root.endsWith('/') || root.endsWith('\\') ? '' : '/';
+    return '$root$sep${parts.join('/')}';
+  }
+
+  /// Validate one `tar -t` member line. Returns null when safe, else a
+  /// human reason. Entry paths must stay in root (lexical `..` allowed
+  /// while it resolves inside). Symlink targets: relative ones resolve
+  /// against the link's directory; absolute ones (`/usr/bin/…`, normal
+  /// in distro rootfs) resolve against the guest root, since proot maps
+  /// them inside at runtime. Hash-pinned bundles are the real trust
+  /// anchor; this stops corrupt archives from writing outside. Pure.
+  static String? unsafeMemberReason(String root, String rawMember) {
+    final split = splitTarMember(rawMember);
+    if (resolveInside(root, split.path) == null) {
+      return 'escapes the runtime: ${split.path}';
+    }
+    final target = split.target;
+    if (target != null && target.isNotEmpty) {
+      String rel;
+      if (target.startsWith('/')) {
+        rel = target;
+      } else {
+        final dir = split.path.contains('/')
+            ? split.path.substring(0, split.path.lastIndexOf('/'))
+            : '';
+        rel = dir.isEmpty ? target : '$dir/$target';
+      }
+      if (resolveInside(root, rel) == null) {
+        return 'link escapes the runtime: ${split.path} -> $target';
+      }
+    }
+    return null;
   }
 }

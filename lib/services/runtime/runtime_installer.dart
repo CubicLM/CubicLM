@@ -8,7 +8,8 @@
 /// - Download: HTTP Range resume into `.part` files with progress.
 /// - Verify: SHA-256 from the catalog or a `<file>.sha256` sidecar.
 /// - Extract: system `tar -tzf` listing validated with
-///   [ToolchainCatalog.safeJoin] (traversal guard), then `tar -xzf`.
+///   [ToolchainCatalog.unsafeMemberReason] (traversal guard that
+///   understands symlinks), then `tar -xzf`.
 /// - State: per-stack observables + Hive persistence + marker files.
 /// - Keep-alive: `com.cubiclm.app/runtime` channel holds a foreground
 ///   service + wakelock during long installs (Android; no-op elsewhere).
@@ -586,10 +587,12 @@ class RuntimeInstaller extends GetxService {
     } catch (e) {
       return 'Archive listing failed: $e';
     }
-    // 2. Traversal guard (pure, no I/O).
+    // 2. Traversal guard (pure, no I/O). Understands `a -> b` symlink
+    // lines and in-root `..` (distro links like fstab); rejects escapes.
     for (final m in members) {
-      if (ToolchainCatalog.safeJoin(dest.path, m) == null) {
-        return 'Blocked unsafe bundle entry: $m';
+      final reason = ToolchainCatalog.unsafeMemberReason(dest.path, m);
+      if (reason != null) {
+        return 'Blocked unsafe bundle entry: $reason';
       }
     }
     if (members.isEmpty) return 'Bundle is empty.';

@@ -193,6 +193,10 @@ class TerminalService extends GetxService {
   final Map<String, _SessionState> _sessions = {};
   Process? _process;
 
+  /// Set by [kill]; a sandboxed one-shot run has no live handle to
+  /// destroy, so the flag discards its late result instead.
+  bool _stopRequested = false;
+
   Future<TerminalService> init() async {
     _loadSession(defaultSessionId);
     return this;
@@ -357,6 +361,7 @@ class TerminalService extends GetxService {
     _append(TerminalLine('\$ $cmd', isCommand: true));
     _pushHistory(cmd);
     isRunning.value = true;
+    _stopRequested = false;
     try {
       int exitCode;
       var shownChars = 0;
@@ -368,6 +373,13 @@ class TerminalService extends GetxService {
           workDir: workingDir.value.isEmpty ? null : workingDir.value,
           timeout: timeout ?? const Duration(seconds: 60),
         );
+        if (_stopRequested) {
+          _stopRequested = false;
+          _append(const TerminalLine('(stopped)', isError: true));
+          lastExitCode.value = -1;
+          AppLogService.trailAction('terminal run stopped by user');
+          return -1;
+        }
         final parsed = tracked
             ? parseCwdMarker(result.stdout, marker)
             : (clean: result.stdout, cwd: '');
@@ -580,10 +592,28 @@ class TerminalService extends GetxService {
     }
   }
 
+  /// Interrupt the foreground process (SIGINT — reference-app parity):
+  /// REPLs and prompts exit, the shell itself usually survives. Unlike
+  /// [kill], never escalates. Falls back to terminate where SIGINT is
+  /// unsupported. No-op without a live direct process.
+  void interrupt() {
+    final proc = _process;
+    if (proc == null) return;
+    try {
+      proc.kill(ProcessSignal.sigint);
+    } catch (_) {
+      try {
+        proc.kill();
+      } catch (_) {}
+    }
+  }
+
   /// Kill the running process: SIGTERM first, SIGKILL after 400 ms
-  /// (reference-app destroy → destroyForcibly parity). No-op for
-  /// sandboxed one-shot runs (no live process handle).
+  /// (reference-app destroy → destroyForcibly parity). For sandboxed
+  /// one-shot runs (no live handle) arms [_stopRequested] so the late
+  /// result is discarded with a `(stopped)` note instead.
   void kill() {
+    _stopRequested = true;
     final proc = _process;
     if (proc == null) return;
     try {
@@ -598,8 +628,10 @@ class TerminalService extends GetxService {
     });
   }
 
-  /// Clear the active session's output.
+  /// Clear the active session's output. Refused while a command runs
+  /// (reference-app parity).
   void clear() {
+    if (isRunning.value) return;
     lines.clear();
     previewUrl.value = null;
     _stashActive();
@@ -608,8 +640,9 @@ class TerminalService extends GetxService {
   /// Clear every session transcript (reference-app "Clear terminal
   /// history" parity): output lines go, command history stays — exactly
   /// like the reference app, which keeps its 50-command history.
-  /// Never throws.
+  /// Refused while a command runs. Never throws.
   void clearAll() {
+    if (isRunning.value) return;
     try {
       for (final entry in _sessions.entries) {
         entry.value.lines.clear();

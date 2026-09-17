@@ -55,3 +55,17 @@ Upstream proot needs Android/bionic patches (seccomp, shmem) to run on
 phones — the Termux build carries exactly those, device-verified here
 (`HELLO_FROM_PROOT` + Node inside Ubuntu 20.04 on Redmi K20 Pro,
 Android 11). A from-source NDK build is future work, not a blocker.
+
+## v2 repack rules (device-enforced by Android toybox tar)
+
+The first published tarballs failed on-device for two toybox reasons —
+fixed in `build_bundles2.py`, verified by re-extract + `guardcheck.py`
+(9135 members, 0 blocked) before re-upload:
+
+1. **Absolute symlinks are refused as escapes.** Ubuntu ships ~20
+   (`/usr/bin/mawk`, `/lib/systemd/…`, `/run`, …). Rewritten to
+   equivalent relative links at build time (guest semantics identical).
+2. **Hardlinks cannot be created at all** (both orders fail). The 4
+   affected files (bzip2/bunzip2, perl, gunzip) are materialized as
+   regular files (~1 MB cost). Symlinks are untouched.
+3. Device nodes/sockets/fifos would be skipped (none present).
