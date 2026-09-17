@@ -17,15 +17,15 @@ Computational Universe for Building Intelligent Learning Machines
 
 <br/>
 
-[![Release](https://img.shields.io/github/v/release/abir2afridi/CubicLM?label=Latest%20Release&style=for-the-badge&color=FF4D00&labelColor=0d1117&logo=github)](https://github.com/abir2afridi/CubicLM/releases/tag/v1.12.0)
+[![Release](https://img.shields.io/github/v/release/abir2afridi/CubicLM?label=Latest%20Release&style=for-the-badge&color=FF4D00&labelColor=0d1117&logo=github)](https://github.com/abir2afridi/CubicLM/releases/tag/v1.16.0)
 [![Downloads](https://img.shields.io/github/downloads/abir2afridi/CubicLM/total?style=for-the-badge&color=22c55e&labelColor=0d1117&logo=github)](https://github.com/abir2afridi/CubicLM/releases)
 [![Stars](https://img.shields.io/github/stars/abir2afridi/CubicLM?style=for-the-badge&color=facc15&labelColor=0d1117&logo=github)](https://github.com/abir2afridi/CubicLM/stargazers)
 [![Forks](https://img.shields.io/github/forks/abir2afridi/CubicLM?style=for-the-badge&color=3b82f6&labelColor=0d1117&logo=github)](https://github.com/abir2afridi/CubicLM/network/members)
 
 <br/>
 
-[![Platform-Android](https://img.shields.io/badge/Android-Full%20Support-3DDC84?style=for-the-badge&logo=android&logoColor=white&labelColor=0d1117)](https://github.com/abir2afridi/CubicLM/releases/tag/v1.12.0)
-[![Platform-Windows](https://img.shields.io/badge/Windows-Cloud%20Mode-0078D4?style=for-the-badge&logo=windows&logoColor=white&labelColor=0d1117)](https://github.com/abir2afridi/CubicLM/releases/tag/v1.12.0)
+[![Platform-Android](https://img.shields.io/badge/Android-Full%20Support-3DDC84?style=for-the-badge&logo=android&logoColor=white&labelColor=0d1117)](https://github.com/abir2afridi/CubicLM/releases/tag/v1.16.0)
+[![Platform-Windows](https://img.shields.io/badge/Windows-Cloud%20Mode-0078D4?style=for-the-badge&logo=windows&logoColor=white&labelColor=0d1117)](https://github.com/abir2afridi/CubicLM/releases/tag/v1.16.0)
 [![Platform-Web](https://img.shields.io/badge/Web-Planned-6b7280?style=for-the-badge&logo=googlechrome&logoColor=white&labelColor=0d1117)](#-universal-multi-platform)
 [![Website](https://img.shields.io/badge/Website-Live-FF4D00?style=for-the-badge&logo=vercel&logoColor=white&labelColor=0d1117)](https://cubiclm.vercel.app)
 
@@ -79,7 +79,7 @@ Computational Universe for Building Intelligent Learning Machines
 
 <br/>
 
-[**📥 Download**](#-download--v1120) &nbsp;·&nbsp; [**✨ Features**](#-features) &nbsp;·&nbsp; [**🤖 Models**](#-supported-models) &nbsp;·&nbsp; [**🛠️ Stack**](#-tech-stack) &nbsp;·&nbsp; [**📂 Structure**](#-project-structure) &nbsp;·&nbsp; [**🚀 Setup**](#-getting-started) &nbsp;·&nbsp; [**⚙️ Config**](#️-configuration) &nbsp;·&nbsp; [**❓ FAQ**](#-frequently-asked-questions) &nbsp;·&nbsp; [**🤝 Contribute**](#-contributing)
+[**📥 Download**](#-download--v1160) &nbsp;·&nbsp; [**✨ Features**](#-features) &nbsp;·&nbsp; [**🤖 Models**](#-supported-models) &nbsp;·&nbsp; [**🛠️ Stack**](#-tech-stack) &nbsp;·&nbsp; [**📂 Structure**](#-project-structure) &nbsp;·&nbsp; [**🚀 Setup**](#-getting-started) &nbsp;·&nbsp; [**⚙️ Config**](#️-configuration) &nbsp;·&nbsp; [**❓ FAQ**](#-frequently-asked-questions) &nbsp;·&nbsp; [**🤝 Contribute**](#-contributing)
 
 </div>
 
@@ -132,7 +132,7 @@ Computational Universe for Building Intelligent Learning Machines
 <div align="center">
 
 ## <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/download/installing-updates.gif" width="80" /> 
-## Download — `v1.12.0`
+## Download — `v1.16.0`
 
 > 🎉 **Latest release** · Build date: current · [View full changelog →](CHANGELOG.md)
 
@@ -152,37 +152,37 @@ Computational Universe for Building Intelligent Learning Machines
 <tr>
 <td align="center"><img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/android/android.png" width="120" /></td>
 <td><b>Android</b><br/><sub>arm64-v8a · modern phones</sub></td>
-<td><code>cubiclm-v1.12.0-arm64-v8a.apk</code></td>
-<td align="right"><b>62 MB</b></td>
-<td align="center"><a href="https://github.com/abir2afridi/CubicLM/releases/download/v1.12.0/cubiclm-v1.12.0-arm64-v8a.apk"><img src="https://img.shields.io/badge/⬇_GET-FF4D00?style=for-the-badge&logo=android&logoColor=white" alt="Download"/></a></td>
+<td><code>cubiclm-v1.16.0-arm64-v8a.apk</code></td>
+<td align="right"><b>67 MB</b></td>
+<td align="center"><a href="https://github.com/abir2afridi/CubicLM/releases/download/v1.16.0/cubiclm-v1.16.0-arm64-v8a.apk"><img src="https://img.shields.io/badge/⬇_GET-FF4D00?style=for-the-badge&logo=android&logoColor=white" alt="Download"/></a></td>
 </tr>
 <tr>
 <td align="center"><img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/android/android.png" width="120" /></td>
 <td><b>Android</b><br/><sub>armeabi-v7a · older devices</sub></td>
-<td><code>cubiclm-v1.12.0-armeabi-v7a.apk</code></td>
-<td align="right"><b>16 MB</b></td>
-<td align="center"><a href="https://github.com/abir2afridi/CubicLM/releases/download/v1.12.0/cubiclm-v1.12.0-armeabi-v7a.apk"><img src="https://img.shields.io/badge/⬇_GET-FF4D00?style=for-the-badge&logo=android&logoColor=white" alt="Download"/></a></td>
+<td><code>cubiclm-v1.16.0-armeabi-v7a.apk</code></td>
+<td align="right"><b>21 MB</b></td>
+<td align="center"><a href="https://github.com/abir2afridi/CubicLM/releases/download/v1.16.0/cubiclm-v1.16.0-armeabi-v7a.apk"><img src="https://img.shields.io/badge/⬇_GET-FF4D00?style=for-the-badge&logo=android&logoColor=white" alt="Download"/></a></td>
 </tr>
 <tr>
 <td align="center"><img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/android/android.png" width="120" /></td>
 <td><b>Android</b><br/><sub>x86_64 · emulators, tablets</sub></td>
-<td><code>cubiclm-v1.12.0-x86_64.apk</code></td>
-<td align="right"><b>28 MB</b></td>
-<td align="center"><a href="https://github.com/abir2afridi/CubicLM/releases/download/v1.12.0/cubiclm-v1.12.0-x86_64.apk"><img src="https://img.shields.io/badge/⬇_GET-FF4D00?style=for-the-badge&logo=android&logoColor=white" alt="Download"/></a></td>
+<td><code>cubiclm-v1.16.0-x86_64.apk</code></td>
+<td align="right"><b>32 MB</b></td>
+<td align="center"><a href="https://github.com/abir2afridi/CubicLM/releases/download/v1.16.0/cubiclm-v1.16.0-x86_64.apk"><img src="https://img.shields.io/badge/⬇_GET-FF4D00?style=for-the-badge&logo=android&logoColor=white" alt="Download"/></a></td>
 </tr>
 <tr>
 <td align="center"><img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/windows/windows%20(2).png" width="120" /></td>
 <td><b>Windows</b><br/><sub>x64 · requires WebView2</sub></td>
-<td><code>cubiclm-v1.12.0-windows-x64.zip</code><br/><sub>unzip & run <code>cubiclm.exe</code></sub></td>
+<td><code>cubiclm-v1.15.1-windows-x64.zip</code><br/><sub>unzip & run <code>cubiclm.exe</code></sub></td>
 <td align="right"><b>17 MB</b></td>
-<td align="center"><a href="https://github.com/abir2afridi/CubicLM/releases/download/v1.12.0/cubiclm-v1.12.0-windows-x64.zip"><img src="https://img.shields.io/badge/⬇_GET-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download"/></a></td>
+<td align="center"><a href="https://github.com/abir2afridi/CubicLM/releases/download/v1.15.1/cubiclm-v1.15.1-windows-x64.zip"><img src="https://img.shields.io/badge/⬇_GET-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download"/></a></td>
 </tr>
 <tr>
 <td align="center"><img src="https://github.com/abir2afridi/abir2afridi/blob/main/lock.png" width="120" /></td>
 <td><b>Checksums</b><br/><sub>SHA-256 verification</sub></td>
 <td><code>checksums.sha256</code></td>
 <td align="right">—</td>
-<td align="center"><a href="https://github.com/abir2afridi/CubicLM/releases/download/v1.12.0/checksums.sha256"><img src="https://img.shields.io/badge/⬇_VERIFY-6b7280?style=for-the-badge&logo=shield&logoColor=white" alt="Verify"/></a></td>
+<td align="center"><a href="https://github.com/abir2afridi/CubicLM/releases/download/v1.16.0/checksums.sha256"><img src="https://img.shields.io/badge/⬇_VERIFY-6b7280?style=for-the-badge&logo=shield&logoColor=white" alt="Verify"/></a></td>
 </tr>
 </tbody>
 </table>
@@ -199,7 +199,7 @@ Computational Universe for Building Intelligent Learning Machines
 
 > [!NOTE]
 > **🌐 Website:** [cubiclm.vercel.app](https://cubiclm.vercel.app) — landing page + direct APK / Windows downloads
-> **📝 Full release notes:** [CHANGELOG.md](CHANGELOG.md) · [GitHub Release page](https://github.com/abir2afridi/CubicLM/releases/tag/v1.12.0)
+> **📝 Full release notes:** [CHANGELOG.md](CHANGELOG.md) · [GitHub Release page](https://github.com/abir2afridi/CubicLM/releases/tag/v1.16.0)
 > **ℹ️ Platform status:** Web (`dart:ffi`-blocked) is tracked for a future release — **Android + Windows** are the supported targets for `v1.12.0`.
 
 ---
@@ -229,7 +229,7 @@ Computational Universe for Building Intelligent Learning Machines
 <!-- ─── Quick Jump Bar ─── -->
 
 <a href="#-what-is-cubiclm"><img src="https://img.shields.io/badge/🎯_Intro-FF4D00?style=flat-square&labelColor=0d1117" alt="Intro"/></a>
-<a href="#-download--v1120"><img src="https://img.shields.io/badge/📥_Download-FF4D00?style=flat-square&labelColor=0d1117" alt="Download"/></a>
+<a href="#-download--v1160"><img src="https://img.shields.io/badge/📥_Download-FF4D00?style=flat-square&labelColor=0d1117" alt="Download"/></a>
 <a href="#-features"><img src="https://img.shields.io/badge/✨_Features-8b5cf6?style=flat-square&labelColor=0d1117" alt="Features"/></a>
 <a href="#-supported-models"><img src="https://img.shields.io/badge/🤖_Models-22c55e?style=flat-square&labelColor=0d1117" alt="Models"/></a>
 <a href="#-getting-started"><img src="https://img.shields.io/badge/🚀_Setup-3b82f6?style=flat-square&labelColor=0d1117" alt="Setup"/></a>
@@ -260,7 +260,7 @@ Computational Universe for Building Intelligent Learning Machines
 *Get to know CubicLM*
 
 🎯 [What is CubicLM?](#-what-is-cubiclm)
-📥 [Download — v1.12.0](#-download--v1120)
+📥 [Download — v1.12.0](#-download--v1160)
 
 ---
 
@@ -407,7 +407,7 @@ Computational Universe for Building Intelligent Learning Machines
 
 <br/>
 
-<a href="#-download--v1120"><img src="https://img.shields.io/badge/📥_Download-FF4D00?style=for-the-badge" alt="Download"/></a>
+<a href="#-download--v1160"><img src="https://img.shields.io/badge/📥_Download-FF4D00?style=for-the-badge" alt="Download"/></a>
 <a href="#-getting-started"><img src="https://img.shields.io/badge/🚀_Setup-FF4D00?style=for-the-badge" alt="Setup"/></a>
 
 <sub>1️⃣ Download → 2️⃣ Install → 3️⃣ Chat</sub>
