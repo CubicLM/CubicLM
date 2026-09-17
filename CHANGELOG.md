@@ -5,6 +5,34 @@ All notable changes to CubicLM are documented here. This is the **single source 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0+25] - 2026-09-17
+
+### Added
+- **Agentic execution engine (Toolkit → Agent Workspace)** — prompt → plan → tools → observe loop (cloud multi-provider + on-device), 14 built-in tools (files, shell, git, web, todo) with risk-aware approval gate (Deny / Always / Once), MCP merge, live execution trace, per-file undo/accept, checkpoint rollback.
+- **Checkpoint / diff / undo system** — SHA-256 snapshots, pure-Dart LCS diff engine with viewer, disk-backed undo/accept per file, live file-watcher panel.
+- **Sandboxed terminal rewrite** — per-project sessions (persisted transcript/history/CWD), quick-command chips, inline cwd-aware `$ ~/…` prompt, helper keys (ESC/TAB/CTRL-C/history/cursor/shell chars), destructive-confirm dialog, ANSI sanitization, 200KB live cap, transcript export, dev-server preview chip (output + `python -m http.server` sniffing), stdin-to-running-process, CWD marker protocol, apt non-interactive + live `[Y/n]` auto-confirm, SIGINT→SIGTERM→SIGKILL escalation.
+- **On-device Ubuntu runtime + toolchains (Toolkit → Runtime & Toolchains)** — 3-step setup wizard + manager: Core Ubuntu 20.04 ARM64 rootfs + PRoot isolation (auto-switch from host shell), opt-in Node/Python/Android/C++/PHP stacks, Range-resume downloads, SHA-256 verify (embedded + sidecar + stale-cache auto-redownload), traversal-guarded extract, foreground-service keep-alive with progress. Runtime bundles ship separately (`runtime-2026.09` release: Core + Node, device-verified).
+- **Setup recommendations (Mobile-Harness parity, skippable)** — onboarding page 4 + Settings → Recommended setup: task notifications, battery reliability (native keep-alive settings), agent runtime, cloud key, on-device model. Live status chips, nothing forced.
+- **MH Settings parity on Config page** — Developer tools section (per-stack Add / % / Installed + progress) and Linux runtime section (arch/env/agent rows, clear-terminal-history with label flip, reliability help + Open Developer options).
+- **Chat upgrades** — multi-chat switcher per project (auto-titled, persisted), attachments (25MB cap, workspace copy, LLM context), "Run in Terminal" from shell code blocks (confirm dialog), copy/share/raw views.
+- **System Logs power tools** — full untruncated widget paths (private names included), screen environment block, trimmed stacks, user-action + route trails (bottom sheets/dialogs tracked), Agent/Runtime/Terminal/Update lanes with instrumentation, per-row Copy-diagnosis + Fix-with-Agent (prefills the agent), renderflex-overflow pattern.
+- **CubicApp Builder** — AI project templates, live preview, ZIP export, on-device APK install (PackageInstaller + MIUI fallback, no ADB).
+- **Live elapsed timer** on agent runs (`Working… 1:23`).
+- **Preview loopback guard** — embedded WebViews stay on localhost/data/about, externals route out.
+
+### Fixed
+- **Slide Maker overflows** — count stepper squeeze (4.3px), style pill subpixel squeeze (0.56px), tall-layout canvas scale-down, comparison column flex errors; 330px regression test.
+- **GetX empty-scope lint rows** — datasheet builds, bookmark early-return on blank tabs, RAM-fit dot subscription (now live-updating).
+- **Runtime contracts** — core extracts to root (`ubuntu/` + `bin/proot`), guest `resolv.conf`, proot exec bit, `PROOT_LOADER(_32)` + `LD_LIBRARY_PATH` env, loader readiness gate, symlink-aware traversal guard (Ubuntu `..`/absolute links pass, escapes blocked).
+- **Kotlin build** — `noBackupFilesDir` synthetic-property calls.
+- **CI analyze gate** — `return await` inside try blocks (newer-SDK lint).
+- **APK diet** — Vulkan validation `.so` (~14.5MB) excluded from packaging.
+
+### Changed
+- **Windows honesty pass** — Runtime installs disabled with explanation (native shell stated), notifications row Android/Web-only, APK-install button Android-only; `flutter build windows --debug` verified + smoke-run alive (Release link needs Firebase C++ SDK with Release libs — documented workaround in BUILD_AND_RUN.md).
+- **Terminal transcript format** — output lines indent under commands; `Process exited with code N` on empty failures.
+- **In-app updater** — SHA-256 verify of downloaded APKs against release `checksums.sha256` (fail-closed delete on mismatch).
+
 ## [1.15.1+24] - 2026-09-11
 
 ### Fixed
