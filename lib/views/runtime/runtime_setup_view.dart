@@ -408,6 +408,18 @@ class _RuntimeSetupViewState extends State<RuntimeSetupView> {
                 ),
               ),
             ),
+          if (!s.available && runtimeSupported)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                'Bundle not published yet — coming soon.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                  color: Theme.of(context).hintColor,
+                ),
+              ),
+            ),
           Row(
             children: [
               if (st.state == ToolchainState.ready)
@@ -421,6 +433,25 @@ class _RuntimeSetupViewState extends State<RuntimeSetupView> {
                   icon: const Icon(Icons.close_rounded, size: 14),
                   label: const Text('Cancel'),
                   onPressed: () => _installer.cancel(),
+                )
+              else if (!s.available && runtimeSupported)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .hintColor
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Coming soon',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).hintColor,
+                    ),
+                  ),
                 )
               else
                 FilledButton.icon(

@@ -27,6 +27,12 @@ and chmods `bin/proot` — see `RuntimeInstaller._finalizeCore`.
 | PRoot 5.1.107.92 + loader (aarch64 Android) | Termux `proot` .deb, unmodified (`packages.termux.dev`) | GPLv2 — sources: `github.com/termux/proot`, upstream `github.com/proot-me/proot` |
 | libtalloc.so.2 2.4.3 | Termux `libtalloc` .deb, unmodified | LGPLv3/GPLv3 — source: `samba.org` (talloc) |
 | libandroid-shmem.so 0.7 | Termux `libandroid-shmem` .deb, unmodified | MIT-style — source: `github.com/termux/libandroid-shmem` |
+| Python 3.8 overlay | Ubuntu focal ARM64 debs (python3.8-minimal, libpython3.8-minimal/stdlib, python3-pip/venv/setuptools/wheel, libssl1.1, libexpat1, libsqlite3-0, libreadline8, libmpdec2, libdb5.3), `usr/bin`+`usr/lib`+`lib/` kept, absolute links relativized, hardlinks materialized | Same Ubuntu/GPL terms as the base |
+
+> Bionic (Termux) Pythons canNOT run in the guest (wrong loader) —
+> distro glibc debs are the only correct source. Dependency closure is
+> machine-checked (`depcheck.py`: every DT_NEEDED resolves to base or
+> overlay, 49 binaries, 0 problems).
 
 GPL compliance: binaries are unmodified redistributions; sources linked
 above; this recipe + script rebuild them bit-for-bit from public sources.

@@ -230,6 +230,9 @@ class RuntimeInstaller extends GetxService {
     if (kIsWeb) return 'Toolchain install needs Android or desktop.';
     if (busy.value) return 'Another install is already running.';
     final stack = ToolchainCatalog.stackOf(id);
+    if (!stack.available) {
+      return 'This stack is not published yet — coming soon.';
+    }
     final blocks = await preflight(id);
     if (blocks.isNotEmpty) return blocks.join('\n');
 

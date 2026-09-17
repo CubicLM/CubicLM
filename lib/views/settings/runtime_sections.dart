@@ -137,6 +137,12 @@ Widget _stackRow(BuildContext context, bool isDark,
               style: GoogleFonts.plusJakartaSans(
                   fontSize: 12,
                   color: Theme.of(context).hintColor))
+        else if (!s.available)
+          Text('Coming soon',
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: Theme.of(context).hintColor))
         else
           OutlinedButton(
             style: OutlinedButton.styleFrom(

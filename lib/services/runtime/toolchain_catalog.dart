@@ -53,6 +53,11 @@ class ToolchainStack {
   final bool needsCore;
   final String downloadNote;
 
+  /// False while no bundle is published: the UI shows "Coming soon"
+  /// instead of a doomed Install button (failed taps used to spam the
+  /// Runtime log lane).
+  final bool available;
+
   const ToolchainStack({
     required this.id,
     required this.title,
@@ -60,6 +65,7 @@ class ToolchainStack {
     required this.bundles,
     this.needsCore = true,
     required this.downloadNote,
+    this.available = true,
   });
 }
 
@@ -101,11 +107,11 @@ class ToolchainCatalog {
         ToolchainStack(
           id: ToolchainId.python,
           title: 'Python suite',
-          subtitle: 'Python 3, pip, venv',
+          subtitle: 'Python 3.8, pip, venv',
           bundles: [
             RuntimeBundle(
               fileName: 'cubiclm-python-arm64.tar.gz',
-              version: 'python-3.10-arm64',
+              version: 'python-3.8-arm64',
               title: 'Python overlay',
             ),
           ],
@@ -124,6 +130,8 @@ class ToolchainCatalog {
           ],
           downloadNote:
               'Large download. Enables the build play button → direct install.',
+          // Needs an ARM64 AAPT2 built from AOSP source — honest hold.
+          available: false,
         ),
         ToolchainStack(
           id: ToolchainId.cpp,
@@ -137,6 +145,7 @@ class ToolchainCatalog {
             ),
           ],
           downloadNote: 'For native compilation inside the runtime.',
+          available: false,
         ),
         ToolchainStack(
           id: ToolchainId.php,
@@ -150,6 +159,7 @@ class ToolchainCatalog {
             ),
           ],
           downloadNote: 'For PHP projects and Composer packages.',
+          available: false,
         ),
       ];
 
