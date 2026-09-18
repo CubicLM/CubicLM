@@ -353,6 +353,7 @@ class BrowserDownloadService extends GetxService {
         fileName: job.fileName,
         mimeType: job.mimeType,
         shareText: job.fileName,
+        category: 'browser',
       );
       try {
         await tmp.delete();

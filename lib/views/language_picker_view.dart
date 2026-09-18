@@ -17,7 +17,7 @@ class LanguagePickerView extends GetView<SettingsController> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor:
             (isDark ? Dt.canvasDark : Dt.canvas).withValues(alpha: 0.8),

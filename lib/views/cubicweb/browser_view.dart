@@ -813,6 +813,7 @@ class _BrowserViewState extends State<BrowserView> {
         fileName: 'screenshot-${DateTime.now().millisecondsSinceEpoch}.png',
         mimeType: 'image/png',
         shareText: 'Screenshot',
+        category: 'browser',
       );
       _toast('Screenshot', 'Saved.');
     } catch (e) {
@@ -1559,7 +1560,18 @@ class _BrowserViewState extends State<BrowserView> {
             },
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: _settings.browserToolbarTools.map((id) => _buildToolbarItem(id, tab, iconColor, context, isDark)).toList(),
+              children: () {
+                final tools = _settings.browserToolbarTools.toList();
+                final list = <Widget>[];
+                for (var i = 0; i < tools.length; i++) {
+                  list.add(_buildToolbarItem(tools[i], tab, iconColor, context, isDark));
+                  // Insert Resource Monitor between 'back' and 'forward'
+                  if (tools[i] == 'back' && i + 1 < tools.length && tools[i+1] == 'forward') {
+                    list.add(_buildResourceMonitor(isDark, isBottom: true));
+                  }
+                }
+                return list;
+              }(),
             ),
           )),
     );
@@ -1612,7 +1624,7 @@ class _BrowserViewState extends State<BrowserView> {
         );
       case 'menu':
         return IconButton(
-          icon: Icon(LucideIcons.moreVertical, color: finalIconColor),
+          icon: Icon(LucideIcons.menu, color: finalIconColor),
           onPressed: () => _showMenu(context, isDark, tab),
         );
       case 'qr':
@@ -1765,6 +1777,96 @@ class _BrowserViewState extends State<BrowserView> {
     final url = tab.url.value;
     final hasPage = url.isNotEmpty && url != 'about:blank';
 
+    final List<Widget> page1 = [
+      _buildMenuItem('Bookmarks', LucideIcons.bookmark, () {
+        Get.back();
+        _showBookmarksSheet(context, isDark);
+      }),
+      _buildMenuItem('History', LucideIcons.history, () {
+        Get.back();
+        _showHistorySheet(context, isDark);
+      }),
+      _buildMenuItem('Downloads', LucideIcons.download, () {
+        Get.back();
+        _showDownloadsSheet(context, isDark);
+      }),
+      _buildMenuItem('Files', LucideIcons.folder, () {
+        Get.back();
+        Get.to(() => const BrowserFilesView());
+      }),
+      _buildMenuItem('AI Notes', LucideIcons.bookMarked, () {
+        Get.back();
+        _scaffoldKey.currentState?.openEndDrawer();
+      }),
+      _buildMenuItem('Offline', LucideIcons.cloudOff, () {
+        Get.back();
+        _saveForOffline(tab);
+      }, enabled: hasPage),
+      _buildMenuItem('As PDF', LucideIcons.fileDown, () {
+        Get.back();
+        _saveAsPdf(tab);
+      }, enabled: hasPage),
+      _buildMenuItem('Find', LucideIcons.fileSearch, () {
+        Get.back();
+        _startFind();
+      }, enabled: hasPage),
+    ];
+
+    final List<Widget> page2 = [
+      _buildMenuItem('Screenshot', LucideIcons.camera, () {
+        Get.back();
+        _takeScreenshot(tab);
+      }, enabled: hasPage),
+      _buildMenuItem('Capture All', LucideIcons.scan, () {
+        Get.back();
+        _takeLongScreenshot(tab);
+      }, enabled: hasPage),
+      _buildMenuItem('QR Handoff', LucideIcons.monitorUp, () {
+        Get.back();
+        _showQrHandoff(tab);
+      }, enabled: hasPage),
+      _buildMenuItem('Group', LucideIcons.library, () {
+        Get.back();
+        _showTabGroupDialog(tab);
+      }),
+      _buildMenuItem('Extract', LucideIcons.clipboardList, () {
+        Get.back();
+        _extractToChat(tab);
+      }, enabled: hasPage),
+      _buildMenuItem('Auto-fill', LucideIcons.userCheck, () {
+        Get.back();
+        _autoFillIdentity(tab);
+      }, enabled: hasPage),
+      _buildMenuItem('Site Rules', LucideIcons.bot, () {
+        Get.back();
+        _showSiteRulesSheet(tab);
+      }),
+      _buildMenuItem('Night', LucideIcons.moon, () {
+        _toggleDarkMode(tab);
+      }, isActive: _settings.browserForcedDark.value),
+    ];
+
+    final List<Widget> page3 = [
+      _buildMenuItem('Desktop', LucideIcons.monitor, () {
+        Get.back();
+        _toggleDesktopMode(tab);
+      }, isActive: tab.desktopMode.value),
+      _buildMenuItem('Wipe', LucideIcons.bomb, () async {
+        Get.back();
+        await _browser.privacyBomb();
+      }),
+      _buildMenuItem('Limiter', LucideIcons.gauge, () {
+        Get.back();
+        _showGxLimiterSheet(context, isDark);
+      }),
+      _buildMenuItem('Wallpaper', LucideIcons.image, () {
+        Get.back();
+        _pickWallpaper();
+      }),
+    ];
+
+    final RxInt currentPage = 0.obs;
+
     Get.bottomSheet(
       Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1772,117 +1874,157 @@ class _BrowserViewState extends State<BrowserView> {
           color: isDark ? Dt.canvasDark : Dt.canvas,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Top Stats & Info
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    _buildDataSavedPill(isDark),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(LucideIcons.shieldCheck, size: 18, color: Colors.green),
-                      onPressed: () { Get.back(); _showPrivacyDashboard(context, isDark, tab); },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header with Center Title
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _buildDataSavedPill(isDark),
+                  ),
+                  Text(
+                    'CUBICWEB',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.5,
+                      color: isDark ? Colors.white70 : Colors.black87,
                     ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.bookOpen, size: 18, color: Colors.amber),
-                      onPressed: () async {
-                        Get.back();
-                        final html = await tab.webController?.evaluateJavascript(source: AdblockService.readerJs);
-                        if (!context.mounted) return;
-                        if (html != null && html.toString().isNotEmpty) {
-                          _showReaderView(context, isDark, tab, html.toString());
-                        }
-                      },
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(LucideIcons.shieldCheck, size: 18, color: Colors.green),
+                          onPressed: () { Get.back(); _showPrivacyDashboard(context, isDark, tab); },
+                        ),
+                        IconButton(
+                          icon: const Icon(LucideIcons.bookOpen, size: 18, color: Colors.amber),
+                          onPressed: () async {
+                            Get.back();
+                            final html = await tab.webController?.evaluateJavascript(source: AdblockService.readerJs);
+                            if (!context.mounted) return;
+                            if (html != null && html.toString().isNotEmpty) {
+                              _showReaderView(context, isDark, tab, html.toString());
+                            }
+                          },
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
-              // Main Grid
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Wrap(
-                  runSpacing: 16,
-                  children: [
-                    _buildMenuItem('Bookmarks', LucideIcons.bookmark, Colors.cyan, () { Get.back(); _showBookmarksSheet(context, isDark); }),
-                    _buildMenuItem('History', LucideIcons.history, Colors.orange, () { Get.back(); _showHistorySheet(context, isDark); }),
-                    _buildMenuItem('Downloads', LucideIcons.download, Colors.blue, () { Get.back(); _showDownloadsSheet(context, isDark); }),
-                    _buildMenuItem('Files', LucideIcons.folder, Colors.deepPurpleAccent, () { Get.back(); Get.to(() => const BrowserFilesView()); }),
-                    _buildMenuItem('AI Notes', LucideIcons.bookMarked, Colors.pinkAccent, () { Get.back(); _scaffoldKey.currentState?.openEndDrawer(); }),
-                    
-                    _buildMenuItem('Offline', LucideIcons.cloudOff, Colors.brown, () { Get.back(); _saveForOffline(tab); }, enabled: hasPage),
-                    _buildMenuItem('As PDF', LucideIcons.fileDown, Colors.redAccent, () { Get.back(); _saveAsPdf(tab); }, enabled: hasPage),
-                    _buildMenuItem('Find', LucideIcons.fileSearch, Colors.indigoAccent, () { Get.back(); _startFind(); }, enabled: hasPage),
-                    _buildMenuItem('Screenshot', LucideIcons.camera, Colors.blueGrey, () { Get.back(); _takeScreenshot(tab); }, enabled: hasPage),
-                    _buildMenuItem('Capture All', LucideIcons.scan, Colors.deepPurple, () { Get.back(); _takeLongScreenshot(tab); }, enabled: hasPage),
-                    
-                    _buildMenuItem('QR Handoff', LucideIcons.monitorUp, Colors.blueGrey, () { Get.back(); _showQrHandoff(tab); }, enabled: hasPage),
-                    _buildMenuItem('Group', LucideIcons.library, Colors.teal, () { Get.back(); _showTabGroupDialog(tab); }),
-                    _buildMenuItem('Extract', LucideIcons.clipboardList, Colors.lightGreen, () { Get.back(); _extractToChat(tab); }, enabled: hasPage),
-                    _buildMenuItem('Auto-fill', LucideIcons.userCheck, Colors.deepOrangeAccent, () { Get.back(); _autoFillIdentity(tab); }, enabled: hasPage),
-                    _buildMenuItem('Site Rules', LucideIcons.bot, Colors.amberAccent, () { Get.back(); _showSiteRulesSheet(tab); }),
-
-                    _buildMenuItem('Night', LucideIcons.moon, Colors.indigo, () { _toggleDarkMode(tab); }, isActive: _settings.browserForcedDark.value),
-                    _buildMenuItem('Desktop', LucideIcons.monitor, Colors.blueGrey, () { Get.back(); _toggleDesktopMode(tab); }, isActive: tab.desktopMode.value),
-                    _buildMenuItem('Wipe', LucideIcons.bomb, Colors.red, () async { Get.back(); await _browser.privacyBomb(); }),
-                    _buildMenuItem('Limiter', LucideIcons.gauge, Dt.accentGx, () { Get.back(); _showGxLimiterSheet(context, isDark); }),
-                    _buildMenuItem('Wallpaper', LucideIcons.image, Colors.pink, () { Get.back(); _pickWallpaper(); }),
-                  ],
-                ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 200,
+              child: PageView(
+                onPageChanged: (idx) => currentPage.value = idx,
+                children: [
+                  _buildMenuPage(page1),
+                  _buildMenuPage(page2),
+                  _buildMenuPage(page3),
+                ],
               ),
-              const SizedBox(height: 24),
-              // Bottom Action Bar
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: const Icon(LucideIcons.settings, size: 20),
-                      onPressed: () { Get.back(); Get.toNamed('/app-settings'); },
-                    ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.eraser, size: 20),
-                      tooltip: 'Clear Data',
-                      onPressed: () { Get.back(); _clearBrowsingData(tab); },
-                    ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.search, size: 20),
-                      tooltip: 'Search Engine',
-                      onPressed: () { Get.back(); _showEngineSheet(context, isDark); },
-                    ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.layout, size: 20),
-                      tooltip: 'Toolbar',
-                      onPressed: () { Get.back(); _showToolbarConfigSheet(isDark); },
-                    ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.palette, size: 20),
-                      tooltip: 'AI Theme',
-                      onPressed: () { Get.back(); _showAiThemeGenerator(); },
-                    ),
-                    const SizedBox(width: 10),
-                    IconButton(
-                      icon: const Icon(LucideIcons.power, color: Colors.red, size: 20),
-                      onPressed: () => SystemNavigator.pop(),
-                    ),
-                  ],
-                ),
+            ),
+            Obx(() => Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                      3,
+                      (index) => Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: currentPage.value == index
+                                  ? Dt.accent
+                                  : Colors.grey.withValues(alpha: 0.3),
+                            ),
+                          )),
+                )),
+            const SizedBox(height: 20),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(LucideIcons.settings, size: 20),
+                    onPressed: () {
+                      Get.back();
+                      Get.toNamed('/app-settings');
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(LucideIcons.eraser, size: 20),
+                    tooltip: 'Clear Data',
+                    onPressed: () {
+                      Get.back();
+                      _clearBrowsingData(tab);
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(LucideIcons.search, size: 20),
+                    tooltip: 'Search Engine',
+                    onPressed: () {
+                      Get.back();
+                      _showEngineSheet(context, isDark);
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(LucideIcons.layout, size: 20),
+                    tooltip: 'Toolbar',
+                    onPressed: () {
+                      Get.back();
+                      _showToolbarConfigSheet(isDark);
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(LucideIcons.palette, size: 20),
+                    tooltip: 'AI Theme',
+                    onPressed: () {
+                      Get.back();
+                      _showAiThemeGenerator();
+                    },
+                  ),
+                  const SizedBox(width: 10),
+                  IconButton(
+                    icon: const Icon(LucideIcons.power,
+                        color: Colors.red, size: 20),
+                    onPressed: () => SystemNavigator.pop(),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
       isScrollControlled: true,
     );
   }
 
-  Widget _buildMenuItem(String label, IconData icon, Color color, VoidCallback onTap, {bool enabled = true, bool isActive = false}) {
+  Widget _buildMenuPage(List<Widget> items) {
+    return GridView.count(
+      crossAxisCount: 4,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 16,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      children: items,
+    );
+  }
+
+  Widget _buildMenuItem(String label, IconData icon, VoidCallback onTap,
+      {bool enabled = true, bool isActive = false}) {
     return Opacity(
       opacity: enabled ? 1.0 : 0.4,
       child: InkWell(
@@ -1896,10 +2038,10 @@ class _BrowserViewState extends State<BrowserView> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: isActive ? color : color.withValues(alpha: 0.15),
+                  color: isActive ? Dt.accent : Colors.transparent,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: isActive ? Colors.white : color, size: 22),
+                child: Icon(icon, color: isActive ? Colors.white : null, size: 22),
               ),
               const SizedBox(height: 8),
               Text(
@@ -1907,7 +2049,7 @@ class _BrowserViewState extends State<BrowserView> {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: isActive ? color : null,
+                  color: isActive ? Dt.accent : null,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -3169,7 +3311,7 @@ class _BrowserViewState extends State<BrowserView> {
     );
   }
 
-  Widget _buildResourceMonitor(bool isDark) {
+  Widget _buildResourceMonitor(bool isDark, {bool isBottom = false}) {
     if (!_settings.browserResourceMonitor.value) return const SizedBox.shrink();
     if (!Get.isRegistered<DeviceInfoService>()) return const SizedBox.shrink();
     final dev = Get.find<DeviceInfoService>();
@@ -3180,32 +3322,30 @@ class _BrowserViewState extends State<BrowserView> {
       final used = total - avail;
       final pct = (used / total).clamp(0.0, 1.0);
       final color = pct > 0.8 ? Colors.red : (pct > 0.6 ? Colors.orange : Dt.accent);
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        margin: const EdgeInsets.only(right: 8),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(LucideIcons.cpu, size: 10, color: color),
-            const SizedBox(width: 4),
-            Text(
-              '${(pct * 100).toStringAsFixed(0)}%',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: color,
+      return GestureDetector(
+        onTap: () => _boostRam(),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          margin: isBottom ? EdgeInsets.zero : const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(LucideIcons.zap, size: 10, color: color),
+              const SizedBox(width: 3),
+              Text(
+                '${(pct * 100).toStringAsFixed(0)}%',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: color,
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            GestureDetector(
-              onTap: () => _boostRam(),
-              child: Icon(LucideIcons.zap, size: 10, color: color),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     });
@@ -3229,7 +3369,7 @@ class _BrowserViewState extends State<BrowserView> {
   Widget _buildAiSidebar(BuildContext context, bool isDark) {
     return Drawer(
       width: 320,
-      backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       child: Column(
         children: [
           Container(

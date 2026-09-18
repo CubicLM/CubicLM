@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -12,6 +15,7 @@ import '../../models/folder_model.dart';
 import '../../services/hive_service.dart';
 import '../../theme/design_tokens.dart';
 import '../prompt_library_view.dart';
+import 'memory_management_view.dart';
 import 'chat_dialogs.dart';
 import 'chat_format.dart';
 
@@ -36,7 +40,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
     return Drawer(
-      backgroundColor: isDark ? AppColors.bg : Dt.sidebar,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
           borderRadius:
               BorderRadius.horizontal(right: Radius.circular(Dt.rDrawerEdge))),
@@ -90,13 +94,13 @@ class _ChatSidebarState extends State<ChatSidebar> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               child: Row(children: [
                 Icon(LucideIcons.messageSquarePlus,
-                    size: 20, color: isDark ? AppColors.primary : Dt.accent),
+                    size: 20, color: Theme.of(context).primaryColor),
                 const SizedBox(width: 14),
                 Text('chat_new_chat'.tr,
                     style: GoogleFonts.plusJakartaSans(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.primary : Dt.accent)),
+                        color: Theme.of(context).primaryColor)),
               ]),
             ),
           ),
@@ -170,7 +174,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide:
-                    BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+                    BorderSide(color: Theme.of(context).primaryColor.withValues(alpha: 0.4)),
               ),
             ),
           ),
@@ -194,6 +198,15 @@ class _ChatSidebarState extends State<ChatSidebar> {
                             color: AppColors.textMuted,
                             letterSpacing: 0.8)),
                     const Spacer(),
+                    IconButton(
+                      icon: const Icon(LucideIcons.sparkles, size: 16),
+                      onPressed: _c.smartOrganizeAll,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Smart Organize All',
+                    ),
+                    const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.add_rounded, size: 16),
                       onPressed: () => _showCreateProjectDialog(context, isDark),
@@ -383,13 +396,49 @@ class _ChatSidebarState extends State<ChatSidebar> {
                 for (final f in _c.folders)
                   _folderTile(context, f, filtered, isDark),
 
-                // ── Chats without folders ──
-                for (final s in filtered.where((s) => s.folderId == null))
-                  _sidebarTile(context, s, _c.currentSessionId.value == s.id,
-                      isDark),
+                // ── Today ──
+                if (q.isEmpty) ..._buildDateGroup('Today', filtered, isDark),
+                
+                // ── Yesterday ──
+                if (q.isEmpty) ..._buildDateGroup('Yesterday', filtered, isDark),
+
+                // ── Older ──
+                if (q.isEmpty) ..._buildDateGroup('Older', filtered, isDark),
+
+                // ── Search Results ──
+                if (q.isNotEmpty)
+                  for (final s in filtered)
+                    _sidebarTile(context, s, _c.currentSessionId.value == s.id, isDark),
               ],
             );
           }),
+        ),
+        // ── AI Memory tile ──
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              Navigator.pop(context);
+              Get.to(() => const MemoryManagementView());
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(children: [
+                Icon(LucideIcons.brain,
+                    size: 18, color: Theme.of(context).primaryColor),
+                const SizedBox(width: 14),
+                Text('AI Memory',
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.textPrimary : Dt.textPrimary)),
+                const Spacer(),
+                const Icon(LucideIcons.chevronRight,
+                    size: 16, color: Dt.textSecondary),
+              ]),
+            ),
+          ),
         ),
         // ── Prompt Library tile ──
         Padding(
@@ -404,7 +453,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(children: [
                 Icon(LucideIcons.library,
-                    size: 18, color: isDark ? AppColors.primary : Dt.accent),
+                    size: 18, color: Theme.of(context).primaryColor),
                 const SizedBox(width: 14),
                 Text('Prompt Library',
                     style: GoogleFonts.plusJakartaSans(
@@ -513,7 +562,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
       onDismissed: (_) => _c.deleteChat(s.id),
       child: Material(
         color: active
-            ? AppColors.primary.withValues(alpha: 0.08)
+            ? Theme.of(context).primaryColor.withValues(alpha: 0.08)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
@@ -531,7 +580,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
                 height: 34,
                 decoration: BoxDecoration(
                   color: active
-                      ? AppColors.primary.withValues(alpha: 0.12)
+                      ? Theme.of(context).primaryColor.withValues(alpha: 0.12)
                       : (isDark ? AppColors.surfaceLight : Dt.pillMuted),
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -543,8 +592,8 @@ class _ChatSidebarState extends State<ChatSidebar> {
                           : Icons.chat_bubble_outline_rounded),
                   size: 16,
                   color: s.pinned
-                      ? AppColors.primary
-                      : (active ? AppColors.primary : AppColors.textMuted),
+                      ? Theme.of(context).primaryColor
+                      : (active ? Theme.of(context).primaryColor : AppColors.textMuted),
                 ),
               ),
               const SizedBox(width: 12),
@@ -734,7 +783,15 @@ class _ChatSidebarState extends State<ChatSidebar> {
                 ),
               ),
               if (active)
-                const Icon(LucideIcons.check, size: 14, color: AppColors.primary),
+                const Icon(LucideIcons.check,
+                    size: 14, color: AppColors.primary),
+              IconButton(
+                icon: const Icon(LucideIcons.settings, size: 14),
+                onPressed: () => _showProjectSettings(context, p, isDark),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                visualDensity: VisualDensity.compact,
+              ),
             ],
           ),
         ),
@@ -742,8 +799,206 @@ class _ChatSidebarState extends State<ChatSidebar> {
     );
   }
 
+  void _showProjectSettings(BuildContext context, ChatProject p, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppColors.surface : Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, sc) => Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Text('Project Settings: ${p.name}',
+                      style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w800, fontSize: 18)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(LucideIcons.trash2,
+                        size: 20, color: AppColors.error),
+                    onPressed: () {
+                      _c.deleteProject(p.id);
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView(
+                controller: sc,
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Text('Instructions',
+                      style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w700, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    maxLines: 3,
+                    controller: TextEditingController(text: p.instructions),
+                    onChanged: (v) {
+                      final updated = p.copyWith(instructions: v);
+                      _c.projects[_c.projects.indexOf(p)] = updated;
+                      Get.find<HiveService>().saveProject(p.id, updated.toMap());
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Add project-wide instructions...',
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withValues(alpha: 0.05)
+                          : Dt.pillMuted,
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Text('Knowledge Base Files',
+                          style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w700, fontSize: 14)),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () async {
+                          final picked = await FilePicker.pickFiles(
+                            allowMultiple: true,
+                            type: FileType.custom,
+                            allowedExtensions: [
+                              'pdf', 'docx', 'txt', 'md', 'dart', 'py', 'js'
+                            ],
+                          );
+                          if (picked != null) {
+                            final newPaths = picked.files
+                                .map((f) => f.path)
+                                .whereType<String>()
+                                .toList();
+                            final updated = p.copyWith(
+                                filePaths: [...p.filePaths, ...newPaths]);
+                            _c.projects[_c.projects.indexOf(p)] = updated;
+                            Get.find<HiveService>().saveProject(p.id, updated.toMap());
+                            _c.invalidateProjectCache(p.id);
+                            setState(() {});
+                          }
+                        },
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text('Add Files'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (p.filePaths.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Text('No files added to this project.',
+                            style: TextStyle(color: Theme.of(context).hintColor)),
+                      ),
+                    )
+                  else
+                    ...p.filePaths.map((path) => ListTile(
+                          dense: true,
+                          leading: const Icon(LucideIcons.fileText, size: 18),
+                          title: Text(path.split(Platform.pathSeparator).last,
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: Text(path,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 10)),
+                          trailing: IconButton(
+                            icon: const Icon(LucideIcons.x, size: 16),
+                            onPressed: () {
+                              final updated = p.copyWith(
+                                filePaths: p.filePaths.where((e) => e != path).toList(),
+                              );
+                              _c.projects[_c.projects.indexOf(p)] = updated;
+                              Get.find<HiveService>().saveProject(p.id, updated.toMap());
+                              _c.invalidateProjectCache(p.id);
+                              setState(() {});
+                            },
+                          ),
+                        )),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showCreateProjectDialog(BuildContext context, bool isDark) {
-    // ...
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.surface : Colors.white,
+        title: const Text('New Project'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Project Name'),
+          onSubmitted: (v) {
+            if (v.trim().isNotEmpty) {
+              _c.createProject(v.trim());
+              Navigator.pop(ctx);
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              if (ctrl.text.trim().isNotEmpty) {
+                _c.createProject(ctrl.text.trim());
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildDateGroup(String title, List<ChatSession> all, bool isDark) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    final group = all.where((s) {
+      if (s.folderId != null) return false;
+      final date = DateTime(s.updatedAt.year, s.updatedAt.month, s.updatedAt.day);
+      if (title == 'Today') return date == today;
+      if (title == 'Yesterday') return date == yesterday;
+      return date.isBefore(yesterday);
+    }).toList();
+
+    if (group.isEmpty) return [];
+
+    return [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+        child: Text(title,
+            style: GoogleFonts.plusJakartaSans(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textMuted.withValues(alpha: 0.5),
+                letterSpacing: 0.5)),
+      ),
+      for (final s in group)
+        _sidebarTile(context, s, _c.currentSessionId.value == s.id, isDark),
+    ];
   }
 
   Widget _folderTile(

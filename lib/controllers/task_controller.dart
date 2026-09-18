@@ -144,6 +144,7 @@ Steps:''';
         fileName: 'cubiclm_task_$taskIdShort.sh',
         mimeType: 'application/x-sh',
         shareText: buf.toString(),
+        category: 'agent',
       );
       if (saved == null) return; // save failed (snackbar already shown)
       final updatedTask = task.copyWith(status: 'exported');

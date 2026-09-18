@@ -2,6 +2,7 @@ class ChatProject {
   final String id;
   final String name;
   final String instructions;
+  final String? rootPath;
   final List<String> filePaths;
   final List<String> chatIds;
   final DateTime createdAt;
@@ -11,6 +12,7 @@ class ChatProject {
     required this.id,
     required this.name,
     this.instructions = '',
+    this.rootPath,
     this.filePaths = const [],
     this.chatIds = const [],
     DateTime? createdAt,
@@ -22,6 +24,7 @@ class ChatProject {
         'id': id,
         'name': name,
         'instructions': instructions,
+        'rootPath': rootPath,
         'filePaths': filePaths,
         'chatIds': chatIds,
         'createdAt': createdAt.toIso8601String(),
@@ -32,6 +35,7 @@ class ChatProject {
         id: map['id'] ?? '',
         name: map['name'] ?? 'Untitled Project',
         instructions: map['instructions'] ?? '',
+        rootPath: map['rootPath'],
         filePaths: List<String>.from(map['filePaths'] ?? []),
         chatIds: List<String>.from(map['chatIds'] ?? []),
         createdAt: DateTime.tryParse(map['createdAt'] ?? '') ?? DateTime.now(),
@@ -41,6 +45,7 @@ class ChatProject {
   ChatProject copyWith({
     String? name,
     String? instructions,
+    String? rootPath,
     List<String>? filePaths,
     List<String>? chatIds,
     DateTime? updatedAt,
@@ -49,6 +54,7 @@ class ChatProject {
         id: id,
         name: name ?? this.name,
         instructions: instructions ?? this.instructions,
+        rootPath: rootPath ?? this.rootPath,
         filePaths: filePaths ?? this.filePaths,
         chatIds: chatIds ?? this.chatIds,
         createdAt: createdAt,

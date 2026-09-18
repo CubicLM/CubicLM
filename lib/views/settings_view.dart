@@ -11,11 +11,9 @@ import '../core/constants.dart';
 import '../services/mcp/mcp_registry_service.dart';
 import '../services/mcp/mcp_config.dart';
 import '../services/mcp/mcp_connection.dart';
-import 'log_view.dart';
 import 'settings/apple_widgets.dart';
 import 'settings/device_card.dart';
 import 'settings/model_params.dart';
-import 'settings/runtime_sections.dart';
 import 'settings/skills_section.dart';
 
 class SettingsView extends GetView<SettingsController> {
@@ -33,7 +31,7 @@ class SettingsView extends GetView<SettingsController> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     if (embedded) return _configBody(context);
     return Scaffold(
-      backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor:
             (isDark ? Dt.canvasDark : Dt.canvas).withValues(alpha: 0.8),
@@ -59,20 +57,6 @@ class SettingsView extends GetView<SettingsController> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           children: [
             const SizedBox(height: 16),
-            sectionLabel(context, 'settings_section_diagnostics'.tr),
-            appleGroupedCard(context, isDark, children: [
-              appleListTile(
-                context,
-                isDark,
-                leading: iconBox(AppColors.info, LucideIcons.terminal),
-                title: 'settings_system_logs'.tr,
-                subtitle: 'settings_system_logs_desc'.tr,
-                trailing: const Icon(LucideIcons.chevronRight, size: 20),
-                showDivider: false,
-                onTap: () => Get.to(() => const LogView()),
-              ),
-            ]),
-            const SizedBox(height: 28),
             sectionLabel(context, 'settings_section_hardware'.tr),
             buildDeviceCard(context, isDark),
             const SizedBox(height: 28),
@@ -103,10 +87,6 @@ class SettingsView extends GetView<SettingsController> {
                 onTap: () => controller.setInferenceMode('cloud'),
               ),
             ]),
-            const SizedBox(height: 28),
-            buildDeveloperToolsSection(context, isDark),
-            const SizedBox(height: 28),
-            LinuxRuntimeSection(isDark: isDark),
             const SizedBox(height: 28),
             sectionLabel(context, 'settings_section_system_prompt'.tr),            appleGroupedCard(context, isDark, children: [
               Padding(

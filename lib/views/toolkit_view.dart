@@ -8,14 +8,39 @@ import 'explore/toolkit_tab.dart';
 
 /// Standalone Toolkit page (Battle Arena, Slide Maker, …).
 /// Moved out of Model Hub into its own bottom-navigation destination.
-class ToolkitView extends StatelessWidget {
+class ToolkitView extends StatefulWidget {
   const ToolkitView({super.key});
+
+  @override
+  State<ToolkitView> createState() => _ToolkitViewState();
+}
+
+class _ToolkitViewState extends State<ToolkitView> {
+  bool _searching = false;
+  String _query = '';
+  final _searchCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _searching = !_searching;
+      if (!_searching) {
+        _query = '';
+        _searchCtrl.clear();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor:
             (isDark ? Dt.canvasDark : Dt.canvas).withValues(alpha: 0.8),
@@ -39,6 +64,13 @@ class ToolkitView extends StatelessWidget {
         ),
         actions: [
           IconButton(
+            tooltip: 'Search tools',
+            icon: Icon(
+                _searching ? LucideIcons.x : LucideIcons.search,
+                size: 20),
+            onPressed: _toggleSearch,
+          ),
+          IconButton(
             tooltip: 'About Toolkit',
             icon: const Icon(LucideIcons.info, size: 20),
             onPressed: () => _showToolkitInfo(context),
@@ -48,7 +80,35 @@ class ToolkitView extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          buildToolkitTab(context),
+          if (_searching)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search tools…',
+                  prefixIcon: const Icon(LucideIcons.search, size: 18),
+                  suffixIcon: _query.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(LucideIcons.x, size: 16),
+                          onPressed: () => setState(() {
+                            _query = '';
+                            _searchCtrl.clear();
+                          }),
+                        ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                ),
+                onChanged: (v) => setState(() => _query = v),
+              ),
+            ),
+          buildToolkitTab(context, query: _query),
         ],
       ),
     );

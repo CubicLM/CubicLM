@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../core/constants.dart';
+import '../services/app_log_service.dart';
 import '../services/hive_service.dart';
 import 'web_download.dart';
 
@@ -108,6 +109,47 @@ class ExportFile {
     return clean;
   }
 
+  /// Per-feature export folders under Download/<app> (or Documents/<app>
+  /// on desktop). Every file-saving caller MUST pass its [category] —
+  /// unmapped categories fall back to the root AND log a warning row so
+  /// hidden exports without a location get a folder assigned.
+  static const Map<String, String> exportSubfolders = {
+    'logs': 'System Logs',
+    'slides': 'Slide Maker',
+    'web': 'CubicWeb Builder',
+    'datasheet': 'CubicDataSheet',
+    'browser': 'CubicWeb Browser',
+    'chat': 'Chat Exports',
+    'cubicapp': 'CubicApp Builder',
+    'agent': 'Agent Runs',
+    'backup': 'Backups',
+  };
+
+  /// Resolves a category to its relative subfolder path
+  /// (`CubicLM/System Logs`). Unknown or blank categories resolve to
+  /// the root AND emit the audit warning. Pure apart from the log call.
+  static String resolveSubfolder(String? category) {
+    final base = appSubfolder();
+    final key = (category ?? '').trim().toLowerCase();
+    if (key.isEmpty) return base;
+    final mapped = exportSubfolders[key];
+    if (mapped == null) {
+      try {
+        if (Get.isRegistered<AppLogService>()) {
+          Get.find<AppLogService>().warning(
+            'Export without location: "$category"',
+            details:
+                'No folder is registered for this export kind — the file lands directly in $base/. '
+                'Report this to the developer so a dedicated folder gets created.',
+            category: LogCategory.system,
+          );
+        }
+      } catch (_) {}
+      return base;
+    }
+    return '$base/$mapped';
+  }
+
   /// Short display label for Settings, e.g. 'Download/CubicLM'.
   static String exportLocationLabel() {
     if (kIsWeb) return 'Browser downloads';
@@ -166,11 +208,13 @@ class ExportFile {
   /// Saves [bytes] straight into the app export folder — no dialog.
   /// Android: Download/\<subfolder\> via MediaStore (no permission needed).
   /// Desktop/iOS: Documents (or the custom dir) / \<subfolder\>.
+  /// Pass [category] (see [exportSubfolders]) for per-feature folders.
   /// Returns the saved display path, or null on failure.
   static Future<String?> saveToAppFolder({
     required Uint8List bytes,
     required String fileName,
     String? mimeType,
+    String? category,
   }) async {
     if (kIsWeb) {
       try {
@@ -212,12 +256,13 @@ class ExportFile {
         }
       } catch (_) {}
       try {
+        final subfolder = resolveSubfolder(category);
         final path =
             await _androidChannel.invokeMethod<String>('saveBytesToDownloads', {
           'filename': fileName,
           'bytes': bytes,
           'mimeType': mimeType ?? _mimeFor(fileName),
-          'subfolder': appSubfolder(),
+          'subfolder': subfolder,
         });
         if (path == null || path.isEmpty) return null;
         _noteSaved();
@@ -227,7 +272,7 @@ class ExportFile {
       }
     }
     try {
-      final dir = await _desktopExportDir();
+      final dir = await _desktopExportDir(subfolder: resolveSubfolder(category));
       final f = File('${dir.path}${Platform.pathSeparator}$fileName');
       await f.writeAsBytes(bytes, flush: true);
       _noteSaved();
@@ -242,14 +287,30 @@ class ExportFile {
     required String text,
     required String fileName,
     String? mimeType,
+    String? category,
   }) =>
       saveToAppFolder(
         bytes: Uint8List.fromList(utf8.encode(text)),
         fileName: fileName,
         mimeType: mimeType,
+        category: category,
       );
 
-  static Future<Directory> _desktopExportDir() async {
+  static Future<Directory> _desktopExportDir({String? subfolder}) async {
+    final sub = (subfolder == null || subfolder.isEmpty)
+        ? appSubfolder()
+        : subfolder;
+    final parts = sub
+        .split('/')
+        .map((s) => sanitizeExportSubfolder(s))
+        .where((s) => s.isNotEmpty);
+    Directory joinParts(String root) {
+      var d = Directory(root);
+      for (final part in parts) {
+        d = Directory('${d.path}${Platform.pathSeparator}$part');
+      }
+      return d;
+    }
     try {
       final custom = Get.isRegistered<HiveService>()
           ? (Get.find<HiveService>()
@@ -257,12 +318,16 @@ class ExportFile {
               '')
           : '';
       if (custom.isNotEmpty) {
-        final d = Directory(custom);
-        if (await d.exists()) return d;
+        final base = Directory(custom);
+        if (await base.exists()) {
+          final d = joinParts(base.path);
+          await d.create(recursive: true);
+          return d;
+        }
       }
     } catch (_) {}
     final docs = await getApplicationDocumentsDirectory();
-    final d = Directory('${docs.path}${Platform.pathSeparator}${appSubfolder()}');
+    final d = joinParts(docs.path);
     await d.create(recursive: true);
     return d;
   }
@@ -327,6 +392,8 @@ class ExportFile {
   /// One-call export: saves into the app folder (no dialog), then shows a
   /// snackbar with the location and a Share action. Returns the saved
   /// path, or null on failure (a failure snackbar is shown).
+  /// Pass [category] (see [exportSubfolders]) for per-feature folders —
+  /// unmapped categories land in the root + log the audit warning.
   static Future<String?> quickExport({
     Uint8List? bytes,
     String? text,
@@ -334,12 +401,16 @@ class ExportFile {
     String? mimeType,
     String? shareText,
     String? shareSubject,
+    String? category,
   }) async {
     final data = bytes ??
         (text != null ? Uint8List.fromList(utf8.encode(text)) : null);
     if (data == null) return null;
     final saved = await saveToAppFolder(
-        bytes: data, fileName: fileName, mimeType: mimeType);
+        bytes: data,
+        fileName: fileName,
+        mimeType: mimeType,
+        category: category);
     if (saved == null) {
       Get.snackbar('Export failed', 'Could not save $fileName.',
           snackPosition: SnackPosition.BOTTOM,

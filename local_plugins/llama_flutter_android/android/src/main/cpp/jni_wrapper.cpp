@@ -439,19 +439,35 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenera
 
     const int n_ctx = llama_n_ctx(g_ctx);
 
-    // Check if the context will be exceeded and apply a sliding window for the KV cache
-    if (g_n_past + (int)tokens.size() > n_ctx) {
-        const int n_discard = n_ctx / 4; // Discard the oldest 25% of the context
+    // Keep every decode position strictly inside the window. A single
+    // 25% shift is NOT enough when the prompt alone exceeds 75% of
+    // n_ctx (normal on 512-ctx devices after a few turns) — decoding
+    // past n_ctx corrupts the heap and kills the process instantly
+    // with no Dart log ("crash when context fills" despite free RAM).
+    int shifts = 0;
+    while (g_n_past + (int)tokens.size() > n_ctx - 1 && g_n_past > 0 && shifts < 32) {
+        const int n_discard = std::max(1, n_ctx / 4);
         LOGI("Context is full, shifting KV cache by %d tokens", n_discard);
 
         // Remove the oldest tokens from the sequence
         llama_memory_seq_rm(llama_get_memory(g_ctx), 0, 0, n_discard);
-        
+
         // Shift the remaining tokens
         llama_memory_seq_add(llama_get_memory(g_ctx), 0, n_discard, g_n_past, -n_discard);
 
         // Update the past tokens count
         g_n_past -= n_discard;
+        if (g_n_past < 0) g_n_past = 0;
+        shifts++;
+    }
+    // Pathological case: the prompt alone still doesn't fit (tiny
+    // n_ctx). Drop oldest prompt tokens rather than writing OOB —
+    // the Dart layer normally budgets history so this is last-resort.
+    if ((int)tokens.size() > n_ctx - 1 && n_ctx > 1) {
+        const int keep = n_ctx - 1;
+        LOGI("Prompt (%d tokens) exceeds context (%d); keeping last %d tokens", (int)tokens.size(), n_ctx, keep);
+        tokens.erase(tokens.begin(), tokens.end() - keep);
+        g_n_past = 0;
     }
 
     // Process prompt in batches to handle long inputs
@@ -562,6 +578,17 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenera
     // Generation loop
     LOGI("Starting generation loop: max_tokens=%lld", max_tokens);
     for (int i = 0; i < max_tokens && !g_stop_flag; i++) {
+        // Never let the decode position reach n_ctx: slide the window
+        // first. Without this, long generations write KV out of bounds
+        // and the process dies instantly (same crash as prefill).
+        if (g_n_past + 1 >= n_ctx) {
+            const int n_discard = std::max(1, n_ctx / 4);
+            LOGI("Context full during generation, shifting KV cache by %d tokens", n_discard);
+            llama_memory_seq_rm(llama_get_memory(g_ctx), 0, 0, n_discard);
+            llama_memory_seq_add(llama_get_memory(g_ctx), 0, n_discard, g_n_past, -n_discard);
+            g_n_past -= n_discard;
+            if (g_n_past < 0) g_n_past = 0;
+        }
         // Sample next token
         LOGI("Sampling token %d, g_n_past=%d", i + 1, g_n_past);
         llama_token new_token_id = llama_sampler_sample(S->sampler, g_ctx, -1);

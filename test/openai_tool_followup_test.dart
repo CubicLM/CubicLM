@@ -54,8 +54,7 @@ void main() {
     });
   });
 
-  group('buildFollowUpMessages', () {
-    test('tool messages keep tool_call_id matching assistant tool_calls', () {
+  group('buildFollowUpMessages', () {    test('tool messages keep tool_call_id matching assistant tool_calls', () {
       final msgs = OpenAICompatibleProvider.buildFollowUpMessages(
         messages: [
           {'role': 'user', 'content': 'build a snake game'}
@@ -92,6 +91,51 @@ void main() {
       }
       // Whole payload must be JSON-serializable for the HTTP body.
       expect(() => jsonEncode(msgs), returnsNormally);
+    });
+  });
+
+  group('reasoning fallback', () {
+    test('pickReasoning finds reasoning_content then reasoning', () {
+      expect(
+          OpenAICompatibleProvider.pickReasoning(
+              {'reasoning_content': 'plan...'}),
+          'plan...');
+      expect(
+          OpenAICompatibleProvider.pickReasoning({'reasoning': 'r2'}),
+          'r2');
+      expect(OpenAICompatibleProvider.pickReasoning({'content': 'x'}),
+          isNull);
+      expect(OpenAICompatibleProvider.pickReasoning(null), isNull);
+    });
+
+    test('withReasoningFallback keeps real content untouched', () {
+      expect(
+          OpenAICompatibleProvider.withReasoningFallback(
+              'answer', 'thought'),
+          'answer');
+    });
+
+    test('withReasoningFallback wraps reasoning as thought', () {
+      final out = OpenAICompatibleProvider.withReasoningFallback(
+          '', 'let me plan the game');
+      expect(out, contains('<think>'));
+      expect(out, contains('let me plan the game'));
+    });
+
+    test('withReasoningFallback caps huge reasoning', () {
+      final big = List.filled(7000, 'r').join();
+      final out =
+          OpenAICompatibleProvider.withReasoningFallback('', big);
+      expect(out.length, lessThan(big.length));
+      expect(out, contains('truncated'));
+    });
+
+    test('withReasoningFallback stays empty without reasoning', () {
+      expect(OpenAICompatibleProvider.withReasoningFallback('', null),
+          isEmpty);
+      expect(
+          OpenAICompatibleProvider.withReasoningFallback('  ', '  '),
+          '  ');
     });
   });
 }

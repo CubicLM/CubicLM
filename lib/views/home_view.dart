@@ -10,7 +10,6 @@ import '../controllers/chat_controller.dart';
 import '../controllers/home_controller.dart';
 import '../core/colors.dart';
 import '../services/hive_service.dart';
-import '../theme/design_tokens.dart';
 import '../utils/app_snackbar.dart';
 import 'chat_view.dart';
 import 'model_view.dart';
@@ -88,14 +87,13 @@ class _HomeViewState extends State<HomeView> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffold = Scaffold(
-      backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
       body: Obx(() {
         final content = IndexedStack(
           index: controller.currentTab.value,
-          children: const [
-            ChatView(),
-            ModelView(),
-            ToolkitView(),
+          children: [
+            const ChatView(),
+            const ModelView(),
+            const ToolkitView(),
             AppSettingsView()
           ],
         );
@@ -165,7 +163,7 @@ class _HomeViewState extends State<HomeView> {
     return Container(
       height: 72 + MediaQuery.of(context).padding.bottom,
       decoration: BoxDecoration(
-        color: (isDark ? Dt.canvasDark : Dt.canvas).withValues(alpha: 0.8),
+        color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.8),
         border: Border(
           top: BorderSide(
             color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
@@ -209,12 +207,12 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Widget _buildSidebar(BuildContext context, bool isDark) {
-    const accent = AppColors.primary;
+    final accent = Theme.of(context).primaryColor;
     final muted = Theme.of(context).hintColor;
 
     return Container(
       width: 84,
-      color: isDark ? Dt.canvasDark : Dt.canvas,
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: Column(children: [
         const SizedBox(height: 24),
         Image.asset(

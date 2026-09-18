@@ -595,7 +595,7 @@ class _SheetEditorViewState extends State<SheetEditorView> {
       final sel = _selected;
       final selCell = sel != null ? sheet.cells[sel] : null;
       return Scaffold(
-        backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
           title: Text(f.name,
               style: GoogleFonts.plusJakartaSans(

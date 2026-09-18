@@ -1,9 +1,12 @@
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_latex/flutter_markdown_latex.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:markdown/markdown.dart' as md;
 import '../../controllers/chat_controller.dart';
 import '../../controllers/home_controller.dart';
 import '../../controllers/settings_controller.dart';
@@ -16,12 +19,38 @@ import '../../widgets/app_ui.dart';
 import '../../widgets/attachment_preview.dart';
 import '../../widgets/model_switcher_sheet.dart';
 import 'chat_widgets.dart';
+import 'chat_bars.dart';
 import 'template_sheets.dart';
 
 /// Chat composer input bar + model label.
 /// Extracted from views/chat_view.dart.
 
 ChatController get _c => Get.find<ChatController>();
+
+/// Desktop paste shortcut (Ctrl/Cmd+V) target.
+class _PasteIntent extends Intent {
+  const _PasteIntent();
+}
+
+/// Pastes clipboard text into the composer. Huge pastes become a file
+/// attachment instead (toggle in App Settings) — GPT-style.
+Future<void> _pasteFromClipboard() async {
+  try {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text ?? '';
+    if (text.isEmpty) return;
+    if (await _c.handlePastedText(text)) return;
+    // Normal insert at the cursor.
+    final ctrl = _c.textController;
+    final cur = ctrl.text;
+    final sel = ctrl.selection;
+    final start = sel.start >= 0 ? sel.start : cur.length;
+    final end = sel.end >= 0 ? sel.end : cur.length;
+    ctrl.text = cur.replaceRange(start, end, text);
+    ctrl.selection = TextSelection.collapsed(offset: start + text.length);
+    _c.inputText.value = ctrl.text;
+  } catch (_) {}
+}
 
 Widget inputBar(BuildContext context, bool isDark) {
   return SafeArea(
@@ -37,6 +66,50 @@ Widget inputBar(BuildContext context, bool isDark) {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         color: Colors.transparent,
         child: Column(mainAxisSize: MainAxisSize.min, children: [
+        // LaTeX Real-time Preview
+        Obx(() {
+          final text = _c.latexPreviewText.value;
+          if (text.isEmpty) return const SizedBox.shrink();
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.surface : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(LucideIcons.sigma, size: 12, color: AppColors.primary),
+                    const SizedBox(width: 6),
+                    Text('Math Preview', 
+                      style: GoogleFonts.plusJakartaSans(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                MarkdownBody(
+                  data: text,
+                  builders: {
+                    'latex': LatexElementBuilder(
+                      textStyle: GoogleFonts.plusJakartaSans(color: isDark ? Colors.white : Colors.black),
+                    ),
+                  },
+                  extensionSet: md.ExtensionSet(
+                    [LatexBlockSyntax()],
+                    [LatexInlineSyntax()],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
         // Attachment preview
         Obx(() {
           final name = _c.selectedFileName.value;
@@ -354,6 +427,57 @@ Widget inputBar(BuildContext context, bool isDark) {
                     ),
                   );
                 }),
+                // ── Token usage indicator (composer placement) ──
+                Obx(() {
+                  if (!showContextAt(ContextWindowStyle.composer)) {
+                    return const SizedBox.shrink();
+                  }
+                  final data = readContextWindow();
+                  if (data == null || !data.isLocal) {
+                    return const SizedBox.shrink();
+                  }
+                  final percent = data.progress;
+                  final color = percent > 0.9
+                      ? AppColors.error
+                      : (percent > 0.7 ? AppColors.warning : AppColors.primary);
+
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                                'Context: ${data.used}/${data.total} tokens',
+                                style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: color)),
+                            const Spacer(),
+                            Text('${(percent * 100).toInt()}%',
+                                style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: color)),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: LinearProgressIndicator(
+                            value: percent,
+                            minHeight: 2,
+                            backgroundColor: isDark
+                                ? Colors.white.withValues(alpha: 0.05)
+                                : Colors.black.withValues(alpha: 0.05),
+                            valueColor: AlwaysStoppedAnimation<Color>(color),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
                 // ── Text field: full-width, ABOVE the controls row (cursor starts here) ──
                 // Enter = send, Shift+Enter = newline
                 Padding(
@@ -380,7 +504,20 @@ Widget inputBar(BuildContext context, bool isDark) {
                         }
                       }
                     },
-                    child: TextField(
+                    child: Shortcuts(
+                      shortcuts: const {
+                        SingleActivator(LogicalKeyboardKey.keyV,
+                            control: true): _PasteIntent(),
+                        SingleActivator(LogicalKeyboardKey.keyV, meta: true):
+                            _PasteIntent(),
+                      },
+                      child: Actions(
+                        actions: {
+                          _PasteIntent: CallbackAction<_PasteIntent>(
+                            onInvoke: (_) => _pasteFromClipboard(),
+                          ),
+                        },
+                        child: TextField(
                       focusNode: _c.composerFocusNode,
                       controller: _c.textController,
                       onChanged: (v) => _c.inputText.value = v,
@@ -405,6 +542,28 @@ Widget inputBar(BuildContext context, bool isDark) {
                             horizontal: 4, vertical: 10),
                         isDense: true,
                         fillColor: Colors.transparent,
+                      ),
+                      contextMenuBuilder:
+                          (context, editableTextState) {
+                        // Swap the default Paste item for one that
+                        // auto-converts huge pastes to a file.
+                        final items = editableTextState
+                            .contextMenuButtonItems
+                            .map((b) => b.type ==
+                                    ContextMenuButtonType.paste
+                                ? ContextMenuButtonItem(
+                                    label: b.label,
+                                    onPressed: _pasteFromClipboard,
+                                  )
+                                : b)
+                            .toList();
+                        return AdaptiveTextSelectionToolbar.buttonItems(
+                          anchors:
+                              editableTextState.contextMenuAnchors,
+                          buttonItems: items,
+                        );
+                      },
+                        ),
                       ),
                     ),
                   ),
@@ -434,37 +593,81 @@ Widget inputBar(BuildContext context, bool isDark) {
                           onTap: () => showModelSwitcherSheet(context),
                         )),
                   ),
-                  const SizedBox(width: 6),
                   Obx(() {
-                    final enabled =
-                        Get.find<SettingsController>().webFetchEnabled.value;
-                    return AppCircleButton(
-                      icon: LucideIcons.globe,
-                      tooltip: 'chat_web_access'.tr,
-                      iconColor: enabled ? Dt.accent : null,
-                      onTap: () => Get.find<SettingsController>()
-                          .setWebFetchEnabled(!enabled),
+                    final s = Get.find<SettingsController>();
+                    if (!s.showWebAccess.value) {
+                      return const SizedBox.shrink();
+                    }
+                    final enabled = s.webFetchEnabled.value;
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(width: 6),
+                        AppCircleButton(
+                          icon: LucideIcons.globe,
+                          tooltip: 'chat_web_access'.tr,
+                          iconColor:
+                              enabled ? Theme.of(context).primaryColor : null,
+                          onTap: () => s.setWebFetchEnabled(!enabled),
+                        ),
+                      ],
                     );
                   }),
-                  const SizedBox(width: 6),
                   Obx(() {
+                    final s = Get.find<SettingsController>();
+                    if (!s.showDeepSearch.value) {
+                      return const SizedBox.shrink();
+                    }
                     final enabled = _c.isSearchMode.value;
-                    return AppCircleButton(
-                      icon: LucideIcons.search,
-                      tooltip: 'Deep Search (Perplexity-style)',
-                      iconColor: enabled ? Dt.accent : null,
-                      onTap: () => _c.isSearchMode.value = !enabled,
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(width: 6),
+                        AppCircleButton(
+                          icon: LucideIcons.search,
+                          tooltip: 'Deep Search (Perplexity-style)',
+                          iconColor:
+                              enabled ? Theme.of(context).primaryColor : null,
+                          onTap: () => _c.isSearchMode.value = !enabled,
+                        ),
+                      ],
                     );
                   }),
-                  const SizedBox(width: 6),
                   Obx(() {
+                    final s = Get.find<SettingsController>();
+                    if (!s.showLiveVision.value) {
+                      return const SizedBox.shrink();
+                    }
                     final vision = Get.find<VisionLiveController>();
                     final enabled = vision.isLive.value;
-                    return AppCircleButton(
-                      icon: LucideIcons.video,
-                      tooltip: 'Live Vision (Snapshot Loop)',
-                      iconColor: enabled ? AppColors.error : null,
-                      onTap: vision.toggleLive,
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(width: 6),
+                        AppCircleButton(
+                          icon: LucideIcons.video,
+                          tooltip: 'Live Vision (Snapshot Loop)',
+                          iconColor: enabled ? AppColors.error : null,
+                          onTap: vision.toggleLive,
+                        ),
+                      ],
+                    );
+                  }),
+                  Obx(() {
+                    final hasText = _c.inputText.value.trim().isNotEmpty;
+                    if (!hasText ||
+                        !Get.find<SettingsController>()
+                            .showPolishPrompt
+                            .value) {
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: AppCircleButton(
+                        icon: LucideIcons.sparkles,
+                        tooltip: 'Polish Prompt (AI Rewrite)',
+                        onTap: _c.polishPrompt,
+                      ),
                     );
                   }),
                   const Spacer(),
@@ -473,14 +676,9 @@ Widget inputBar(BuildContext context, bool isDark) {
                   // and inner Row keeps mic + send at the same vertical level.
                   Obx(() {
                     final loading = _c.isLoading.value;
-                    final listening = _c.isListening.value;
                     final hasContent = _c.inputText.value.isNotEmpty ||
                         _c.selectedFileName.value != null ||
                         _c.selectedImagePath.value != null;
-                    // Hide the mic when speech recognition is
-                    // unavailable (e.g. permission denied, or a
-                    // platform without an STT engine) instead of
-                    // showing a dead button.
                     final micAvailable = _c.sttAvailable.value;
                     final voiceMode = _c.voiceMode.value;
 
@@ -488,8 +686,16 @@ Widget inputBar(BuildContext context, bool isDark) {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Single voice button (like ChatGPT/Gemini):
-                        // tap = push-to-talk, hold = hands-free mode.
+                        if (loading)
+                           Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: AppCircleButton(
+                              icon: LucideIcons.square,
+                              tooltip: 'Stop generation',
+                              onTap: _c.stopGenerating,
+                              iconColor: AppColors.error,
+                            ),
+                          ),
                         if (!loading && !hasContent && micAvailable)
                           AppCircleButton(
                             icon: LucideIcons.mic,
@@ -497,8 +703,8 @@ Widget inputBar(BuildContext context, bool isDark) {
                                 ? 'Hands-free ON — tap to stop'
                                 : 'Voice input (hold for hands-free)',
                             iconColor: voiceMode
-                                ? Dt.accent
-                                : (listening ? AppColors.error : null),
+                                ? Theme.of(context).primaryColor
+                                : (_c.isListening.value ? AppColors.error : null),
                             onTap: () {
                               if (_c.voiceMode.value) {
                                 _c.setVoiceMode(false);
@@ -515,12 +721,8 @@ Widget inputBar(BuildContext context, bool isDark) {
                         if (!loading && !hasContent && micAvailable)
                           const SizedBox(width: 8),
                         AppCtaButton(
-                          icon: loading
-                              ? LucideIcons.square
-                              : LucideIcons.arrowUp,
-                          onTap: loading
-                              ? _c.stopGenerating
-                              : (hasContent ? _c.sendMessage : null),
+                          icon: LucideIcons.arrowUp,
+                          onTap: hasContent ? _c.sendMessage : null,
                         ),
                       ],
                     );

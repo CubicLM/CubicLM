@@ -25,7 +25,7 @@ class ModelView extends GetView<ModelController> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor:
             (isDark ? Dt.canvasDark : Dt.canvas).withValues(alpha: 0.8),
@@ -105,7 +105,7 @@ class ModelView extends GetView<ModelController> {
           await controller.refreshDownloaded();
         }
       },
-      color: Dt.accent,
+      color: Theme.of(context).primaryColor,
       child: Obx(() => ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -260,7 +260,7 @@ class ModelView extends GetView<ModelController> {
           ? AppColors.warning
           : avail < 3.0
               ? AppColors.primary
-              : Dt.accent;
+              : Theme.of(context).primaryColor;
       final tier = dev.deviceTier.value;
       final tierLabel =
           tier.isEmpty ? '' : '${tier[0].toUpperCase()}${tier.substring(1)}';
@@ -294,14 +294,14 @@ class ModelView extends GetView<ModelController> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Dt.accent.withValues(alpha: 0.12),
+                    color: Theme.of(context).primaryColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(tierLabel,
                       style: GoogleFonts.plusJakartaSans(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          color: Dt.accent)),
+                          color: Theme.of(context).primaryColor)),
                 ),
               const SizedBox(width: 4),
               InkWell(
@@ -504,7 +504,7 @@ class ModelView extends GetView<ModelController> {
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     color: selected == entry.key
-                        ? Dt.accent.withValues(alpha: 0.18)
+                        ? Theme.of(context).primaryColor.withValues(alpha: 0.18)
                         : Theme.of(context)
                             .colorScheme
                             .surfaceContainerHighest
@@ -512,7 +512,7 @@ class ModelView extends GetView<ModelController> {
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: selected == entry.key
-                          ? Dt.accent.withValues(alpha: 0.3)
+                          ? Theme.of(context).primaryColor.withValues(alpha: 0.3)
                           : Theme.of(context)
                               .dividerColor
                               .withValues(alpha: 0.5),
@@ -522,7 +522,7 @@ class ModelView extends GetView<ModelController> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (selected == entry.key) ...[
-                        const Icon(Icons.check, size: 16, color: Dt.accent),
+                        Icon(Icons.check, size: 16, color: Theme.of(context).primaryColor),
                         const SizedBox(width: 4),
                       ],
                       Text(
@@ -531,7 +531,7 @@ class ModelView extends GetView<ModelController> {
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: selected == entry.key
-                              ? Dt.accent
+                              ? Theme.of(context).primaryColor
                               : Theme.of(context).hintColor,
                         ),
                       ),
@@ -629,7 +629,7 @@ class ModelView extends GetView<ModelController> {
               isDark ? AppColors.surface.withValues(alpha: 0.5) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Dt.accent.withValues(alpha: 0.15),
+            color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
             width: 1,
           ),
         ),
@@ -638,12 +638,12 @@ class ModelView extends GetView<ModelController> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Dt.accent.withValues(alpha: 0.1),
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 useGpu ? LucideIcons.zap : LucideIcons.cpu,
-                color: Dt.accent,
+                color: Theme.of(context).primaryColor,
                 size: 22,
               ),
             ),
@@ -658,7 +658,7 @@ class ModelView extends GetView<ModelController> {
                         : 'model_active_intelligence'.tr,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 10,
-                      color: Dt.accent,
+                      color: Theme.of(context).primaryColor,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.0,
                     ),
@@ -712,17 +712,17 @@ class ModelView extends GetView<ModelController> {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Dt.accent.withValues(alpha: 0.2)),
+        border: Border.all(color: Theme.of(context).primaryColor.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Dt.accent.withValues(alpha: 0.1),
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.cloud_done, color: Dt.accent, size: 20),
+            child: Icon(Icons.cloud_done, color: Theme.of(context).primaryColor, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -763,19 +763,19 @@ class ModelView extends GetView<ModelController> {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Dt.accent.withValues(alpha: 0.1),
+          color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Dt.accent.withValues(alpha: 0.2)),
+          border: Border.all(color: Theme.of(context).primaryColor.withValues(alpha: 0.2)),
         ),
         child: Column(
           children: [
             Row(
               children: [
-                const SizedBox(
+                SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Dt.accent)),
+                        strokeWidth: 2, color: Theme.of(context).primaryColor)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -792,10 +792,10 @@ class ModelView extends GetView<ModelController> {
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: const LinearProgressIndicator(
+              child: LinearProgressIndicator(
                 minHeight: 4,
                 backgroundColor: Colors.transparent,
-                color: Dt.accent,
+                color: Theme.of(context).primaryColor,
               ),
             ),
           ],
@@ -826,7 +826,7 @@ class ModelView extends GetView<ModelController> {
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Icon(LucideIcons.gauge, size: 16, color: Dt.accent),
+            Icon(LucideIcons.gauge, size: 16, color: Theme.of(context).primaryColor),
             const SizedBox(width: 8),
             Expanded(
               child: Text('Usage (estimate)',
@@ -950,7 +950,7 @@ class ModelView extends GetView<ModelController> {
               color: isDark ? AppColors.border : AppColors.borderLightMode),
         ),
         child: Row(children: [
-          const Icon(LucideIcons.refreshCw, size: 14, color: Dt.accent),
+          Icon(LucideIcons.refreshCw, size: 14, color: Theme.of(context).primaryColor),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -967,14 +967,14 @@ class ModelView extends GetView<ModelController> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
               decoration: BoxDecoration(
-                color: Dt.accent.withValues(alpha: 0.12),
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text('Every ${hours}h',
                   style: GoogleFonts.plusJakartaSans(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: Dt.accent)),
+                      color: Theme.of(context).primaryColor)),
             ),
           ),
           const SizedBox(width: 6),
@@ -1048,21 +1048,21 @@ class ModelView extends GetView<ModelController> {
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
         decoration: BoxDecoration(
           color: selected
-              ? Dt.accent.withValues(alpha: 0.15)
+              ? Theme.of(context).primaryColor.withValues(alpha: 0.15)
               : (isDark
                   ? Colors.white.withValues(alpha: 0.06)
                   : Colors.black.withValues(alpha: 0.05)),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
               color: selected
-                  ? Dt.accent.withValues(alpha: 0.4)
+                  ? Theme.of(context).primaryColor.withValues(alpha: 0.4)
                   : Colors.transparent),
         ),
         child: Text(label,
             style: GoogleFonts.plusJakartaSans(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: selected ? Dt.accent : Theme.of(context).hintColor)),
+                color: selected ? Theme.of(context).primaryColor : Theme.of(context).hintColor)),
       ),
     );
   }

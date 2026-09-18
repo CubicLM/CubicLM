@@ -743,6 +743,19 @@ Controlled by `AppConstants.keyAutoLoadLastModel`:
 
 ---
 
+## 🧠 Long-Term Memory *(ROM, not RAM)*
+
+> Chats persist in on-device Hive storage forever — but a 2K context window can't hold them. CubicLM auto-learns durable facts and recalls relevant past turns into each generation. 100% offline: no embeddings model, no online database.
+
+| Layer | How |
+| :--- | :--- |
+| 📝 **Auto-learn facts** | "amar nam Abir" / "remember X" → fact box (EN + romanized Bangla patterns, max 2/turn, duplicates + contradictions auto-replaced). Review/edit/delete on the Memory page |
+| 🔍 **Cross-chat recall** | Each turn: keywords → recent visible chats scanned → isolate-scored → top 3 turns (300-char centered snippets, 1 per chat) injected before your question when budget allows. Archived/hidden chats excluded |
+| 🎯 **Ranked injection** | System prompt gets only query-relevant facts (600-char budget), not a dump |
+| 🧠 **Proof chip** | Assistant bubble shows **Memory +N** when past turns informed the answer; System Logs rows `New memory stored` / `Recalled N past turn(s)` |
+
+---
+
 ## ☁️ Cloud AI Providers
 
 > **23+ providers, one unified interface.** Every provider implements the same `CloudProvider` interface and registers in `CloudProviderRegistry`.
@@ -984,7 +997,7 @@ curl http://<device-ip>:8080/v1/chat/completions \
 | :--- | :--- |
 | 🔍 **Explore** | **Model Hub** (Local / Online / Skills / MCP scopes) |
 | 🧰 **Toolkit** | Battle Arena + Slide Maker + CubicWeb Builder widget cards |
-| ⚙️ **App Settings** | Four tabs — **General** (theme, orbs, language, startup), **Nodes** (local API server), **Config** (diagnostics, hardware, inference mode, system prompt, Skills, Custom MCP Server), **Parameters** (local model & imaging parameters) |
+| ⚙️ **App Settings** | Six tabs — **General** (theme, orbs, language, startup), **Nodes** (local API server), **Config** (diagnostics, hardware, inference mode, system prompt, Skills, Custom MCP Server), **Parameters** (local model & imaging parameters), **Dev Tools** (Strict RAM guard, Developer tools, Linux runtime), **Data** (backups, export/import, usage stats, System logs) |
 
 ### 💬 Chat & Sessions
 

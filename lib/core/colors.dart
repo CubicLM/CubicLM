@@ -64,8 +64,10 @@ class AppColors {
             ? Get.find<SettingsController>().glassIntensity.value 
             : 0.7);
 
+    final baseBg = Theme.of(context).scaffoldBackgroundColor;
+
     return BoxDecoration(
-      color: isDark ? bg.withValues(alpha: alpha) : bgLight.withValues(alpha: alpha),
+      color: baseBg.withValues(alpha: alpha),
       border: Border(
         top: BorderSide(
           color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05),

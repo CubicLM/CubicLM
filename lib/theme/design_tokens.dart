@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 /// Design tokens reverse-engineered from a minimalistic reference chat app
 /// (see docs/ClaudeAPK_UIdesign.md). Every UI value below is measured;
@@ -19,17 +20,40 @@ abstract class Dt {
   static const Color pillMutedDark = Color(0xFF3A3937);
 
   /// Page background for any screen, both modes.
-  static Color pageBg(bool isDark) => isDark ? canvasDark : canvas;
+  static Color pageBg(bool isDark) {
+    try {
+      return Theme.of(Get.context!).scaffoldBackgroundColor;
+    } catch (_) {
+      return isDark ? canvasDark : canvas;
+    }
+  }
 
   /// Card/row background for any surface, both modes.
-  static Color cardBg(bool isDark) => isDark ? cardDark : card;
+  static Color cardBg(bool isDark) {
+    try {
+      return Theme.of(Get.context!).cardColor;
+    } catch (_) {
+      return isDark ? cardDark : card;
+    }
+  }
 
   /// Muted pill/chip background, both modes.
-  static Color pillBg(bool isDark) => isDark ? pillMutedDark : pillMuted;
+  static Color pillBg(bool isDark) {
+    try {
+      return Theme.of(Get.context!).colorScheme.surfaceContainerHighest;
+    } catch (_) {
+      return isDark ? pillMutedDark : pillMuted;
+    }
+  }
 
   /// Warm hairline border for cards/rows, both modes.
-  static Color borderColor(bool isDark) =>
-      isDark ? Colors.white.withValues(alpha: 0.07) : hairline;
+  static Color borderColor(bool isDark) {
+    try {
+      return Theme.of(Get.context!).dividerColor;
+    } catch (_) {
+      return isDark ? Colors.white.withValues(alpha: 0.07) : hairline;
+    }
+  }
 
   static const Color textPrimary = Color(0xFF2D2520);
   static const Color textSecondary = Color(0xFF5A4F44);

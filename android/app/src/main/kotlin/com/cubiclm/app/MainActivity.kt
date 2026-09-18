@@ -132,8 +132,7 @@ class MainActivity : FlutterFragmentActivity() {
                     val filename = call.argument<String>("filename")
                     val bytes = call.argument<ByteArray>("bytes")
                     val mimeType = call.argument<String>("mimeType") ?: "application/octet-stream"
-                    val subfolder = sanitizeFilename(call.argument<String>("subfolder") ?: "CubicLM")
-                        .ifBlank { "CubicLM" }
+                    val subfolder = sanitizeSubfolder(call.argument<String>("subfolder") ?: "CubicLM")
                     if (filename.isNullOrBlank() || bytes == null) {
                         result.error("INVALID_EXPORT", "Filename or bytes are missing.", null)
                         return@setMethodCallHandler
@@ -201,8 +200,7 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                 }
                 "listExportFiles" -> {
-                    val subfolder = sanitizeFilename(call.argument<String>("subfolder") ?: "CubicLM")
-                        .ifBlank { "CubicLM" }
+                    val subfolder = sanitizeSubfolder(call.argument<String>("subfolder") ?: "CubicLM")
                     thread(name = "list-exports") {
                         try {
                             val files = listExportFiles(subfolder)
@@ -1719,5 +1717,17 @@ class MainActivity : FlutterFragmentActivity() {
 
     private fun sanitizeFilename(filename: String): String {
         return filename.replace(Regex("""[\\/:*?"<>|]"""), "_")
+    }
+
+    /// Sanitizes a RELATIVE subfolder path (e.g. "CubicLM/System Logs")
+    /// segment by segment, preserving '/' separators. Prevents both
+    /// traversal ('..') and flattening ('/' → '_').
+    private fun sanitizeSubfolder(subfolder: String): String {
+        val clean = subfolder
+            .split('/')
+            .map { it.trim().replace(Regex("""[\\:*?"<>|]"""), "") }
+            .filter { it.isNotEmpty && it != "." && it != ".." }
+            .joinToString("/")
+        return clean.ifBlank { "CubicLM" }
     }
 }

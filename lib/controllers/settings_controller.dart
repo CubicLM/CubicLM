@@ -195,6 +195,10 @@ class SettingsController extends GetxController {
   final browserSiteAiRules = <String, String>{}.obs;
   final browserAutoRenameDownloads = true.obs;
 
+  /// Long-paste auto-convert: huge pastes become a .md file attachment
+  /// (GPT-style) instead of flooding the composer. Plain bool pref.
+  final longPasteToFile = true.obs;
+
   /// Custom homepage URL (empty = blank new-tab page). Plain string pref.
   final browserHomepage = ''.obs;
 
@@ -206,6 +210,20 @@ class SettingsController extends GetxController {
 
   /// Dismissible upsell pill shown inside the composer card.
   final composerUpsellDismissed = false.obs;
+
+  /// Composer toolbar buttons (chat input row). Hidden ones stay
+  /// reachable from the + menu. Plain bool prefs, default visible.
+  final showDeepSearch = true.obs;
+  final showWebAccess = true.obs;
+  final showLiveVision = true.obs;
+  final showPolishPrompt = true.obs;
+
+  /// Context-window indicator placement: 'header' | 'composer' | 'ring'.
+  final contextWindowStyle = 'header'.obs;
+
+  /// Settings-page search UI state (session only, never persisted).
+  final settingsSearching = false.obs;
+  final settingsSearchQuery = ''.obs;
   final liteRtPerformanceMode = AppConstants.defaultLiteRtPerformanceMode.obs;
   final imageSteps = 1.obs;
   final imageGenForceCpu = AppConstants.defaultImageGenForceCpu.obs;
@@ -671,6 +689,10 @@ class SettingsController extends GetxController {
             AppConstants.keyBrowserAutoRenameDownloads,
             defaultValue: true) ??
         true;
+    longPasteToFile.value = _hive.getSetting<bool>(
+            AppConstants.keyLongPasteToFile,
+            defaultValue: true) ??
+        true;
     browserRamLimit.value = _hive.getSetting<int>(AppConstants.keyBrowserRamLimit, defaultValue: 1024) ?? 1024;
     browserCpuLimit.value = _hive.getSetting<double>(AppConstants.keyBrowserCpuLimit, defaultValue: 0.5) ?? 0.5;
     browserLimiterEnabled.value = _hive.getSetting<bool>(AppConstants.keyBrowserLimiterEnabled, defaultValue: false) ?? false;
@@ -686,6 +708,26 @@ class SettingsController extends GetxController {
             AppConstants.keyComposerUpsellDismissed,
             defaultValue: false) ??
         false;
+    showDeepSearch.value = _hive.getSetting<bool>(
+            AppConstants.keyShowDeepSearch,
+            defaultValue: true) ??
+        true;
+    showWebAccess.value = _hive.getSetting<bool>(
+            AppConstants.keyShowWebAccess,
+            defaultValue: true) ??
+        true;
+    showLiveVision.value = _hive.getSetting<bool>(
+            AppConstants.keyShowLiveVision,
+            defaultValue: true) ??
+        true;
+    showPolishPrompt.value = _hive.getSetting<bool>(
+            AppConstants.keyShowPolishPrompt,
+            defaultValue: true) ??
+        true;
+    contextWindowStyle.value = _hive.getSetting<String>(
+            AppConstants.keyContextWindowStyle,
+            defaultValue: 'header') ??
+        'header';
     if (autoTuneParams.value) {
       // Persist tuned values so the native loaders (which read the Hive
       // keys directly) always pick up tier-matched context/output even if
@@ -1966,6 +2008,39 @@ class SettingsController extends GetxController {
   Future<void> setBrowserAutoRenameDownloads(bool enabled) async {
     browserAutoRenameDownloads.value = enabled;
     await _hive.setSetting(AppConstants.keyBrowserAutoRenameDownloads, enabled);
+  }
+
+  Future<void> setLongPasteToFile(bool enabled) async {
+    longPasteToFile.value = enabled;
+    await _hive.setSetting(AppConstants.keyLongPasteToFile, enabled);
+  }
+
+  Future<void> setShowDeepSearch(bool v) async {
+    showDeepSearch.value = v;
+    await _hive.setSetting(AppConstants.keyShowDeepSearch, v);
+  }
+
+  Future<void> setShowWebAccess(bool v) async {
+    showWebAccess.value = v;
+    await _hive.setSetting(AppConstants.keyShowWebAccess, v);
+  }
+
+  Future<void> setShowLiveVision(bool v) async {
+    showLiveVision.value = v;
+    await _hive.setSetting(AppConstants.keyShowLiveVision, v);
+  }
+
+  Future<void> setShowPolishPrompt(bool v) async {
+    showPolishPrompt.value = v;
+    await _hive.setSetting(AppConstants.keyShowPolishPrompt, v);
+  }
+
+  static const contextWindowStyles = ['header', 'composer', 'ring'];
+
+  Future<void> setContextWindowStyle(String v) async {
+    final style = contextWindowStyles.contains(v) ? v : 'header';
+    contextWindowStyle.value = style;
+    await _hive.setSetting(AppConstants.keyContextWindowStyle, style);
   }
 
   Future<void> addSiteAiRule(String host, String action) async {

@@ -65,7 +65,7 @@ class AboutView extends StatelessWidget {
         : 'v${settings.appVersion.value}';
 
     return Scaffold(
-      backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,

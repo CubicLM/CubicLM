@@ -488,6 +488,7 @@ class AgentRunnerController extends GetxController {
         bytes: Uint8List.fromList(out),
         fileName: 'cubiclm_project_${safeName}_$stamp.zip',
         mimeType: 'application/zip',
+        category: 'agent',
       );
       if (skipped > 0) {
         AppSnackbar.showTop(

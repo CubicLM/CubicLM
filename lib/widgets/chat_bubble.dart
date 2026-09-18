@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:math' show min;
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_markdown_latex/flutter_markdown_latex.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -9,6 +10,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../controllers/chat_controller.dart';
+import '../controllers/settings_controller.dart';
 import '../models/chat_message.dart';
 import '../models/web_source.dart';
 import '../utils/prompt_export.dart';
@@ -55,6 +57,7 @@ class ChatBubble extends StatefulWidget {
 
 class _ChatBubbleState extends State<ChatBubble> {
   bool _copied = false;
+  final SettingsController _settings = Get.find<SettingsController>();
 
   /// Claude-style prompt view toggle: rendered markdown (default) ↔ exact
   /// raw text (code format). Per-bubble state, not persisted.
@@ -79,7 +82,11 @@ class _ChatBubbleState extends State<ChatBubble> {
       _mdSheet = _markdownStyle(context);
       _thoughtSheet = _thoughtMarkdownStyle(context);
       _codeBuilder = CodeBlockBuilder(context);
-      _citationBuilder = CitationLinkBuilder(context, widget.message.citations);
+      _citationBuilder = CitationLinkBuilder(
+        context,
+        widget.message.citations,
+        widget.message.webSources,
+      );
     }
   }
 
@@ -257,7 +264,9 @@ class _ChatBubbleState extends State<ChatBubble> {
                                         CodeBlockBuilder(context),
                                     'a': _citationBuilder ??
                                         CitationLinkBuilder(
-                                            context, widget.message.citations),
+                                            context,
+                                            widget.message.citations,
+                                            widget.message.webSources),
                                   },
                                   extensionSet: md.ExtensionSet(
                                     [
@@ -274,7 +283,7 @@ class _ChatBubbleState extends State<ChatBubble> {
                                 )
                         else ...[
                           if (hasAlternatives && preferredIdx == null)
-                            _buildDualResponses(
+                            _buildArenaResponses(
                                 answerContent, alternatives, isDark)
                           else
                             _buildSingleResponse(
@@ -288,8 +297,6 @@ class _ChatBubbleState extends State<ChatBubble> {
                         ],
 
                         // Activated skills (intelligent per-prompt)
-
-                        // Activated skills (intelligent per-prompt)
                         if (!isUser &&
                             widget.message.usedSkills != null &&
                             widget.message.usedSkills!.isNotEmpty)
@@ -297,6 +304,16 @@ class _ChatBubbleState extends State<ChatBubble> {
                             padding: const EdgeInsets.only(top: 10),
                             child: _skillsUsedBar(
                                 context, widget.message.usedSkills!, isDark),
+                          ),
+
+                        // Past turns auto-recalled from other chats (ROM).
+                        if (!isUser && widget.message.recalledTurns > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: _recallBar(
+                                context,
+                                widget.message.recalledTurns,
+                                isDark),
                           ),
 
                         // Claude-style artifacts detected in this message
@@ -395,6 +412,42 @@ class _ChatBubbleState extends State<ChatBubble> {
                                   icon: Icons.timer_outlined,
                                 ),
                               ),
+                            if (widget.message.isQueued)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(LucideIcons.clock, size: 10, color: Colors.orange),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Queued',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 9,
+                                          color: Colors.orange,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            if (!isUser && _settings.inferenceMode.value == 'cloud')
+                              Padding(
+                                padding: const EdgeInsets.only(right: 10),
+                                child: _infoBadge(
+                                  _estimateCost(widget.message),
+                                  isUser,
+                                  context,
+                                  icon: LucideIcons.dollarSign,
+                                ),
+                              ),
                             Text(
                               _formatTime(widget.message.timestamp),
                               style: GoogleFonts.plusJakartaSans(
@@ -488,7 +541,8 @@ class _ChatBubbleState extends State<ChatBubble> {
               'code': _codeBuilder ?? CodeBlockBuilder(context),
               'pre': _codeBuilder ?? CodeBlockBuilder(context),
               'a': _citationBuilder ??
-                  CitationLinkBuilder(context, widget.message.citations),
+                  CitationLinkBuilder(context, widget.message.citations,
+                      widget.message.webSources),
             },
             extensionSet: md.ExtensionSet(
               [
@@ -503,7 +557,7 @@ class _ChatBubbleState extends State<ChatBubble> {
           );
   }
 
-  Widget _buildDualResponses(
+  Widget _buildArenaResponses(
       String first, List<String> alternatives, bool isDark) {
     final all = [first, ...alternatives];
     return Column(
@@ -526,22 +580,50 @@ class _ChatBubbleState extends State<ChatBubble> {
         ),
         const SizedBox(height: 16),
         LayoutBuilder(builder: (context, constraints) {
-          if (constraints.maxWidth > 600) {
-            // Horizontal for wide screens
-            return Row(
+          final isWide = constraints.maxWidth > 800 && all.length >= 3;
+          final isMedium = constraints.maxWidth > 600;
+          
+          if (isWide) {
+            // Horizontal for 3 models on wide screen
+             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (var i = 0; i < all.length; i++)
                   Expanded(
                     child: Padding(
-                      padding: EdgeInsets.only(right: i == 0 ? 12 : 0),
+                      padding: EdgeInsets.only(right: i < all.length - 1 ? 12 : 0),
                       child: _dualChoiceCard(all[i], i, isDark),
                     ),
                   ),
               ],
             );
           }
-          // Vertical for narrow screens
+          
+          if (isMedium) {
+            // Stack dual + one full width if triple
+            return Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < min(all.length, 2); i++)
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(right: i == 0 ? 12 : 0),
+                          child: _dualChoiceCard(all[i], i, isDark),
+                        ),
+                      ),
+                  ],
+                ),
+                if (all.length > 2)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: _dualChoiceCard(all[2], 2, isDark),
+                  ),
+              ],
+            );
+          }
+          // Vertical for narrow screens or mobile
           return Column(
             children: [
               for (var i = 0; i < all.length; i++)
@@ -618,48 +700,18 @@ class _ChatBubbleState extends State<ChatBubble> {
   Widget _buildActionBar(BuildContext context, bool isUser, bool isDark) {
     final iconColor =
         isDark ? AppColors.textMuted.withValues(alpha: 0.6) : Dt.textMuted;
-    final mutedColor =
-        isDark ? AppColors.textMuted.withValues(alpha: 0.3) : Dt.toggleTrackOff;
     const double iconSize = 16;
     final revisions = widget.message.revisions;
     final hasRevisions = revisions != null && revisions.isNotEmpty;
-    final canPrev = hasRevisions && widget.message.revisionIndex > 0;
-    final canNext =
-        hasRevisions && widget.message.revisionIndex < revisions.length - 1;
 
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Revision navigation (prev/next) ──
-          if (hasRevisions) ...[
-            _actionButton(
-              icon: Icons.chevron_left_rounded,
-              tooltip: 'Previous version',
-              onTap: canPrev ? widget.onPrevRevision! : () {},
-              color: canPrev ? iconColor : mutedColor,
-              size: iconSize + 4,
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: Text(
-                '${widget.message.revisionIndex + 1}/${revisions.length + 1}',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10,
-                  color: iconColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            _actionButton(
-              icon: Icons.chevron_right_rounded,
-              tooltip: 'Next version',
-              onTap: canNext ? widget.onNextRevision! : () {},
-              color: canNext ? iconColor : mutedColor,
-              size: iconSize + 4,
-            ),
-          ],
+          // ── Branch Navigation ──
+          if (hasRevisions)
+            _branchPickerButton(context, revisions, widget.message.revisionIndex, iconColor),
 
           if (isUser) ...[
             // User: View toggle + Edit + Copy + Share (+ .md / PDF in raw mode)
@@ -679,6 +731,15 @@ class _ChatBubbleState extends State<ChatBubble> {
                 color: iconColor,
                 size: iconSize,
               ),
+            _actionButton(
+              icon: widget.message.isPinned
+                  ? Icons.push_pin_rounded
+                  : Icons.push_pin_outlined,
+              tooltip: widget.message.isPinned ? 'Unpin from context' : 'Pin to context',
+              onTap: () => Get.find<ChatController>().toggleMessagePin(widget.message),
+              color: widget.message.isPinned ? AppColors.primary : iconColor,
+              size: iconSize,
+            ),
             _actionButton(
               icon: _copied ? Icons.check_rounded : Icons.copy_rounded,
               tooltip: _copied ? 'prompt_copied'.tr : 'prompt_copy_exact'.tr,
@@ -843,10 +904,133 @@ class _ChatBubbleState extends State<ChatBubble> {
                   : iconColor,
               size: iconSize - 2,
             ),
+            _actionButton(
+              icon: widget.message.isPinned
+                  ? Icons.push_pin_rounded
+                  : Icons.push_pin_outlined,
+              tooltip: widget.message.isPinned ? 'Unpin from context' : 'Pin to context',
+              onTap: () => Get.find<ChatController>().toggleMessagePin(widget.message),
+              color: widget.message.isPinned ? AppColors.primary : iconColor,
+              size: iconSize - 2,
+            ),
           ],
         ],
       ),
     );
+  }
+
+  Widget _branchPickerButton(BuildContext context,
+      List<Map<String, dynamic>> revisions, int current, Color iconColor) {
+    return InkWell(
+      onTap: () => _showBranchPicker(context, revisions, current),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(LucideIcons.gitBranch, size: 14, color: iconColor),
+            const SizedBox(width: 6),
+            Text(
+              '${current + 1}/${revisions.length}',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                color: iconColor,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBranchPicker(
+      BuildContext context, List<Map<String, dynamic>> revisions, int current) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.surface : Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('Message History',
+                  style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w800, fontSize: 16)),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: revisions.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (ctx, i) {
+                  final rev = revisions[i];
+                  final content = rev['content'] as String;
+                  final active = i == current;
+                  return ListTile(
+                    dense: true,
+                    leading: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: active
+                            ? AppColors.primary
+                            : (isDark ? AppColors.surfaceLight : Dt.hairline),
+                      ),
+                      child: Center(
+                        child: Text('${i + 1}',
+                            style: TextStyle(
+                                color: active ? Colors.white : Dt.textSecondary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12)),
+                      ),
+                    ),
+                    title: Text(
+                      content.replaceAll('\n', ' ').trim(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: active ? FontWeight.w700 : FontWeight.w500),
+                    ),
+                    trailing: active
+                        ? const Icon(Icons.check_circle,
+                            color: AppColors.success, size: 20)
+                        : null,
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Jump directly to the tapped revision.
+                      _jumpToRevision(i, current);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _jumpToRevision(int target, int current) {
+    final diff = target - current;
+    if (diff == 0) return;
+    if (diff > 0 && widget.onNextRevision != null) {
+      for (var i = 0; i < diff; i++) {
+        widget.onNextRevision!();
+      }
+    } else if (diff < 0 && widget.onPrevRevision != null) {
+      for (var i = 0; i < -diff; i++) {
+        widget.onPrevRevision!();
+      }
+    }
   }
 
   Widget _actionButton({
@@ -1127,14 +1311,59 @@ class _ChatBubbleState extends State<ChatBubble> {
     );
   }
 
-  Widget _skillsUsedBar(
-      BuildContext context, List<String> skills, bool isDark) {
+  /// Past-conversation recall indicator: N turns from other chats
+  /// informed this answer (long-term ROM memory). Static proof row.
+  Widget _recallBar(BuildContext context, int count, bool isDark) {
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
-        color: Dt.accent.withValues(alpha: isDark ? 0.08 : 0.06),
+        color:
+            Theme.of(context).primaryColor.withValues(alpha: isDark ? 0.08 : 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Dt.accent.withValues(alpha: 0.15)),
+        border: Border.all(
+            color: Theme.of(context).primaryColor.withValues(alpha: 0.15)),
+      ),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(LucideIcons.brain,
+              size: 12, color: Theme.of(context).primaryColor),
+        ),
+        const SizedBox(width: 6),
+        Text('Memory',
+            style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.3,
+                color: Theme.of(context).primaryColor)),
+        const SizedBox(width: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+          decoration: BoxDecoration(
+            color: Theme.of(context).primaryColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text('+$count past turn${count == 1 ? '' : 's'}',
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: Theme.of(context).primaryColor)),
+        ),
+      ]),
+    );
+  }
+
+  Widget _skillsUsedBar(
+      BuildContext context, List<String> skills, bool isDark) {    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).primaryColor.withValues(alpha: isDark ? 0.08 : 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).primaryColor.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1143,11 +1372,11 @@ class _ChatBubbleState extends State<ChatBubble> {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: Dt.accent.withValues(alpha: 0.15),
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(6),
               ),
               child:
-                  const Icon(LucideIcons.sparkles, size: 12, color: Dt.accent),
+                  Icon(LucideIcons.sparkles, size: 12, color: Theme.of(context).primaryColor),
             ),
             const SizedBox(width: 6),
             Text('Skills used',
@@ -1155,19 +1384,19 @@ class _ChatBubbleState extends State<ChatBubble> {
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.3,
-                    color: Dt.accent)),
+                    color: Theme.of(context).primaryColor)),
             const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
               decoration: BoxDecoration(
-                color: Dt.accent.withValues(alpha: 0.12),
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text('${skills.length}',
                   style: GoogleFonts.plusJakartaSans(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
-                      color: Dt.accent)),
+                      color: Theme.of(context).primaryColor)),
             ),
           ]),
           const SizedBox(height: 8),
@@ -1184,13 +1413,13 @@ class _ChatBubbleState extends State<ChatBubble> {
                             : Colors.white,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: Dt.accent.withValues(alpha: 0.18)),
+                            color: Theme.of(context).primaryColor.withValues(alpha: 0.18)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(LucideIcons.check,
-                              size: 10, color: Dt.accent),
+                          Icon(LucideIcons.check,
+                              size: 10, color: Theme.of(context).primaryColor),
                           const SizedBox(width: 4),
                           Text(name,
                               style: GoogleFonts.plusJakartaSans(
@@ -1354,21 +1583,21 @@ class _ChatBubbleState extends State<ChatBubble> {
       decoration: BoxDecoration(
         color: isUser
             ? Dt.textPrimary.withValues(alpha: 0.06)
-            : Dt.accent.withValues(alpha: 0.1),
+            : Theme.of(context).primaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 10, color: isUser ? Dt.textSecondary : Dt.accent),
+            Icon(icon, size: 10, color: isUser ? Dt.textSecondary : Theme.of(context).primaryColor),
             const SizedBox(width: 4),
           ],
           Text(
             label,
             style: GoogleFonts.plusJakartaSans(
               fontSize: 9,
-              color: isUser ? Dt.textSecondary : Dt.accent,
+              color: isUser ? Dt.textSecondary : Theme.of(context).primaryColor,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -1457,6 +1686,41 @@ class _ChatBubbleState extends State<ChatBubble> {
     return s > 0 ? '${m}m ${s}s' : '${m}m';
   }
 
+  String _estimateCost(ChatMessage msg) {
+    // Very simple pricing proxy: GPT-4o mini class vs GPT-4o class.
+    final content = msg.content;
+    final inChars = (msg.revisions?.last['content'] ?? '').toString().length;
+    final outChars = content.length;
+    
+    // Estimate tokens
+    final inTokens = inChars ~/ 4;
+    final outTokens = outChars ~/ 4;
+    
+    final model = _settings.selectedCloudModelName.toLowerCase();
+    
+    double pricePer1MIn = 0.15; // default mini
+    double pricePer1MOut = 0.60;
+    
+    if (model.contains('gpt-4o') && !model.contains('mini')) {
+      pricePer1MIn = 2.50;
+      pricePer1MOut = 10.00;
+    } else if (model.contains('claude-3-5-sonnet')) {
+      pricePer1MIn = 3.00;
+      pricePer1MOut = 15.00;
+    } else if (model.contains('gemini-1.5-pro')) {
+      pricePer1MIn = 3.50;
+      pricePer1MOut = 10.50;
+    } else if (model.contains('deepseek')) {
+      pricePer1MIn = 0.14;
+      pricePer1MOut = 0.28;
+    }
+
+    final total = (inTokens * pricePer1MIn / 1000000) + (outTokens * pricePer1MOut / 1000000);
+    
+    if (total < 0.0001) return '<\$0.0001';
+    return '\$${total.toStringAsFixed(4)}';
+  }
+
   String _cleanAssistantText(String text) {
     return sanitizeUtf16(text
         .replaceAll('<|endoftext|>', '')
@@ -1469,23 +1733,39 @@ class _ChatBubbleState extends State<ChatBubble> {
 class CitationLinkBuilder extends MarkdownElementBuilder {
   final BuildContext context;
   final List<Map<String, dynamic>>? citations;
+  final List<WebSource>? webSources;
 
-  CitationLinkBuilder(this.context, this.citations);
+  CitationLinkBuilder(this.context, this.citations, this.webSources);
 
   @override
   Widget? visitElementAfter(element, TextStyle? preferredStyle) {
     final href = element.attributes['href'];
     if (href != null && href.startsWith('cite:')) {
       final index = int.tryParse(href.substring(5)) ?? 0;
-      final citation =
-          (citations != null && index > 0 && index <= citations!.length)
-              ? citations![index - 1]
-              : null;
+
+      // Priority 1: Semantic citations (RAG)
+      if (citations != null && index > 0 && index <= citations!.length) {
+        final citation = citations![index - 1];
+        return CitationChip(
+          index: index,
+          source: citation['source'] ?? 'Unknown Source',
+          page: citation['pageNumber'],
+        );
+      }
+
+      // Priority 2: Web sources
+      if (webSources != null && index > 0 && index <= webSources!.length) {
+        final src = webSources![index - 1];
+        return CitationChip(
+          index: index,
+          source: src.title.isNotEmpty ? src.title : src.domain,
+          url: src.url,
+        );
+      }
 
       return CitationChip(
         index: index,
-        source: citation?['source'] ?? 'Unknown Source',
-        page: citation?['pageNumber'],
+        source: 'Source $index',
       );
     }
     return null;

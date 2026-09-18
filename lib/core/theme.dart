@@ -17,25 +17,51 @@ class AppTheme {
   static ThemeData _buildTheme(Brightness brightness, {Color? accentColor, String? fontFamily, ColorScheme? colorScheme}) {
     final isDark = brightness == Brightness.dark;
 
-    final accent = accentColor ?? Dt.accent;
+    // Two paths, by design:
+    // - Signature (no custom accent): the original Claude-warm look —
+    //   parchment/paper surfaces. NEVER touched by theme picks.
+    // - Swatch / custom accent: a full colorful scheme seeded from the
+    //   picked color (backgrounds, surfaces, texts all follow it).
+    // - Explicit scheme (Dynamic Color): honored as given, INCLUDING
+    //   its primary as the accent — otherwise wallpaper sync would
+    //   tint surfaces but leave buttons/switches orange.
+    late final Color accent;
     final family = fontFamily ?? 'Plus Jakarta Sans';
 
-    final bg = isDark ? AppColors.bg : AppColors.bgLight;
-    final surface = isDark ? AppColors.surface : AppColors.surfaceLightMode;
-    final surfaceHigh = isDark ? AppColors.surfaceLight : Dt.pillMuted;
-    final textPrimary = isDark ? AppColors.textPrimary : Dt.textPrimary;
-    final textSecondary = isDark ? AppColors.textSecondary : Dt.textSecondary;
-    final textMuted = isDark ? AppColors.textMuted : Dt.textMuted;
-    final separator = isDark ? AppColors.border : AppColors.borderLightMode;
-
-    return ThemeData(
-      brightness: brightness,
-      scaffoldBackgroundColor: bg,
-      primaryColor: accent,
-      cardColor: surface,
-      hintColor: textMuted,
-      dividerColor: separator,
-      colorScheme: colorScheme ?? ColorScheme(
+    late final Color bg;
+    late final Color surface;
+    late final Color surfaceHigh;
+    late final Color textPrimary;
+    late final Color textSecondary;
+    late final ColorScheme scheme;
+    if (colorScheme != null) {
+      scheme = colorScheme;
+      accent = scheme.primary;
+      bg = scheme.surface;
+      surface = scheme.surfaceContainerLow;
+      surfaceHigh = scheme.surfaceContainerHigh;
+      textPrimary = scheme.onSurface;
+      textSecondary = scheme.onSurfaceVariant;
+    } else if (accentColor != null) {
+      accent = accentColor;
+      scheme = ColorScheme.fromSeed(
+        seedColor: accent,
+        brightness: brightness,
+        primary: accent,
+      );
+      bg = scheme.surface;
+      surface = scheme.surfaceContainerLow;
+      surfaceHigh = scheme.surfaceContainerHigh;
+      textPrimary = scheme.onSurface;
+      textSecondary = scheme.onSurfaceVariant;
+    } else {
+      accent = Dt.accent;
+      bg = isDark ? AppColors.bg : AppColors.bgLight;
+      surface = isDark ? AppColors.surface : AppColors.surfaceLightMode;
+      surfaceHigh = isDark ? AppColors.surfaceLight : Dt.pillMuted;
+      textPrimary = isDark ? AppColors.textPrimary : Dt.textPrimary;
+      textSecondary = isDark ? AppColors.textSecondary : Dt.textSecondary;
+      scheme = ColorScheme(
         brightness: brightness,
         primary: accent,
         onPrimary: Colors.white,
@@ -46,7 +72,19 @@ class AppTheme {
         error: AppColors.error,
         onError: Colors.white,
         surfaceContainerHighest: surfaceHigh,
-      ),
+      );
+    }
+    final textMuted = isDark ? AppColors.textMuted : Dt.textMuted;
+    final separator = isDark ? AppColors.border : AppColors.borderLightMode;
+
+    return ThemeData(
+      brightness: brightness,
+      scaffoldBackgroundColor: bg,
+      primaryColor: accent,
+      cardColor: surface,
+      hintColor: textMuted,
+      dividerColor: separator,
+      colorScheme: scheme,
       textTheme: GoogleFonts.getTextTheme(
         family,
         isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
@@ -260,16 +298,14 @@ class AppTheme {
 
   // Bubble colors
   static Color userBubbleColor(BuildContext context) {
-    return AppColors.primary;
+    return Theme.of(context).primaryColor;
   }
 
   static Color aiBubbleColor(BuildContext context) {
-    return Theme.of(context).brightness == Brightness.dark
-        ? AppColors.surface
-        : Dt.pillMuted;
+    return Theme.of(context).cardColor;
   }
 
   static Color cmdBubbleColor(BuildContext context) {
-    return AppColors.cmdBubble;
+    return Theme.of(context).colorScheme.secondary;
   }
 }

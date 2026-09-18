@@ -1,28 +1,22 @@
-import 'dart:io' show Platform;
 import 'dart:ui';
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/settings_controller.dart';
-import '../controllers/chat_controller.dart';
-import '../services/chat_backup.dart';
-import '../services/device_info_service.dart';
-import '../services/hive_service.dart';
 import '../services/memory_service.dart';
-import '../services/stats_service.dart';
 import '../core/routes.dart';
 import '../core/colors.dart';
 import '../services/tts_service.dart';
-import '../utils/app_snackbar.dart';
-import '../utils/export_file.dart';
 import 'about_view.dart';
 import 'language_picker_view.dart';
+import 'log_view.dart';
 import 'memory_view.dart';
 import 'server_view.dart';
 import 'settings_view.dart';
 import 'setup_recommendations_view.dart';
+import 'settings/dev_tools_view.dart';
+import 'settings/data_view.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_ui.dart';
@@ -33,236 +27,53 @@ import '../widgets/thinking_orb.dart';
 /// Split out of the main Config page: appearance (theme), typography
 /// scale, and app info live here; everything inference/model related
 /// stays in Config.
+/// One jump target in Settings search.
+class _SettingSearchEntry {
+  final String title;
+  final String keywords;
+  final int tab;
+  final VoidCallback? open;
+
+  const _SettingSearchEntry({
+    required this.title,
+    this.keywords = '',
+    required this.tab,
+    this.open,
+  });
+
+  String get hint {
+    const names = [
+      'General',
+      'Nodes',
+      'Config',
+      'Parameters',
+      'Dev Tools',
+      'Data'
+    ];
+    return (tab >= 0 && tab < names.length) ? names[tab] : '';
+  }
+
+  /// Tab icon shown next to the result.
+  IconData get icon {
+    switch (tab) {
+      case 1:
+        return LucideIcons.server;
+      case 2:
+        return LucideIcons.slidersHorizontal;
+      case 3:
+        return LucideIcons.gauge;
+      case 4:
+        return LucideIcons.wrench;
+      case 5:
+        return LucideIcons.database;
+      default:
+        return LucideIcons.settings;
+    }
+  }
+}
+
 class AppSettingsView extends GetView<SettingsController> {
-  const AppSettingsView({super.key});
-
-  // ── Backup / Restore ──
-  Future<void> _exportAllChats() async {
-    final opts = await _showBackupOptionsDialog();
-    if (opts == null) return; // cancelled
-    try {
-      if (!Get.isRegistered<ChatController>()) {
-        Get.put(ChatController());
-      }
-      final err = await exportAllChats(
-        Get.find<HiveService>(),
-        includeImages: opts.includeImages,
-        passphrase: opts.passphrase.isEmpty ? null : opts.passphrase,
-      );
-      if (err == 'empty') {
-        AppSnackbar.showTop(
-            'Nothing to export', 'No chats found. Start a conversation first.',
-            icon: LucideIcons.info, type: 'general', logHistory: false);
-      } else if (err == 'cancelled') {
-        // User dismissed the desktop save dialog — stay silent.
-        return;
-      } else if (err != null) {
-        AppSnackbar.showTop(
-            'Export failed', 'Something went wrong while creating the backup.',
-            icon: LucideIcons.alertTriangle, type: 'error', iconName: 'alert');
-      } else if (opts.passphrase.isNotEmpty) {
-        AppSnackbar.showTop('Encrypted backup saved',
-            'Keep your passphrase safe — it cannot be recovered.',
-            icon: LucideIcons.lock, type: 'success', iconName: 'lock');
-      }
-    } catch (_) {
-      AppSnackbar.showTop(
-          'Export failed', 'Something went wrong while creating the backup.',
-          icon: LucideIcons.alertTriangle, type: 'error', iconName: 'alert');
-    }
-  }
-
-  /// Export options: include images + optional passphrase encryption.
-  Future<_BackupOptions?> _showBackupOptionsDialog() async {
-    var includeImages = false;
-    final passCtrl = TextEditingController();
-    try {
-      return await Get.dialog<_BackupOptions>(
-        AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Export backup'),
-          content: StatefulBuilder(
-            builder: (ctx, setState) => Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CheckboxListTile(
-                  value: includeImages,
-                  onChanged: (v) => setState(() => includeImages = v ?? false),
-                  title: const Text('Include images'),
-                  subtitle: const Text(
-                      'Much larger file. Needed to restore pictures.'),
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: passCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Passphrase (optional)',
-                    hintText: 'Encrypts the backup (AES-256)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Get.back(result: null),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Get.back(
-                result: _BackupOptions(
-                  includeImages: includeImages,
-                  passphrase: passCtrl.text,
-                ),
-              ),
-              child: const Text('Export'),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      passCtrl.dispose();
-    }
-  }
-
-  void _showStats(BuildContext context, StatsService stats) {
-    final counts = stats.snapshot();
-    final entries = counts.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? AppColors.surface : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Usage statistics',
-            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Counted on this device only. Nothing leaves the app.',
-                style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12, color: Theme.of(ctx).hintColor)),
-            const SizedBox(height: 12),
-            if (entries.isEmpty)
-              Text('No events yet.',
-                  style: GoogleFonts.plusJakartaSans(fontSize: 14)),
-            for (final e in entries)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(children: [
-                  Expanded(
-                    child: Text(StatsService.label(e.key),
-                        style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14, fontWeight: FontWeight.w600)),
-                  ),
-                  Text('${e.value}',
-                      style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: Dt.accent)),
-                ]),
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await stats.reset();
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: Text('Reset',
-                style: GoogleFonts.plusJakartaSans(color: AppColors.error)),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _exportSettings() async {
-    try {
-      if (!Get.isRegistered<ChatController>()) Get.put(ChatController());
-      final err = await exportSettings(Get.find<HiveService>());
-      if (err == null) {
-        AppSnackbar.showTop('Settings exported',
-            'API keys were excluded. Import them manually on the new device.',
-            icon: LucideIcons.check, type: 'general', logHistory: false);
-      } else if (err != 'cancelled') {
-        AppSnackbar.showTop('Export failed', err,
-            icon: LucideIcons.alertTriangle, type: 'error', iconName: 'alert');
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _importSettings() async {
-    try {
-      if (!Get.isRegistered<ChatController>()) Get.put(ChatController());
-      final err = await importSettings(Get.find<HiveService>());
-      if (err == null) {
-        AppSnackbar.showTop('Settings imported',
-            'Applied. Restart the app if something looks stale.',
-            icon: LucideIcons.check, type: 'general', logHistory: false);
-      } else if (err != 'cancelled') {
-        AppSnackbar.showTop('Import failed', err,
-            icon: LucideIcons.alertTriangle, type: 'error', iconName: 'alert');
-      }
-    } catch (_) {}
-  }
-
-  /// Explains the Strict RAM guard with live numbers: what it blocks,
-  /// how the dynamic reserve works, and what turning it off means.
-  void _showRamGuardInfo(BuildContext context) {
-    double total = 0;
-    double avail = 0;
-    try {
-      if (Get.isRegistered<DeviceInfoService>()) {
-        final dev = Get.find<DeviceInfoService>();
-        total = dev.totalRamGB.value;
-        avail = dev.availableRamGB.value;
-      }
-    } catch (_) {}
-    final roomMb = avail > 0 ? ((avail - 0.25) / 1.25 * 1024).round() : 0;
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Strict RAM guard'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _infoRow('What it does',
-                  'Before loading a local model, the app estimates file × 1.25 working space plus context cache. If free RAM cannot cover it, the load is a near-certain native crash — with no error message possible.'),
-              _infoRow('Dynamic reserve',
-                  'The safety reserve scales with file size (256 MB for tiny models up to 1 GB for huge ones) instead of a fixed 1 GB, so small models are not blocked needlessly.'),
-              if (avail > 0)
-                _infoRow('Right now',
-                    '${avail.toStringAsFixed(1)} GB free of ${total.toStringAsFixed(1)} GB — room for a model up to ≈$roomMb MB.'),
-              _infoRow('When off',
-                  'Blocked loads ask "Load anyway?" instead of refusing. The loader still frees other models first and uses minimal threads and context — but Android may still close the app mid-load.'),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Got it'),
-          ),
-        ],
-      ),
-    );
-  }
+  AppSettingsView({super.key});
 
   void _showCodeEditorInfo(BuildContext context) {
     showDialog(
@@ -310,296 +121,15 @@ class AppSettingsView extends GetView<SettingsController> {
     );
   }
 
-  /// Strict-guard toggle with an explicit warning on disable: turning
-  /// it off converts would-be refusals into confirmed risky loads, and
-  /// the OS may still kill the app mid-load. The switch only flips
-  /// after the user accepts that.
-  Future<void> _setStrictRamGuard(BuildContext context, bool v) async {
-    if (v) {
-      await controller.setStrictRamGuard(true);
-      return;
-    }
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Turn off Strict RAM guard?'),
-        content: const Text(
-          'Blocked model loads will ask to proceed anyway instead of '
-          'being refused. Android may close CubicLM mid-load if memory '
-          'runs out — the loader still minimizes footprint first, but '
-          'there is no guarantee.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep it on'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.orange),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('I accept the risk'),
-          ),
-        ],
-      ),
-    );
-    if (accepted == true && context.mounted) {
-      await controller.setStrictRamGuard(false);
-    }
-  }
-
-  /// Explains where exports go: default folder, custom picks, and why
-  /// files survive app uninstall.
-  void _showExportFolderInfo(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Export folder'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _infoRow('Default',
-                  'Every export saves straight into Download/CubicLM — no folder picker every time.'),
-              _infoRow('Custom folder',
-                  'Choose folder opens the system file manager: browse, create or select any folder once. The app remembers it (permission survives reboot). Reset returns to the default.'),
-              _infoRow('Uninstall-safe',
-                  'Files in Download stay on your device even if CubicLM is uninstalled.'),
-              _infoRow('Share',
-                  'Every export notice has a Share button to send the file to Drive, chat apps or email.'),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Got it'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Export destination picker. Android opens the system file manager
-  /// (SAF tree picker: browse, create and select any folder); desktop
-  /// can rename the subfolder or pick any folder outright.
-  Future<void> _pickExportFolder(BuildContext context, bool isDark) async {
-    final s = controller;
-    final nameCtrl = TextEditingController(text: s.exportSubfolder.value);
-    final isDesktop = !Platform.isAndroid && !Platform.isIOS;
-    final isAndroid = Platform.isAndroid;
-    await showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Export folder'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Current:\n${ExportFile.exportLocationLabel()}',
-                  style: GoogleFonts.plusJakartaSans(fontSize: 13)),
-              const SizedBox(height: 12),
-              if (isAndroid) ...[
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    icon: const Icon(LucideIcons.folderOpen, size: 16),
-                    label: const Text('Choose folder…'),
-                    onPressed: () async {
-                      final picked = await ExportFile.pickExportFolder();
-                      if (picked != null) {
-                        await s.setExportTree(picked['uri']!, picked['name']!);
-                      }
-                      if (context.mounted) Navigator.pop(context);
-                    },
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                    'Opens the system file manager — browse, create or select any folder.',
-                    style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11, color: Dt.textSecondary)),
-              ] else ...[
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Folder name',
-                    hintText: 'CubicLM',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                ),
-              ],
-              if (isDesktop) ...[
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  icon: const Icon(LucideIcons.folderOpen, size: 16),
-                  label: const Text('Pick custom folder…'),
-                  onPressed: () async {
-                    try {
-                      final dir = await FilePicker.getDirectoryPath(
-                          dialogTitle: 'Export folder');
-                      if (dir != null && dir.isNotEmpty) {
-                        await s.setExportCustomDir(dir);
-                        if (context.mounted) Navigator.pop(context);
-                      }
-                    } catch (_) {}
-                  },
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await s.resetExportDir();
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: const Text('Reset'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          if (!isAndroid)
-            FilledButton(
-              onPressed: () async {
-                // A custom desktop dir wins while set; saving a name here
-                // clears it so the name actually takes effect.
-                await s.setExportCustomDir('');
-                await s.setExportSubfolder(nameCtrl.text);
-                if (context.mounted) Navigator.pop(context);
-              },
-              child: const Text('Save'),
-            ),
-        ],
-      ),
-    );
-    nameCtrl.dispose();
-  }
-
-  Future<void> _importChats() async {
-    try {
-      if (!Get.isRegistered<ChatController>()) {
-        Get.put(ChatController());
-      }
-      final chat = Get.find<ChatController>();
-      final err = await chat.importChats();
-      switch (err) {
-        case 'cancelled':
-          return;
-        case 'locked':
-          // Encrypted backup — ask passphrase and retry once.
-          final pass = await _showPassphraseDialog();
-          if (pass == null || pass.isEmpty) return;
-          final retry = await chat.importChats(passphrase: pass);
-          if (retry == null || retry.startsWith('ok:')) {
-            _showRestoreDone(retry);
-          } else {
-            _showImportError(retry);
-          }
-          return;
-        case 'invalid':
-          AppSnackbar.showTop('Invalid file',
-              'Not a CubicLM backup — or the passphrase is wrong.',
-              icon: LucideIcons.alertTriangle,
-              type: 'error',
-              iconName: 'alert');
-          return;
-        case 'nothing':
-          AppSnackbar.showTop(
-              'Nothing new', 'All chats in that backup already exist here.',
-              icon: LucideIcons.info, type: 'general', logHistory: false);
-          return;
-        case 'error':
-          AppSnackbar.showTop(
-              'Import failed', 'Something went wrong while reading the backup.',
-              icon: LucideIcons.alertTriangle,
-              type: 'error',
-              iconName: 'alert');
-          return;
-        default:
-          if (err != null && err.startsWith('ok:')) {
-            _showRestoreDone(err);
-          }
-      }
-    } catch (_) {
-      AppSnackbar.showTop(
-          'Import failed', 'Something went wrong while reading the backup.',
-          icon: LucideIcons.alertTriangle, type: 'error', iconName: 'alert');
-    }
-  }
-
-  void _showRestoreDone(String? err) {
-    final parts = (err ?? '').split(':');
-    final sessions = parts.length > 1 ? parts[1] : '0';
-    final messages = parts.length > 2 ? parts[2] : '0';
-    AppSnackbar.showTop(
-        'Backup restored', '$sessions chats and $messages messages imported.',
-        icon: LucideIcons.checkCircle2, type: 'success', iconName: 'check');
-  }
-
-  void _showImportError(String err) {
-    if (err == 'invalid') {
-      AppSnackbar.showTop(
-          'Invalid file', 'Not a CubicLM backup — or the passphrase is wrong.',
-          icon: LucideIcons.alertTriangle, type: 'error', iconName: 'alert');
-    } else {
-      AppSnackbar.showTop(
-          'Import failed', 'Something went wrong while reading the backup.',
-          icon: LucideIcons.alertTriangle, type: 'error', iconName: 'alert');
-    }
-  }
-
-  Future<String?> _showPassphraseDialog() async {
-    final c = TextEditingController();
-    try {
-      return await Get.dialog<String>(
-        AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Encrypted backup'),
-          content: TextField(
-            controller: c,
-            autofocus: true,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Passphrase',
-              border: OutlineInputBorder(),
-            ),
-            onSubmitted: (_) => Get.back(result: c.text),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Get.back(result: null),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Get.back(result: c.text),
-              child: const Text('Unlock'),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      c.dispose();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return DefaultTabController(
-      length: 4,
+      length: 6,
       child: Scaffold(
-      backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
       appBar: AppBar(
         backgroundColor:
-            (isDark ? Dt.canvasDark : Dt.canvas).withValues(alpha: 0.8),
+            Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.8),
         flexibleSpace: ClipRRect(
           child: Obx(() => BackdropFilter(
             filter: ImageFilter.blur(sigmaX: AppColors.blurSigma, sigmaY: AppColors.blurSigma),
@@ -615,12 +145,37 @@ class AppSettingsView extends GetView<SettingsController> {
                 fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -1)),
         toolbarHeight: 70,
         centerTitle: false,
+        actions: [
+          Obx(() => IconButton(
+                tooltip: 'Search settings',
+                icon: Icon(
+                    controller.settingsSearching.value
+                        ? LucideIcons.x
+                        : LucideIcons.search,
+                    size: 20),
+                onPressed: () {
+                  final s = controller;
+                  final on = !s.settingsSearching.value;
+                  s.settingsSearching.value = on;
+                  if (on) {
+                    _searchCtrl.clear();
+                    s.settingsSearchQuery.value = '';
+                  }
+                },
+              )),
+          IconButton(
+            tooltip: 'System logs',
+            icon: const Icon(LucideIcons.terminal, size: 20),
+            onPressed: () => Get.to(() => const LogView()),
+          ),
+          const SizedBox(width: 4),
+        ],
         bottom: TabBar(
           isScrollable: true,
           tabAlignment: TabAlignment.start,
-          indicatorColor: Dt.accent,
+          indicatorColor: Theme.of(context).primaryColor,
           indicatorSize: TabBarIndicatorSize.label,
-          labelColor: Dt.accent,
+          labelColor: Theme.of(context).primaryColor,
           unselectedLabelColor: Theme.of(context).hintColor,
           dividerColor: Colors.transparent,
           labelStyle: GoogleFonts.plusJakartaSans(
@@ -632,10 +187,14 @@ class AppSettingsView extends GetView<SettingsController> {
             Tab(text: 'nodes_node'.tr),
             Tab(text: 'nodes_config'.tr),
             Tab(text: 'settings_tab_parameters'.tr),
+            Tab(text: 'settings_tab_devtools'.tr),
+            Tab(text: 'settings_tab_data'.tr),
           ],
         ),
       ),
-      body: TabBarView(
+      body: Obx(() => controller.settingsSearching.value
+          ? _buildSearchBody(context)
+          : TabBarView(
         children: [
           Obx(() => ListView(
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -646,8 +205,8 @@ class AppSettingsView extends GetView<SettingsController> {
                 _appleListTile(
                   context,
                   isDark,
-                  leading: const Icon(LucideIcons.palette,
-                      size: 20, color: Dt.accent),
+                  leading: Icon(LucideIcons.palette,
+                      size: 20, color: Theme.of(context).primaryColor),
                   title: 'settings_personalize'.tr,
                   subtitle: 'settings_personalize_desc'.tr,
                   trailing: const Icon(LucideIcons.chevronRight, size: 20),
@@ -665,8 +224,8 @@ class AppSettingsView extends GetView<SettingsController> {
                         size: 20, color: Theme.of(context).hintColor),
                     title: _themeModeName(mode),
                     trailing: controller.themeMode.value == mode
-                        ? const Icon(LucideIcons.check,
-                            size: 20, color: Dt.accent)
+                        ? Icon(LucideIcons.check,
+                            size: 20, color: Theme.of(context).primaryColor)
                         : null,
                     showDivider: mode != ThemeMode.system,
                     onTap: () => controller.setThemeMode(mode),
@@ -703,8 +262,8 @@ class AppSettingsView extends GetView<SettingsController> {
                 Obx(() => _appleSwitchTile(
                       context,
                       isDark,
-                      leading: const Icon(LucideIcons.volume2,
-                          size: 20, color: Dt.accent),
+                      leading: Icon(LucideIcons.volume2,
+                          size: 20, color: Theme.of(context).primaryColor),
                       title: 'Read aloud',
                       subtitle: controller.readAloudEnabled.value
                           ? 'Tap speaker on assistant messages to hear them'
@@ -731,8 +290,8 @@ class AppSettingsView extends GetView<SettingsController> {
                   return _appleListTile(
                     context,
                     isDark,
-                    leading: const Icon(LucideIcons.brain,
-                        size: 20, color: Dt.accent),
+                    leading: Icon(LucideIcons.brain,
+                        size: 20, color: Theme.of(context).primaryColor),
                     title: 'Memory',
                     subtitle: mem.isEnabled.value
                         ? '${mem.memoryCount} fact${mem.memoryCount == 1 ? '' : 's'} stored'
@@ -749,7 +308,7 @@ class AppSettingsView extends GetView<SettingsController> {
                   _sectionLabel(context, 'CODE EDITOR'),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(LucideIcons.info, size: 16, color: Dt.accent),
+                    icon: Icon(LucideIcons.info, size: 16, color: Theme.of(context).primaryColor),
                     tooltip: 'Editor Information',
                     visualDensity: VisualDensity.compact,
                     onPressed: () => _showCodeEditorInfo(context),
@@ -761,12 +320,12 @@ class AppSettingsView extends GetView<SettingsController> {
                 Obx(() => _appleListTile(
                       context,
                       isDark,
-                      leading: const Icon(LucideIcons.layout,
-                          size: 20, color: Dt.accent),
+                      leading: Icon(LucideIcons.layout,
+                          size: 20, color: Theme.of(context).primaryColor),
                       title: 'Canvas Split Editor',
                       subtitle: 'Side-by-side code editor + live preview with auto-close',
                       trailing: controller.codeEditorType.value == 'split'
-                          ? const Icon(LucideIcons.check, size: 20, color: Dt.accent)
+                          ? Icon(LucideIcons.check, size: 20, color: Theme.of(context).primaryColor)
                           : null,
                       showDivider: true,
                       onTap: () => controller.setCodeEditorType('split'),
@@ -774,16 +333,59 @@ class AppSettingsView extends GetView<SettingsController> {
                 Obx(() => _appleListTile(
                       context,
                       isDark,
-                      leading: const Icon(LucideIcons.code,
-                          size: 20, color: Dt.accent),
+                      leading: Icon(LucideIcons.code,
+                          size: 20, color: Theme.of(context).primaryColor),
                       title: 'Lightweight Editor',
                       subtitle: 'Plain TextField + line numbers (zero overhead)',
                       trailing: controller.codeEditorType.value == 'plain'
-                          ? const Icon(LucideIcons.check, size: 20, color: Dt.accent)
+                          ? Icon(LucideIcons.check, size: 20, color: Theme.of(context).primaryColor)
                           : null,
-                      showDivider: false,
+                      showDivider: true,
                       onTap: () => controller.setCodeEditorType('plain'),
                     )),
+                Obx(() => _appleSwitchTile(
+                      context,
+                      isDark,
+                      leading: Icon(LucideIcons.clipboardPaste,
+                          size: 20, color: Theme.of(context).primaryColor),
+                      title: 'Long-paste to file',
+                      subtitle: controller.longPasteToFile.value
+                          ? 'Huge pastes attach as .md files'
+                          : 'Huge pastes stay as text',
+                      value: controller.longPasteToFile.value,
+                      onChanged: (v) => controller.setLongPasteToFile(v),
+                    )),
+                _appleListTile(
+                  context,
+                  isDark,
+                  leading: Icon(LucideIcons.slidersHorizontal,
+                      size: 20, color: Theme.of(context).primaryColor),
+                  title: 'Composer buttons',
+                  subtitle: 'Show or hide chat input icons',
+                  trailing: const Icon(LucideIcons.chevronRight, size: 20),
+                  onTap: () => _showComposerButtonsSheet(context, isDark),
+                ),
+                Obx(() {
+                  final style = controller.contextWindowStyle.value;
+                  return _appleListTile(
+                    context,
+                    isDark,
+                    leading: Icon(LucideIcons.gauge,
+                        size: 20,
+                        color: Theme.of(context).primaryColor),
+                    title: 'Context window',
+                    subtitle: style == 'ring'
+                        ? 'Ring badge in the chat header'
+                        : style == 'composer'
+                            ? 'Bar above the send button'
+                            : 'Bar below the chat header',
+                    trailing:
+                        const Icon(LucideIcons.chevronRight, size: 20),
+                    showDivider: false,
+                    onTap: () =>
+                        _showContextWindowSheet(context, isDark),
+                  );
+                }),
               ]),
               const SizedBox(height: 28),
               _sectionLabel(context, 'settings_startup'.tr),
@@ -791,8 +393,8 @@ class AppSettingsView extends GetView<SettingsController> {
                 Obx(() => _appleSwitchTile(
                       context,
                       isDark,
-                      leading: const Icon(LucideIcons.rocket,
-                          size: 20, color: Dt.accent),
+                      leading: Icon(LucideIcons.rocket,
+                          size: 20, color: Theme.of(context).primaryColor),
                       title: 'startup_auto_load'.tr,
                       subtitle: controller.autoLoadLastModel.value
                           ? 'startup_auto_load_on'.tr
@@ -807,8 +409,8 @@ class AppSettingsView extends GetView<SettingsController> {
                 _appleListTile(
                   context,
                   isDark,
-                  leading: const Icon(LucideIcons.listChecks,
-                      size: 20, color: Dt.accent),
+                  leading: Icon(LucideIcons.listChecks,
+                      size: 20, color: Theme.of(context).primaryColor),
                   title: 'Recommended setup',
                   subtitle:
                       'Notifications, battery, runtime, keys — all optional',
@@ -823,8 +425,8 @@ class AppSettingsView extends GetView<SettingsController> {
                 Obx(() => _appleSwitchTile(
                       context,
                       isDark,
-                      leading: const Icon(LucideIcons.fingerprint,
-                          size: 20, color: Dt.accent),
+                      leading: Icon(LucideIcons.fingerprint,
+                          size: 20, color: Theme.of(context).primaryColor),
                       title: 'App Lock',
                       subtitle: !controller.biometricsAvailable.value
                           ? 'No biometric hardware detected on this device'
@@ -849,8 +451,8 @@ class AppSettingsView extends GetView<SettingsController> {
                   return _appleListTile(
                     context,
                     isDark,
-                    leading: const Icon(LucideIcons.timer,
-                        size: 20, color: Dt.accent),
+                    leading: Icon(LucideIcons.timer,
+                        size: 20, color: Theme.of(context).primaryColor),
                     title: 'Re-lock',
                     subtitle: 'Lock again $label in background',
                     onTap: () => _pickLockTimeout(context, controller),
@@ -863,8 +465,8 @@ class AppSettingsView extends GetView<SettingsController> {
                   return _appleSwitchTile(
                     context,
                     isDark,
-                    leading: const Icon(LucideIcons.scanFace,
-                        size: 20, color: Dt.accent),
+                    leading: Icon(LucideIcons.scanFace,
+                        size: 20, color: Theme.of(context).primaryColor),
                     title: 'Biometric only',
                     subtitle: controller.lockBiometricOnly.value
                         ? 'Device PIN will NOT unlock the app'
@@ -875,185 +477,13 @@ class AppSettingsView extends GetView<SettingsController> {
                 }),
               ]),
               const SizedBox(height: 28),
-              _sectionLabel(context, 'DATA'),
-              _appleGroupedCard(context, isDark, children: [
-                _appleListTile(
-                  context,
-                  isDark,
-                  leading: const Icon(LucideIcons.download,
-                      size: 20, color: Dt.accent),
-                  title: 'Export all chats',
-                  subtitle: 'Save every conversation as a JSON backup',
-                  onTap: () => _exportAllChats(),
-                ),
-                _appleListTile(
-                  context,
-                  isDark,
-                  leading: const Icon(LucideIcons.upload,
-                      size: 20, color: Dt.accent),
-                  title: 'Import chats',
-                  subtitle: 'Restore from a CubicLM backup file',
-                  onTap: () => _importChats(),
-                ),
-                Obx(() {
-                  final chat = Get.isRegistered<ChatController>()
-                      ? Get.find<ChatController>()
-                      : Get.put(ChatController());
-                  return _appleSwitchTile(
-                    context,
-                    isDark,
-                    leading: const Icon(LucideIcons.history,
-                        size: 20, color: Dt.accent),
-                    title: 'Auto backup',
-                    subtitle: chat.autoBackupEnabled.value
-                        ? 'Silent JSON every ${chat.autoBackupDays.value}d (last 3 kept)'
-                        : 'Off — only manual exports',
-                    value: chat.autoBackupEnabled.value,
-                    onChanged: (v) => chat.setAutoBackup(v),
-                  );
-                }),
-                Obx(() {
-                  final chat = Get.isRegistered<ChatController>()
-                      ? Get.find<ChatController>()
-                      : Get.put(ChatController());
-                  if (!chat.autoBackupEnabled.value) {
-                    return const SizedBox.shrink();
-                  }
-                  return _appleListTile(
-                    context,
-                    isDark,
-                    leading: const Icon(LucideIcons.calendarClock,
-                        size: 20, color: Dt.accent),
-                    title: 'Backup every',
-                    subtitle:
-                        'Every ${chat.autoBackupDays.value} days (unencrypted)',
-                    onTap: () => _pickAutoBackupDays(context, chat),
-                  );
-                }),
-                _appleListTile(
-                  context,
-                  isDark,
-                  leading: const Icon(LucideIcons.settings2,
-                      size: 20, color: Dt.accent),
-                  title: 'Export settings',
-                  subtitle: 'Preferences without API keys',
-                  onTap: () => _exportSettings(),
-                ),
-                _appleListTile(
-                  context,
-                  isDark,
-                  leading: const Icon(LucideIcons.settings,
-                      size: 20, color: Dt.accent),
-                  title: 'Import settings',
-                  subtitle: 'Restore preferences (keys never transfer)',
-                  onTap: () => _importSettings(),
-                ),
-                if (!kIsWeb)
-                  Obx(() => _appleListTile(
-                        context,
-                        isDark,
-                        leading: const Icon(LucideIcons.shieldCheck,
-                            size: 20, color: Dt.accent),
-                        title: 'Strict RAM guard',
-                        subtitle: controller.strictRamGuard.value
-                            ? 'On — risky loads are blocked'
-                            : 'Off — blocked loads ask first (crash risk)',
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              tooltip: 'How this works',
-                              icon: const Icon(LucideIcons.info, size: 19),
-                              onPressed: () => _showRamGuardInfo(context),
-                            ),
-                            Switch.adaptive(
-                              value: controller.strictRamGuard.value,
-                              activeThumbColor: Dt.accent,
-                              onChanged: (v) => _setStrictRamGuard(context, v),
-                            ),
-                          ],
-                        ),
-                        onTap: () => _showRamGuardInfo(context),
-                      )),
-                if (!kIsWeb)
-                  Obx(() {
-                    // Subscribe to the Rx prefs so the label refreshes
-                    // right after a change (the label itself reads Hive).
-                    controller.exportSubfolder.value;
-                    controller.exportCustomDir.value;
-                    controller.exportTreeUri.value;
-                    controller.exportTreeName.value;
-                    return _appleListTile(
-                      context,
-                      isDark,
-                      leading: const Icon(LucideIcons.folderOutput,
-                          size: 20, color: Dt.accent),
-                      title: 'Export folder',
-                      subtitle: ExportFile.exportLocationLabel(),
-                      trailing: IconButton(
-                        tooltip: 'How this works',
-                        icon: const Icon(LucideIcons.info, size: 19),
-                        onPressed: () => _showExportFolderInfo(context),
-                      ),
-                      onTap: () => _pickExportFolder(context, isDark),
-                    );
-                  }),
-                Obx(() {
-                  final stats = Get.isRegistered<StatsService>()
-                      ? Get.find<StatsService>()
-                      : Get.put(StatsService());
-                  final on = stats.enabled.value;
-                  // ignore: unused_local_variable
-                  final v = stats.version.value;
-                  final counts = on ? stats.snapshot() : <String, int>{};
-                  final total = counts.values.fold<int>(0, (a, b) => a + b);
-                  return _appleListTile(
-                    context,
-                    isDark,
-                    leading: const Icon(LucideIcons.barChart3,
-                        size: 20, color: Dt.accent),
-                    title: 'Usage statistics',
-                    subtitle: !on
-                        ? 'Off — nothing is counted'
-                        : total == 0
-                            ? 'On — no events yet'
-                            : '$total events counted (device only)',
-                    trailing: Switch.adaptive(
-                      value: on,
-                      activeThumbColor: Dt.accent,
-                      onChanged: (nv) => stats.setEnabled(nv),
-                    ),
-                    showDivider: false,
-                    onTap: on ? () => _showStats(context, stats) : null,
-                  );
-                }),
-                _appleListTile(
-                  context,
-                  isDark,
-                  leading: const Icon(LucideIcons.graduationCap,
-                      size: 20, color: Dt.accent),
-                  title: 'Replay onboarding',
-                  subtitle: 'Walk through setup again',
-                  showDivider: false,
-                  onTap: () async {
-                    await controller.resetOnboarding();
-                    // Push (don't offAllNamed): keeps the home stack and its
-                    // controllers alive underneath. offAllNamed from here
-                    // would dispose lazy controllers (Chat/Home/Model) and
-                    // break the return trip. Onboarding finishes with its
-                    // own offAllNamed(home), which rebuilds cleanly.
-                    Get.toNamed(AppRoutes.onboarding);
-                  },
-                ),
-              ]),
-              const SizedBox(height: 28),
               _sectionLabel(context, 'settings_language'.tr),
               _appleGroupedCard(context, isDark, children: [
                 _appleListTile(
                   context,
                   isDark,
                   leading:
-                      const Icon(LucideIcons.globe, size: 20, color: Dt.accent),
+                      Icon(LucideIcons.globe, size: 20, color: Theme.of(context).primaryColor),
                   title: 'settings_language'.tr,
                   subtitle:
                       '${controller.locale.value.flag}  ${controller.locale.value.nativeName}',
@@ -1069,8 +499,8 @@ class AppSettingsView extends GetView<SettingsController> {
                 _appleListTile(
                   context,
                   isDark,
-                  leading: const Icon(LucideIcons.arrowDownToLine,
-                      size: 20, color: Dt.accent),
+                  leading: Icon(LucideIcons.arrowDownToLine,
+                      size: 20, color: Theme.of(context).primaryColor),
                   title: 'View Update',
                   subtitle: 'Version, highlights & update settings',
                   trailing: Icon(LucideIcons.chevronRight,
@@ -1117,7 +547,7 @@ class AppSettingsView extends GetView<SettingsController> {
                                   style: GoogleFonts.plusJakartaSans(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
-                                      color: Dt.accent.withValues(alpha: 0.7))),
+                                      color: Theme.of(context).primaryColor.withValues(alpha: 0.7))),
                               const SizedBox(height: 1),
                               Obx(() => Text(
                                   controller.appVersion.value.isEmpty
@@ -1141,10 +571,244 @@ class AppSettingsView extends GetView<SettingsController> {
           const ServerView(embedded: true),
           const SettingsView(embedded: true, hideParams: true),
           const ParametersView(),
+          const DevToolsView(),
+          const DataView(),
         ],
-      ),
-    ));
+      ))));
   }
+
+  // ── Settings search ──
+
+  final _searchCtrl = TextEditingController();
+
+  void _toggleSearching() {
+    final on = !controller.settingsSearching.value;
+    controller.settingsSearching.value = on;
+    if (on) {
+      _searchCtrl.clear();
+      controller.settingsSearchQuery.value = '';
+    }
+  }
+
+  void _goToTab(BuildContext context, int tab) {
+    controller.settingsSearching.value = false;
+    controller.settingsSearchQuery.value = '';
+    try {
+      DefaultTabController.of(context).animateTo(tab);
+    } catch (_) {}
+  }
+
+  Widget _buildSearchBody(BuildContext context) {
+    final query = controller.settingsSearchQuery.value;
+    final results = _filterSettings(query);
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+          child: TextField(
+            controller: _searchCtrl,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Search settings…',
+              prefixIcon:
+                  const Icon(LucideIcons.search, size: 18),
+              suffixIcon: IconButton(
+                icon: const Icon(LucideIcons.x, size: 16),
+                onPressed: _toggleSearching,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 12),
+            ),
+            onChanged: (v) =>
+                controller.settingsSearchQuery.value = v,
+          ),
+        ),
+        Expanded(
+          child: query.trim().isEmpty
+              ? Center(
+                  child: Text(
+                    'Type to jump to any setting.',
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        color: Theme.of(context).hintColor),
+                  ),
+                )
+              : results.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No settings match "$query".',
+                        style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            color: Theme.of(context).hintColor),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                      itemCount: results.length,
+                      itemBuilder: (ctx, i) {
+                        final e = results[i];
+                        return _appleListTile(
+                          context,
+                          Theme.of(context).brightness ==
+                              Brightness.dark,
+                          leading: Icon(e.icon,
+                              size: 20,
+                              color:
+                                  Theme.of(context).primaryColor),
+                          title: e.title,
+                          subtitle: e.hint,
+                          trailing: const Icon(
+                              LucideIcons.chevronRight,
+                              size: 18),
+                          showDivider: i != results.length - 1,
+                          onTap: () {
+                            if (e.open != null) {
+                              controller.settingsSearching
+                                  .value = false;
+                              controller.settingsSearchQuery.value =
+                                  '';
+                              e.open!();
+                            } else {
+                              _goToTab(context, e.tab);
+                            }
+                          },
+                        );
+                      },
+                    ),
+        ),
+      ],
+    );
+  }
+
+  List<_SettingSearchEntry> _filterSettings(String q) {
+    final query = q.trim().toLowerCase();
+    if (query.isEmpty) return const [];
+    return _settingsIndex()
+        .where((e) =>
+            e.title.toLowerCase().contains(query) ||
+            e.keywords.toLowerCase().contains(query))
+        .toList();
+  }
+
+  /// Jump index across all six tabs. Entries without [open] just
+  /// Jump index across all six tabs. Entries without [open] just
+  /// switch to their tab; entries with [open] navigate directly.
+  List<_SettingSearchEntry> _settingsIndex() => [
+        _SettingSearchEntry(
+            title: 'Personalize',
+            keywords: 'theme color font typography appearance',
+            tab: 0,
+            open: () => Get.toNamed(AppRoutes.personalization)),
+        const _SettingSearchEntry(
+            title: 'Theme mode', keywords: 'dark light system', tab: 0),
+        _SettingSearchEntry(
+            title: 'Language',
+            keywords: 'bangla english locale',
+            tab: 0,
+            open: () => Get.to(() => const LanguagePickerView())),
+        const _SettingSearchEntry(
+            title: 'Memory', keywords: 'long term recall facts', tab: 0),
+        const _SettingSearchEntry(
+            title: 'Read aloud',
+            keywords: 'tts speech voice speaker',
+            tab: 0),
+        const _SettingSearchEntry(
+            title: 'Thinking orbs', keywords: 'animation', tab: 0),
+        const _SettingSearchEntry(
+            title: 'Startup', keywords: 'autoload resume', tab: 0),
+        _SettingSearchEntry(
+            title: 'App info',
+            keywords: 'version about update',
+            tab: 0,
+            open: () => Get.toNamed(AppRoutes.update)),
+        const _SettingSearchEntry(
+            title: 'Node server',
+            keywords: 'api openai endpoint start stop',
+            tab: 1),
+        const _SettingSearchEntry(
+            title: 'API key',
+            keywords: 'token bearer security auth',
+            tab: 1),
+        const _SettingSearchEntry(
+            title: 'Recent requests',
+            keywords: 'traffic log server calls',
+            tab: 1),
+        const _SettingSearchEntry(
+            title: 'Hardware',
+            keywords: 'device ram soc cpu gpu info',
+            tab: 2),
+        const _SettingSearchEntry(
+            title: 'Inference mode',
+            keywords: 'local cloud',
+            tab: 2),
+        const _SettingSearchEntry(
+            title: 'System prompt',
+            keywords: 'persona instructions',
+            tab: 2),
+        const _SettingSearchEntry(
+            title: 'Skills', keywords: 'extensions prompts', tab: 2),
+        const _SettingSearchEntry(
+            title: 'MCP server',
+            keywords: 'tools remote model context protocol',
+            tab: 2),
+        const _SettingSearchEntry(
+            title: 'Context size',
+            keywords: 'context window memory tokens',
+            tab: 3),
+        const _SettingSearchEntry(
+            title: 'Output tokens',
+            keywords: 'max tokens length response',
+            tab: 3),
+        const _SettingSearchEntry(
+            title: 'Temperature',
+            keywords: 'sampling top-p top-k creativity',
+            tab: 3),
+        const _SettingSearchEntry(
+            title: 'Image generation',
+            keywords: 'steps resolution size stable diffusion',
+            tab: 3),
+        const _SettingSearchEntry(
+            title: 'Strict RAM guard',
+            keywords: 'memory safety load block',
+            tab: 4),
+        const _SettingSearchEntry(
+            title: 'Developer tools',
+            keywords: 'toolchain node python runtime install',
+            tab: 4),
+        const _SettingSearchEntry(
+            title: 'Linux runtime',
+            keywords: 'ubuntu proot terminal history',
+            tab: 4),
+        const _SettingSearchEntry(
+            title: 'Export chats',
+            keywords: 'backup json download',
+            tab: 5),
+        const _SettingSearchEntry(
+            title: 'Import chats',
+            keywords: 'restore backup upload',
+            tab: 5),
+        const _SettingSearchEntry(
+            title: 'Auto backup',
+            keywords: 'automatic schedule',
+            tab: 5),
+        const _SettingSearchEntry(
+            title: 'Export folder',
+            keywords: 'downloads directory location',
+            tab: 5),
+        const _SettingSearchEntry(
+            title: 'Usage statistics',
+            keywords: 'stats count events',
+            tab: 5),
+        _SettingSearchEntry(
+            title: 'System logs',
+            keywords: 'diagnostics errors crash debug health',
+            tab: 5,
+            open: () => Get.to(() => const LogView())),
+      ];
 
   // ── Typography ──
 
@@ -1165,7 +829,7 @@ class AppSettingsView extends GetView<SettingsController> {
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Icon(LucideIcons.type, size: 16, color: Dt.accent),
+            Icon(LucideIcons.type, size: 16, color: Theme.of(context).primaryColor),
             const SizedBox(width: 10),
             Text('typography_scale'.tr,
                 style: GoogleFonts.plusJakartaSans(
@@ -1174,12 +838,12 @@ class AppSettingsView extends GetView<SettingsController> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                  color: Dt.accent.withValues(alpha: 0.1),
+                  color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8)),
               child: Text(scaleLabel(controller.fontScale.value),
                   style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
-                      color: Dt.accent,
+                      color: Theme.of(context).primaryColor,
                       fontWeight: FontWeight.w800)),
             ),
           ]),
@@ -1189,7 +853,7 @@ class AppSettingsView extends GetView<SettingsController> {
             min: min,
             max: max,
             divisions: 12,
-            activeColor: Dt.accent,
+            activeColor: Theme.of(context).primaryColor,
             onChanged: (v) => controller.setFontScale(v),
           ),
         ]),
@@ -1378,7 +1042,7 @@ class AppSettingsView extends GetView<SettingsController> {
                 ]),
           ),
           if (selected)
-            const Icon(LucideIcons.check, size: 20, color: Dt.accent),
+            Icon(LucideIcons.check, size: 20, color: Theme.of(sheetCtx).primaryColor),
         ]),
       ),
     );
@@ -1398,24 +1062,6 @@ class AppSettingsView extends GetView<SettingsController> {
       clipBehavior: Clip.antiAlias,
       child: Column(mainAxisSize: MainAxisSize.min, children: children),
     );
-  }
-
-  Future<void> _pickAutoBackupDays(
-      BuildContext context, ChatController chat) async {
-    final picked = await showDialog<int>(
-      context: context,
-      builder: (dlgCtx) => SimpleDialog(
-        title: const Text('Auto backup every'),
-        children: [
-          for (final d in ChatController.autoBackupDayOptions)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(dlgCtx, d),
-              child: Text(d == 1 ? 'Every day' : 'Every $d days'),
-            ),
-        ],
-      ),
-    );
-    if (picked != null) await chat.setAutoBackup(true, picked);
   }
 
   Future<void> _pickLockTimeout(
@@ -1530,10 +1176,148 @@ class AppSettingsView extends GetView<SettingsController> {
         const SizedBox(width: 12),
         Switch.adaptive(
           value: value,
-          activeThumbColor: Dt.accent,
+          activeThumbColor: Theme.of(context).primaryColor,
           onChanged: onChanged,
         ),
       ]),
+    );
+  }
+
+  /// Composer toolbar visibility: hidden icons stay reachable from
+  /// the + menu. Mirrors the browser toolbar config pattern.
+  void _showComposerButtonsSheet(BuildContext context, bool isDark) {
+    Widget chip(
+        String label, bool selected, ValueChanged<bool> onSelected) {
+      return FilterChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: onSelected,
+      );
+    }
+
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        decoration: BoxDecoration(
+          color: isDark ? Dt.cardDark : Dt.card,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text('Composer buttons',
+                style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text('Hidden icons stay in the + menu',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: Theme.of(context).hintColor)),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Obx(() => chip(
+                    'Deep Search',
+                    controller.showDeepSearch.value,
+                    (v) => controller.setShowDeepSearch(v))),
+                Obx(() => chip(
+                    'Web access',
+                    controller.showWebAccess.value,
+                    (v) => controller.setShowWebAccess(v))),
+                Obx(() => chip(
+                    'Live Vision',
+                    controller.showLiveVision.value,
+                    (v) => controller.setShowLiveVision(v))),
+                Obx(() => chip(
+                    'Polish Prompt',
+                    controller.showPolishPrompt.value,
+                    (v) => controller.setShowPolishPrompt(v))),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Context-window indicator placement: header bar, composer bar,
+  /// or compact ring badge in the chat header.
+  void _showContextWindowSheet(BuildContext context, bool isDark) {
+    Widget option(String id, String title, String subtitle, IconData icon) {
+      return Obx(() {
+        final selected = controller.contextWindowStyle.value == id;
+        return ListTile(
+          dense: true,
+          leading: Icon(icon,
+              size: 20,
+              color: selected
+                  ? Theme.of(context).primaryColor
+                  : Theme.of(context).hintColor),
+          title: Text(title,
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14, fontWeight: FontWeight.w700)),
+          subtitle: Text(subtitle,
+              style: GoogleFonts.plusJakartaSans(fontSize: 12)),
+          trailing: selected
+              ? Icon(LucideIcons.check,
+                  size: 20, color: Theme.of(context).primaryColor)
+              : null,
+          onTap: () {
+            controller.setContextWindowStyle(id);
+            Get.back();
+          },
+        );
+      });
+    }
+
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        decoration: BoxDecoration(
+          color: isDark ? Dt.cardDark : Dt.card,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text('Context window display',
+                style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            option('header', 'Chat header',
+                'Full bar below the header (default)', LucideIcons.panelTop),
+            option('composer', 'Text box',
+                'Slim bar above the send button', LucideIcons.textCursorInput),
+            option('ring', 'Ring badge',
+                'Tiny % circle in the header — tap for details',
+                LucideIcons.circleDot),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1548,11 +1332,4 @@ class AppSettingsView extends GetView<SettingsController> {
               color: Theme.of(context).hintColor)),
     );
   }
-}
-
-/// Backup export choices from the export-options dialog.
-class _BackupOptions {
-  final bool includeImages;
-  final String passphrase;
-  const _BackupOptions({required this.includeImages, required this.passphrase});
 }

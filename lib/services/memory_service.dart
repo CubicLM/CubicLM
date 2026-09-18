@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../utils/memory_extract.dart';
 import 'app_log_service.dart';
 import 'hive_service.dart';
 
@@ -65,6 +66,26 @@ class MemoryService extends GetxService {
         .info('New memory stored: $fact', category: LogCategory.system);
   }
 
+  /// Adds [fact], first dropping stored facts on the same [topic]
+  /// (name/project/live/role/fav:X). Contradictions ("moved to…",
+  /// new name/job) thus replace instead of piling up and confusing
+  /// the model. Empty topic (builds, remembrances) keeps multiples.
+  Future<void> replaceTopic(String topic, String fact) async {
+    if (topic.isEmpty) {
+      await addMemory(fact);
+      return;
+    }
+    try {
+      final olds = memories
+          .where((m) => factTopic(m['fact'] ?? '') == topic)
+          .toList();
+      for (final o in olds) {
+        await _memoryBox.delete(o['key']);
+      }
+    } catch (_) {}
+    await addMemory(fact);
+  }
+
   Future<void> updateMemory(String key, String newFact) async {
     if (newFact.trim().isEmpty) return;
     await _memoryBox.put(key, newFact.trim());
@@ -97,6 +118,35 @@ class MemoryService extends GetxService {
     final buffer = StringBuffer(basePrompt);
     buffer.writeln('\n\n[User Context & Information]');
     for (final m in all) {
+      buffer.writeln('- $m');
+    }
+    return buffer.toString();
+  }
+
+  /// Ranked variant: only memories relevant to [query] are injected,
+  /// newest-relevant first, within [maxChars]. With many stored facts
+  /// this keeps the system prompt lean instead of dumping everything.
+  String injectRelevantMemories(
+    String basePrompt,
+    String query, {
+    int maxChars = 600,
+    int maxItems = 5,
+  }) {
+    if (!isEnabled.value) return basePrompt;
+    final all = getAllMemories();
+    if (all.isEmpty) return basePrompt;
+    // Box order is oldest-first; ranking ties resolve to most recent.
+    final picked = rankFacts(
+      all.reversed.toList(),
+      query: query,
+      maxChars: maxChars,
+      maxItems: maxItems,
+    );
+    if (picked.isEmpty) return basePrompt;
+
+    final buffer = StringBuffer(basePrompt);
+    buffer.writeln('\n\n[User Context & Information]');
+    for (final m in picked) {
       buffer.writeln('- $m');
     }
     return buffer.toString();

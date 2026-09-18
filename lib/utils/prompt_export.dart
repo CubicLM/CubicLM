@@ -46,6 +46,7 @@ class PromptExport {
         fileName: name,
         mimeType: 'text/markdown',
         shareText: text,
+        category: 'chat',
       );
     } catch (e) {
       Get.snackbar('prompt_export_failed'.tr, '$e',
@@ -65,6 +66,7 @@ class PromptExport {
         fileName: name,
         mimeType: 'application/pdf',
         shareText: text,
+        category: 'chat',
       );
     } catch (e) {
       Get.snackbar('prompt_export_failed'.tr, '$e',
@@ -82,6 +84,7 @@ class PromptExport {
         fileName: name,
         mimeType: 'image/png',
         shareText: text,
+        category: 'chat',
       );
     } catch (e) {
       Get.snackbar('prompt_export_failed'.tr, '$e',

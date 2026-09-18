@@ -937,6 +937,7 @@ class _LogViewState extends State<LogView> {
       text: text,
       fileName: fileName,
       mimeType: 'text/plain',
+      category: 'logs',
     );
   }
 

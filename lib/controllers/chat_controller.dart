@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -37,8 +38,13 @@ import '../services/skills/skill_injector.dart';
 import '../models/web_source.dart';
 import '../utils/thought_parser.dart';
 import '../utils/text_sanitize.dart';
+import '../utils/paste_convert.dart';
+import '../utils/app_snackbar.dart';
 import '../utils/history_budget.dart';
+import '../utils/memory_extract.dart';
 import '../services/stats_service.dart';
+import '../services/device_info_service.dart';
+import '../services/tool_service.dart';
 import '../services/memory_service.dart';
 import '../services/vector_service.dart';
 import '../utils/artifact_parser.dart';
@@ -67,6 +73,13 @@ class ChatController extends GetxController {
   final selectedFileType = Rxn<String>();
   final selectedFileSize = 0.obs;
   final selectedFileChunks = <String>[].obs;
+
+  // Real-time LaTeX Preview
+  final latexPreviewText = ''.obs;
+  Timer? _latexDebounce;
+
+  // IDE Mode / Active Project File
+  final activeProjectFile = Rxn<String>(); // Path
 
   // Real-time streaming state — the AI response as it's being generated
   final streamingResponse = ''.obs;
@@ -121,9 +134,6 @@ class ChatController extends GetxController {
   // Search Mode (Perplexity-style)
   final isSearchMode = false.obs;
 
-  // Dual Response Mode
-  final dualResponseMode = false.obs;
-
   // Prompt templates
   static const _kTemplatesKey = 'prompt_templates_v1';
   final promptTemplates = <Map<String, String>>[].obs;
@@ -143,6 +153,53 @@ class ChatController extends GetxController {
   // Multi-select
   final selectionMode = false.obs;
   final selectedIds = <String>{}.obs;
+
+  // Project Chunks Cache
+  final _projectChunkCache = <String, List<String>>{};
+
+  Future<String> _getProjectRelevantContext(String query, ChatProject project) async {
+    if (project.filePaths.isEmpty) return '';
+    
+    final vs = Get.find<VectorService>();
+    
+    // Check cache
+    List<String> chunks = _projectChunkCache[project.id] ?? [];
+    
+    if (chunks.isEmpty) {
+      for (final path in project.filePaths) {
+        try {
+          final ext = path.split('.').last.toLowerCase();
+          final text = await DocumentExtractorService.extractText(path, ext);
+          if (text.isNotEmpty) {
+            chunks.addAll(vs.chunkText(text));
+          }
+        } catch (_) {}
+      }
+      _projectChunkCache[project.id] = chunks;
+    }
+    
+    if (chunks.isEmpty) return '';
+    final hits = vs.retrieve(query, chunks, topK: 5);
+    return hits.map((h) => "> $h").join('\n\n');
+  }
+  
+  void invalidateProjectCache(String projectId) {
+    _projectChunkCache.remove(projectId);
+  }
+
+  Future<String?> pickProjectRoot(ChatProject project) async {
+    try {
+      final selected = await FilePicker.getDirectoryPath();
+      if (selected != null) {
+        final updated = project.copyWith(rootPath: selected);
+        final idx = projects.indexOf(project);
+        if (idx >= 0) projects[idx] = updated;
+        await _hive.saveProject(project.id, updated.toMap());
+        return selected;
+      }
+    } catch (_) {}
+    return null;
+  }
 
   // Side-by-side compare
   Map<String, String>? _compareRef;
@@ -215,13 +272,18 @@ class ChatController extends GetxController {
     showArtifactPanel.value = false;
   }
 
-  void toggleDualMode() {
-    dualResponseMode.value = !dualResponseMode.value;
+  // Response Mode: 0 = Single, 1 = Dual, 2 = Triple
+  final responseMode = 0.obs;
+
+  bool get dualResponseMode => responseMode.value >= 1;
+  bool get tripleResponseMode => responseMode.value >= 2;
+
+  void toggleResponseMode() {
+    responseMode.value = (responseMode.value + 1) % 3;
+    final labels = ['Single', 'Dual', 'Triple'];
     Get.snackbar(
-      dualResponseMode.value ? 'Dual Response ON' : 'Dual Response OFF',
-      dualResponseMode.value
-          ? 'AI will generate two versions for comparison.'
-          : 'AI will generate a single response.',
+      '${labels[responseMode.value]} Mode',
+      'AI will generate ${responseMode.value + 1} version(s) for comparison.',
       snackPosition: SnackPosition.BOTTOM,
       duration: const Duration(seconds: 2),
     );
@@ -295,6 +357,10 @@ class ChatController extends GetxController {
   bool _voiceStopQuiet = false;
   final _voiceWorkers = <Worker>[];
 
+  /// Prompts sent while a generation is busy wait here FIFO instead of
+  /// being dropped (see sendMessage isBusy branch + queue drain).
+  final pendingQueue = <Map<String, dynamic>>[];
+
   TtsService? _tts() {
     try {
       return Get.isRegistered<TtsService>() ? Get.find<TtsService>() : null;
@@ -355,6 +421,21 @@ class ChatController extends GetxController {
     }));
   }
 
+  void _onTextChanged() {
+    inputText.value = textController.text;
+    
+    // LaTeX Preview logic
+    _latexDebounce?.cancel();
+    _latexDebounce = Timer(const Duration(milliseconds: 300), () {
+      final text = textController.text;
+      if (text.contains(r'$') || text.contains(r'$$')) {
+        latexPreviewText.value = text;
+      } else {
+        latexPreviewText.value = '';
+      }
+    });
+  }
+
   void _detachVoiceWorkers() {
     for (final w in _voiceWorkers) {
       try {
@@ -397,6 +478,84 @@ class ChatController extends GetxController {
   final scrollController = ScrollController();
   final composerFocusNode = FocusNode();
   final composerKeyboardFocusNode = FocusNode();
+
+  /// A single text change adding this many chars counts as a bulk insert
+  /// (paste), eligible for auto-convert to a file attachment.
+  static const int longPasteThreshold = 2000;
+
+  /// Set while our own code rewrites the composer, so the paste watcher
+  /// doesn't mistake bulk programmatic inserts for user pastes.
+  bool suppressPasteWatch = false;
+  String _lastComposerText = '';
+
+  /// Runs [fn] with the paste watcher suppressed, resyncing the
+  /// baseline afterwards. Use around programmatic bulk writes.
+  T withoutPasteWatch<T>(T Function() fn) {
+    suppressPasteWatch = true;
+    try {
+      return fn();
+    } finally {
+      suppressPasteWatch = false;
+      _lastComposerText = textController.text;
+    }
+  }
+
+  /// Watches for huge pastes (IME commits bypass menus/shortcuts) and
+  /// converts them to a file attachment, keeping surrounding text.
+  void _watchComposerPaste() {
+    final cur = textController.text;
+    final prev = _lastComposerText;
+    _lastComposerText = cur;
+    if (suppressPasteWatch) return;
+    if (!looksLikeBulkInsert(prev, cur, longPasteThreshold)) return;
+    final inserted = extractInserted(prev, cur);
+    if (inserted.length < longPasteThreshold) return;
+    withoutPasteWatch(() {
+      textController.text = removeInserted(prev, cur);
+      inputText.value = textController.text;
+    });
+    unawaited(handlePastedText(inserted));
+  }
+
+  /// Converts huge pasted text into a .md file attachment (GPT-style).
+  /// Returns true when converted (caller should NOT insert the text).
+  /// Honors the [SettingsController.longPasteToFile] toggle.
+  Future<bool> handlePastedText(String pasted) async {
+    if (pasted.length < longPasteThreshold) return false;
+    try {
+      if (Get.isRegistered<SettingsController>()) {
+        if (!Get.find<SettingsController>().longPasteToFile.value) {
+          return false;
+        }
+      }
+    } catch (_) {
+      return false;
+    }
+    try {
+      final dir = await getTemporaryDirectory();
+      final stamp = DateTime.now().millisecondsSinceEpoch;
+      final name = 'pasted-$stamp.md';
+      final file = File('${dir.path}/$name');
+      await file.writeAsString(pasted, flush: true);
+      selectedFileName.value = name;
+      selectedFileType.value = 'md';
+      selectedFileSize.value = pasted.length;
+      selectedFilePath.value = file.path;
+      selectedFileContent.value = pasted;
+      try {
+        if (Get.isRegistered<VectorService>()) {
+          selectedFileChunks.assignAll(
+              Get.find<VectorService>().chunkText(pasted));
+        }
+      } catch (_) {}
+      AppSnackbar.showTop(
+          'Pasted as file', '$name attached — send to include it.',
+          icon: LucideIcons.fileText, type: 'general', logHistory: false);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   final findActive = false.obs;
   final findQuery = ''.obs;
@@ -474,12 +633,14 @@ class ChatController extends GetxController {
     } catch (_) {}
   }
 
-  final chatScaffoldKey = GlobalKey<ScaffoldState>();
+  /// Active ChatView Scaffold key (per mounted instance — see
+  /// _ChatViewElement). Null when no ChatView is mounted.
+  GlobalKey<ScaffoldState>? chatScaffoldKey;
   final historySearchFocus = FocusNode();
 
   void openHistorySearch() {
     try {
-      chatScaffoldKey.currentState?.openDrawer();
+      chatScaffoldKey?.currentState?.openDrawer();
     } catch (_) {}
     Future.delayed(const Duration(milliseconds: 350), () {
       try {
@@ -497,6 +658,9 @@ class ChatController extends GetxController {
   void onInit() {
     super.onInit();
     scrollController.addListener(_handleUserScroll);
+    textController.addListener(_onTextChanged);
+    textController.addListener(_watchComposerPaste);
+    _lastComposerText = textController.text;
     _scrollListenerAttached = true;
     loadSessions();
     loadProjects();
@@ -522,8 +686,10 @@ class ChatController extends GetxController {
       if (text == null || text.trim().isEmpty) return;
       if (currentSessionId.value.isEmpty) createNewChat();
       final cur = textController.text;
-      textController.text =
-          cur.isEmpty ? sanitizeUtf16(text) : '$cur\n${sanitizeUtf16(text)}';
+      withoutPasteWatch(() {
+        textController.text =
+            cur.isEmpty ? sanitizeUtf16(text) : '$cur\n${sanitizeUtf16(text)}';
+      });
       try {
         textController.selection =
             TextSelection.collapsed(offset: textController.text.length);
@@ -549,7 +715,9 @@ class ChatController extends GetxController {
     final header = title.trim().isEmpty ? url : '${title.trim()} ($url)';
     final block = sanitizeUtf16('[Web page: $header]\n$clean');
     final cur = textController.text;
-    textController.text = cur.isEmpty ? block : '$cur\n\n$block';
+    withoutPasteWatch(() {
+      textController.text = cur.isEmpty ? block : '$cur\n\n$block';
+    });
     try {
       textController.selection =
           TextSelection.collapsed(offset: textController.text.length);
@@ -1426,6 +1594,7 @@ class ChatController extends GetxController {
           'png', 'jpg', 'jpeg', 'webp', 'gif', 'heic',
           'pdf', 'docx',
           'mp3', 'm4a', 'wav', 'aac', 'ogg', 'flac',
+          'mp4', 'mov', 'avi', 'mkv',
           'txt', 'md', 'json', 'csv', 'log', 'yaml', 'yml', 'xml',
           'dart', 'kt', 'java', 'js', 'ts', 'py',
           'zip', 'c', 'cpp', 'h', 'hpp', 'go', 'rs', 'rb', 'php'
@@ -1539,6 +1708,24 @@ class ChatController extends GetxController {
   /// rename, page skim, theme palettes). Follows the same cloud/local
   /// dispatch as [_generateSuggestions] but never touches the visible
   /// session. Returns null when no engine is available or the call fails.
+  /// Whether a non-essential background generation (suggestions,
+  /// auto-categorize, silent one-shots) may run right now. False when
+  /// the engine is busy (a turn is active — piling on risks the
+  /// stop/start race that aborts the process) or free RAM is critical.
+  /// Foreground user turns never consult this.
+  bool _bgGenAllowed() {
+    try {
+      if (Get.isRegistered<InferenceService>()) {
+        if (Get.find<InferenceService>().isGenerating.value) return false;
+      }
+      if (Get.isRegistered<DeviceInfoService>()) {
+        final free = Get.find<DeviceInfoService>().availableRamGB.value;
+        if (free > 0 && free < 1.0) return false;
+      }
+    } catch (_) {}
+    return true;
+  }
+
   Future<String?> askOnce(String prompt,
       {int maxTokens = 300, String source = 'browser'}) async {
     try {
@@ -1555,6 +1742,7 @@ class ChatController extends GetxController {
         return raw.trim().isEmpty ? null : raw;
       }
       if (!inference.isModelLoaded.value) return null;
+      if (!_bgGenAllowed()) return null;
       final raw = await inference.generate(prompt: prompt, source: source);
       if (raw.startsWith('ERROR:') || raw.trim().isEmpty) return null;
       return raw;
@@ -1568,19 +1756,80 @@ class ChatController extends GetxController {
   /// features that hand off to the Chat tab.
   Future<void> askInNewChat(String prompt) async {
     createNewChat();
-    textController.text = prompt;
+    withoutPasteWatch(() {
+      textController.text = prompt;
+    });
     inputText.value = prompt;
     await sendMessage();
   }
 
-  Future<void> sendMessage() async {    if (isLoading.value || isStreaming.value) return;
+  Future<void> polishPrompt() async {
+    final draft = textController.text.trim();
+    if (draft.isEmpty) return;
 
+    Get.snackbar('Polishing...', 'Rewriting your prompt for better results',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 1));
+
+    final prompt =
+        "You are a prompt engineering expert. Rewrite the following user prompt to be more clear, detailed, and effective for an LLM. "
+        "Maintain the original intent. Return ONLY the improved prompt text, no conversational filler.\n\n"
+        "Original Prompt: $draft";
+
+    final polished = await askOnce(prompt, maxTokens: 500);
+    if (polished != null && polished.trim().isNotEmpty) {
+      withoutPasteWatch(() {
+        textController.text = polished.trim();
+      });
+      inputText.value = textController.text;
+      HapticFeedback.mediumImpact();
+    }
+  }
+
+  Future<void> autoCategorizeChat(String sessionId) async {
+    final session = sessions.firstWhereOrNull((s) => s.id == sessionId);
+    if (session == null || session.folderId != null) return;
+
+    final firstMsg = messages.firstWhereOrNull((m) => m.role == 'user');
+    if (firstMsg == null) return;
+
+    final prompt = "Analyze this chat title and user query. Return ONLY a single-word general category (e.g. Coding, Writing, Math, Research, Social, Travel, Finance, Science, Health). No punctuation.\n\n"
+        "Title: ${session.title}\n"
+        "Query: ${firstMsg.content.substring(0, min(firstMsg.content.length, 200))}";
+
+    final category = await askOnce(prompt, maxTokens: 10);
+    if (category != null && category.trim().isNotEmpty) {
+      final name = category.trim().replaceAll(RegExp(r'[^\w\s]'), '');
+      if (name.length > 20) return;
+
+      var folder = folders.firstWhereOrNull((f) => f.name.toLowerCase() == name.toLowerCase());
+      if (folder == null) {
+        createFolder(name);
+        folder = folders.firstWhereOrNull((f) => f.name.toLowerCase() == name.toLowerCase());
+      }
+      
+      if (folder != null) {
+        addChatToFolder(sessionId, folder.id);
+      }
+    }
+  }
+
+  Future<void> smartOrganizeAll() async {
+    Get.snackbar('Organizing...', 'AI is categorizing your chats', snackPosition: SnackPosition.BOTTOM);
+    for (final s in sessions) {
+      if (s.folderId == null && !s.archived && !s.hidden) {
+        await autoCategorizeChat(s.id);
+        await Future.delayed(const Duration(milliseconds: 500)); // Rate limit safety
+      }
+    }
+    Get.snackbar('Organized', 'All chats have been grouped into folders.', snackPosition: SnackPosition.BOTTOM);
+  }
+
+  Future<void> sendMessage() async {
     final text = textController.text.trim();
     final hasAttachment =
         selectedImagePath.value != null || selectedFileName.value != null;
     if (text.isEmpty && !hasAttachment) return;
-
-    unawaited(HapticFeedback.lightImpact());
 
     final fileName = selectedFileName.value;
     final fileContent = selectedFileContent.value;
@@ -1589,6 +1838,7 @@ class ChatController extends GetxController {
     final fileSize = selectedFileSize.value;
     final imagePath = selectedImagePath.value;
     final imageBase64 = selectedImageBase64.value;
+
     final visibleText =
         text.isEmpty ? _defaultAttachmentPrompt(fileType) : text;
     final effectiveText = (fileContent != null && fileContent.trim().isNotEmpty)
@@ -1599,19 +1849,13 @@ class ChatController extends GetxController {
       createNewChat();
     }
 
-    String? imgBase64 = imageBase64;
-    if (imgBase64 == null && imagePath != null && !kIsWeb) {
-      try {
-        imgBase64 =
-            await compute(base64Encode, await File(imagePath).readAsBytes());
-      } catch (_) {}
-    }
-
     final userMsgId = _uuid.v4();
     String? persistedImagePath = imagePath;
     if (imagePath != null && !kIsWeb) {
       persistedImagePath = await _persistImageFile(imagePath, userMsgId);
     }
+
+    final isBusy = isLoading.value || isStreaming.value;
 
     final userMsg = ChatMessage(
       id: userMsgId,
@@ -1625,6 +1869,7 @@ class ChatController extends GetxController {
       filePath: filePath,
       fileType: fileType,
       fileSize: fileSize > 0 ? fileSize : null,
+      isQueued: isBusy,
     );
     messages.add(userMsg);
     _hive.saveMessage(userMsg.id, userMsg.toMap());
@@ -1634,6 +1879,28 @@ class ChatController extends GetxController {
     clearImage(deleteFile: false);
     clearFile();
     _scrollToBottom(force: true);
+
+    if (isBusy) {
+      pendingQueue.add({
+        'prompt': effectiveText,
+        'imagePath': imagePath,
+        'imageBase64': imageBase64,
+        'fileType': fileType,
+        'filePath': filePath,
+        'userMsgId': userMsgId,
+      });
+      return;
+    }
+
+    unawaited(HapticFeedback.lightImpact());
+
+    String? imgBase64 = imageBase64;
+    if (imgBase64 == null && imagePath != null && !kIsWeb) {
+      try {
+        imgBase64 =
+            await compute(base64Encode, await File(imagePath).readAsBytes());
+      } catch (_) {}
+    }
 
     if (messages.where((m) => m.role == 'user').length == 1) {
       final title = visibleText.length > 40
@@ -1678,12 +1945,19 @@ class ChatController extends GetxController {
     String? filePath,
     int? insertAt,
     bool isSecond = false,
+    bool isThird = false,
+    int agenticLoopCount = 0,
+    String? toolOutputs,
   }) async {
-    final generationId = isSecond ? _generationSerial : ++_generationSerial;
-    if (!isSecond) {
+    final generationId = (isSecond || isThird) ? _generationSerial : ++_generationSerial;
+    if (!isSecond && !isThird && agenticLoopCount == 0) {
       isLoading.value = true;
       isStreaming.value = true;
     }
+    // Past turns auto-recalled from other chats this turn (drives the
+    // 🧠 chip on the saved bubble). Declared up here: finalizeMessage
+    // is defined before the recall site runs.
+    var recalledCount = 0;
     streamingAttachmentType.value =
         (imagePath != null || fileType == 'audio') ? fileType : null;
     streamingResponse.value = '';
@@ -1691,6 +1965,15 @@ class ChatController extends GetxController {
     streamingAnswer.value = '';
     streamingIsThinking.value = false;
     generationStartTime.value = DateTime.now();
+
+    // ── Project Context Injection ──
+    String projectContext = '';
+    if (currentProjectId.value != null) {
+      final project = projects.firstWhereOrNull((p) => p.id == currentProjectId.value);
+      if (project != null) {
+        projectContext = await _getProjectRelevantContext(prompt, project);
+      }
+    }
     
     unawaited(HapticFeedback.mediumImpact());
     generationLiveDurationSecs.value = 0;
@@ -1749,13 +2032,14 @@ class ChatController extends GetxController {
       required int? thoughtDurationSeconds,
       required List<Map<String, String>> history,
       required String systemPrompt,
+      required bool isCloud,
     bool isSecond = false,
+    bool isThird = false,
     }) async {
-      if (generationId != _generationSerial && !isSecond) return;
+      if (generationId != _generationSerial && !isSecond && !isThird) return;
       
-      // If it was a dual response, we need to handle it differently
-      if (dualResponseMode.value && !isSecond && !rawResponse.startsWith('[IMAGE_BASE64]')) {
-        // Start generating the second version immediately
+      // If it was a dual or triple response, handle next generation
+      if (responseMode.value >= 1 && !isSecond && !isThird && !rawResponse.startsWith('[IMAGE_BASE64]')) {
         unawaited(_generateAIResponse(
           prompt: prompt,
           imagePath: imagePath,
@@ -1764,6 +2048,16 @@ class ChatController extends GetxController {
           filePath: filePath,
           insertAt: insertAt,
           isSecond: true,
+        ));
+      } else if (responseMode.value >= 2 && isSecond && !isThird) {
+         unawaited(_generateAIResponse(
+          prompt: prompt,
+          imagePath: imagePath,
+          imgBase64: imgBase64,
+          fileType: fileType,
+          filePath: filePath,
+          insertAt: insertAt,
+          isThird: true,
         ));
       }
 
@@ -1810,7 +2104,59 @@ class ChatController extends GetxController {
       final artifactsDetected = parseArtifacts(rawResponse);
       final cleanContent = removeArtifacts(rawResponse);
 
-      if (isSecond && messages.isNotEmpty && messages.last.role == 'assistant') {
+      // Never save a silent empty bubble. Typical cause: a thinking
+      // model burns the whole output budget reasoning (long "thinking",
+      // then cut off by context/output limits before writing the
+      // answer) — brutal on low-RAM devices for big asks like a full
+      // game file. Say so + how to fix instead of showing blank.
+      var effectiveContent = cleanContent;
+      final replacement = emptyResponseReplacement(
+        rawResponse: rawResponse,
+        cleanContent: cleanContent,
+        hasArtifacts: artifactsDetected.isNotEmpty,
+        hasToolSteps: currentToolSteps.isNotEmpty,
+        isCloud: isCloud,
+      );
+      if (replacement != null) {
+        String diag = '';
+        try {
+          var provider = '?';
+          var model = '?';
+          var auto = '?';
+          var maxTok = '?';
+          if (Get.isRegistered<SettingsController>()) {
+            final s = Get.find<SettingsController>();
+            try {
+              provider = s.cloudProvider.value;
+            } catch (_) {}
+            try {
+              model = s.selectedCloudModelName;
+            } catch (_) {}
+            try {
+              auto = s.autoTuneParams.value.toString();
+              maxTok = s.maxTokens.value.toString();
+            } catch (_) {}
+          }
+          diag =
+              'rawLen=${rawResponse.length} historyTurns=${history.length} '
+              'cloud=$isCloud provider=$provider model=$model autoTune=$auto maxTokens=$maxTok '
+              'durationMs=${totalDurationMs ?? -1} thoughtSecs=${thoughtDurationSeconds ?? -1} tps=${tps ?? 0}';
+        } catch (_) {
+          diag = 'rawLen=${rawResponse.length} historyTurns=${history.length}';
+        }
+        try {
+          Get.find<AppLogService>().warning(
+            replacement.startsWith('⚠️ The model only')
+                ? 'Empty answer: model only produced reasoning'
+                : 'Empty answer: model returned no text',
+            details: diag,
+            category: LogCategory.chat,
+          );
+        } catch (_) {}
+        effectiveContent = replacement;
+      }
+
+      if ((isSecond || isThird) && messages.isNotEmpty && messages.last.role == 'assistant') {
         final last = messages.last;
         final updated = ChatMessage(
           id: last.id,
@@ -1827,7 +2173,7 @@ class ChatController extends GetxController {
           usedSkills: last.usedSkills,
           artifacts: last.artifacts,
           citations: last.citations,
-          alternatives: [cleanContent],
+          alternatives: [...(last.alternatives ?? []), cleanContent],
           preferredIndex: last.preferredIndex,
           feedback: last.feedback,
           suggestions: last.suggestions,
@@ -1839,11 +2185,39 @@ class ChatController extends GetxController {
         return;
       }
 
+      // ── Tool Call Detection & Execution ──
+      final toolCallMatches = RegExp(r'<tool_call name="(.*?)">([\s\S]*?)</tool_call>').allMatches(rawResponse);
+      final StringBuffer loopOutputs = StringBuffer();
+      
+      if (toolCallMatches.isNotEmpty) {
+        for (final match in toolCallMatches) {
+          final name = match.group(1)!;
+          final argsStr = match.group(2)!;
+          try {
+            final args = jsonDecode(argsStr) as Map<String, dynamic>;
+            addToolStep(name: name, args: args, running: true);
+            final output = await Get.find<ToolService>().executeTool(name, args);
+            
+            if (currentToolSteps.isNotEmpty) {
+              currentToolSteps[currentToolSteps.length - 1] = {
+                ...currentToolSteps.last,
+                'output': output,
+                'running': false,
+                'success': !output.startsWith('Error'),
+              };
+            }
+            loopOutputs.writeln('Tool: $name\nOutput: $output');
+          } catch (e) {
+            loopOutputs.writeln('Tool: $name\nError: $e');
+          }
+        }
+      }
+
       final aiMsg = ChatMessage(
         id: aiMsgId,
         chatId: currentSessionId.value,
         role: 'assistant',
-        content: cleanContent,
+        content: effectiveContent,
         imageBase64: outImageBase64,
         imagePath: outImagePath,
         tokensPerSec: (tps != null && tps > 0) ? tps.toDouble() : null,
@@ -1852,6 +2226,7 @@ class ChatController extends GetxController {
         generationDurationMs: totalDurationMs,
         webSources: webSources.isEmpty ? null : webSources,
         usedSkills: usedSkillNames.isEmpty ? null : usedSkillNames,
+        recalledTurns: recalledCount,
         artifacts: artifactsDetected.isEmpty ? null : artifactsDetected.map((e) => {
           'id': e.id ?? _uuid.v4(),
           'type': e.type ?? 'code',
@@ -1868,6 +2243,20 @@ class ChatController extends GetxController {
       }
       _hive.saveMessage(aiMsg.id, aiMsg.toMap());
       imageGenStartTime.value = null;
+
+      if (toolCallMatches.isNotEmpty && agenticLoopCount < 2) {
+        unawaited(_generateAIResponse(
+          prompt: prompt,
+          imagePath: imagePath,
+          imgBase64: imgBase64,
+          fileType: fileType,
+          filePath: filePath,
+          insertAt: insertAt != null ? insertAt + 1 : null,
+          agenticLoopCount: agenticLoopCount + 1,
+          toolOutputs: loopOutputs.toString(),
+        ));
+        return;
+      }
 
       final session = sessions.firstWhereOrNull((s) => s.id == currentSessionId.value);
       if (session != null) {
@@ -1894,9 +2283,36 @@ class ChatController extends GetxController {
 
       // ── Follow-up Suggestions ──
       unawaited(_generateSuggestions(rawResponse));
+
+      // ── Auto Categorization ──
+      if (agenticLoopCount == 0 && !isSecond && !isThird) {
+         unawaited(autoCategorizeChat(currentSessionId.value));
+      }
       
       isLoading.value = false;
       _scrollToBottom();
+
+      // ── Process Queue ──
+      if (pendingQueue.isNotEmpty) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          final next = pendingQueue.removeAt(0);
+          final userMsgId = next['userMsgId'] as String;
+          final idx = messages.indexWhere((m) => m.id == userMsgId);
+          if (idx >= 0) {
+            final updated = messages[idx].copyWithQueued(false);
+            messages[idx] = updated;
+            _hive.saveMessage(updated.id, updated.toMap());
+          }
+          
+          _generateAIResponse(
+            prompt: next['prompt'] as String,
+            imagePath: next['imagePath'] as String?,
+            imgBase64: next['imageBase64'] as String?,
+            fileType: next['fileType'] as String?,
+            filePath: next['filePath'] as String?,
+          );
+        });
+      }
     }
 
     void startFluidEngine({
@@ -1918,7 +2334,9 @@ class ChatController extends GetxController {
             thoughtDurationSeconds: thoughtDurationSeconds,
             history: history,
             systemPrompt: systemPrompt,
+            isCloud: inferenceMode != 'local',
             isSecond: isSecond,
+            isThird: isThird,
           );
           return;
         }
@@ -1961,84 +2379,102 @@ class ChatController extends GetxController {
 
       final storedForHistory = _hive.getMessagesForChatPaged(
         currentSessionId.value,
-        limit: 40,
+        limit: 100, // Increase limit to find pinned messages
       );
-      var history = storedForHistory
-          .map((m) {
-            final role = m['role']?.toString() ?? '';
-            var content = m['content']?.toString() ?? '';
-            if (role == 'assistant') {
-              content = splitThoughtTags(content).answer;
-            }
-            return {'role': role, 'content': content};
-          })
-          .where((e) => e['role'] == 'user' || e['role'] == 'assistant')
-          .toList();
-
-      try {
-        final vs = Get.find<VectorService>();
-        if (prompt.contains('Attached file:') && prompt.length > 3000) {
-          final contentMatch = RegExp(r'```text\n([\s\S]*?)\n```').firstMatch(prompt);
-          if (contentMatch != null) {
-            final full = contentMatch.group(1) ?? '';
-            final hits = await compute((String text) => vs.retrieve(prompt.split('\n\n').first, vs.chunkText(text)), full);
-            if (hits.isNotEmpty) {
-              prompt = prompt.replaceFirst(
-                RegExp(r'Attached file:.*?\n```text\n[\s\S]*?\n```'),
-                '[Relevant snippets from attachment]:\n${hits.map((h) => "> $h").join("\n\n")}'
-              );
-            }
-          }
+      
+      var rawHistory = storedForHistory.map((m) {
+        final role = m['role']?.toString() ?? '';
+        var content = m['content']?.toString() ?? '';
+        if (role == 'assistant') {
+          content = splitThoughtTags(content).answer;
         }
-        
-        for (var i = 0; i < history.length; i++) {
-          final turn = history[i];
-          final content = turn['content'] ?? '';
-          if (turn['role'] == 'user' && content.contains('Attached file:') && content.length > 3000) {
-            final contentMatch = RegExp(r'```text\n([\s\S]*?)\n```').firstMatch(content);
-            if (contentMatch != null) {
-              final full = contentMatch.group(1) ?? '';
-              final hits = await compute((String text) => vs.retrieve(prompt, vs.chunkText(text)), full);
-              if (hits.isNotEmpty) {
-                history[i] = {
-                  'role': 'user',
-                  'content': content.replaceFirst(
-                    RegExp(r'Attached file:.*?\n```text\n[\s\S]*?\n```'),
-                    '[Relevant snippets from file]:\n${hits.map((h) => "> $h").join("\n\n")}'
-                  )
-                };
-              }
-            }
-          }
-        }
-      } catch (_) {}
+        return {
+          'role': role, 
+          'content': content, 
+          'pinned': (m['isPinned'] ?? false).toString()
+        };
+      }).toList();
 
-      final uiTurns = messages
-          .where((m) => m.role == 'user' || m.role == 'assistant')
-          .length;
-      if (history.isEmpty && uiTurns > 0) {
-        Get.find<AppLogService>().warning(
-          'History empty despite $uiTurns UI turns — using visible list',
-          category: LogCategory.chat,
-        );
-        history = messages
-            .where((m) => m.role == 'user' || m.role == 'assistant')
-            .map((m) {
-          var content = m.content;
-          if (m.role == 'assistant') {
-            content = splitThoughtTags(content).answer;
-          }
-          return {'role': m.role, 'content': content};
-        }).toList();
+      if (toolOutputs != null && toolOutputs.isNotEmpty) {
+        rawHistory.add({
+          'role': 'system',
+          'content': 'Tool execution results:\n$toolOutputs\nPlease analyze these and provide the next step or final answer.',
+          'pinned': 'false'
+        });
       }
 
-      final preTrimTurns = history.length;
+      // Separate pinned and unpinned
+      final pinnedTurns = rawHistory.where((m) => m['pinned'] == 'true').toList();
+      final unpinnedTurns = rawHistory.where((m) => m['pinned'] != 'true').toList();
+
       final historyBudget =
           inferenceMode == 'local' ? _historyCharBudget() : 48000;
       
-      history = await compute((Map<String, dynamic> p) => fitHistoryToBudget(p['h'] as List<Map<String, String>>, p['b'] as int), {'h': history, 'b': historyBudget});
+      // Always keep pinned turns first, then fit remaining budget with unpinned
+      final pinnedChars = pinnedTurns.fold<int>(0, (s, m) => s + (m['content'] ?? '').length);
+      final remainingBudget = max(2000, historyBudget - pinnedChars);
+
+      final fittedUnpinned = await compute(
+        (Map<String, dynamic> p) => fitHistoryToBudget(p['h'] as List<Map<String, String>>, p['b'] as int), 
+        {'h': unpinnedTurns.map((m) => {'role': m['role']!, 'content': m['content']!}).toList(), 'b': remainingBudget}
+      );
+
+      var history = [...pinnedTurns.map((m) => {'role': m['role']!, 'content': m['content']!}), ...fittedUnpinned];
+
+      // ── Long-term recall (ROM, not RAM) ─────────────────────
+      // Past chats live in Hive forever, but the model only ever sees
+      // this turn's history. When budget room remains, pull the most
+      // relevant turns from OTHER chats in as a leading system block.
+      // Skipped for dual-response follow-ups (same prompt, no gain).
+      if (!isSecond && !isThird) {
+        try {
+          final histChars =
+              history.fold<int>(0, (s, m) => s + (m['content'] ?? '').length);
+          if (Get.isRegistered<MemoryService>() &&
+              Get.find<MemoryService>().isEnabled.value &&
+              historyBudget - histChars > 1500) {
+            final kws = extractKeywords(prompt);
+            if (kws.length >= 2) {
+              final hits = await Get.find<HiveService>().recallPastTurns(
+                keywords: kws,
+                excludeChatId: currentSessionId.value,
+                maxHits: 3,
+              );
+              if (hits.isNotEmpty) {
+                recalledCount = hits.length;
+                final buf = StringBuffer(
+                    '[Auto-recalled past conversations — may be outdated; '
+                    'the current chat wins on conflict]');
+                for (final h in hits) {
+                  buf.writeln();
+                  buf.write(
+                      'From "${h['chat'] ?? 'past chat'}" (${h['role'] ?? 'user'}): ${h['text'] ?? ''}');
+                }
+                // Just before the current question (recency effect) —
+                // or at the end when history is empty. Pinned leading
+                // turns keep their priority either way.
+                final block = {
+                  'role': 'system',
+                  'content': buf.toString(),
+                };
+                if (history.isNotEmpty &&
+                    history.last['role'] == 'user') {
+                  history.insert(history.length - 1, block);
+                } else {
+                  history.add(block);
+                }
+                Get.find<AppLogService>().info(
+                  'Recalled ${hits.length} past turn(s) from other chats',
+                  category: LogCategory.chat,
+                );
+              }
+            }
+          }
+        } catch (_) {}
+      }
 
       try {
+        final preTrimTurns = pinnedTurns.length + unpinnedTurns.length;
         final chars =
             history.fold<int>(0, (s, m) => s + (m['content'] ?? '').length);
         final roles = history.isEmpty
@@ -2066,10 +2502,24 @@ class ChatController extends GetxController {
       if (persona.isNotEmpty) {
         basePrompt = '$basePrompt\n\n[Chat persona]\n$persona';
       }
-      final String systemPromptForThisTurn = Get.find<MemoryService>().injectMemories(
+      
+      if (projectContext.isNotEmpty) {
+        basePrompt = '$basePrompt\n\n[Project Context]:\n$projectContext';
+      }
+
+      basePrompt = "$basePrompt\n\n--- Available Tools ---\n"
+          "You can call tools by using the format: <tool_call name=\"tool_name\">{\"arg\": \"val\"}</tool_call>\n"
+          "1. read_file(path: string): Reads content of a local file.\n"
+          "2. list_directory(path: string): Lists files in a directory.\n"
+          "3. run_shell(command: string): Executes a terminal command.\n"
+          "Always provide reasoning before calling a tool. Use only one tool call per response."
+          "\n--- End Tools ---";
+
+      final String systemPromptForThisTurn = Get.find<MemoryService>().injectRelevantMemories(
       relevantSkills.isEmpty
           ? basePrompt
           : '$basePrompt${SkillInjector.buildForSkills(relevantSkills)}',
+      prompt,
     );
 
       List<WebSource> webSources = [];
@@ -2103,6 +2553,7 @@ class ChatController extends GetxController {
       fullResponse = '';
 
       if (isSearchMode.value && cloud.isProviderConfigured('perplexity')) {
+        addToolStep(name: 'web_search', args: {'query': prompt}, running: true);
         final apiMessages = [
           {
             'role': 'system',
@@ -2130,6 +2581,14 @@ class ChatController extends GetxController {
             bufferToken(chunk);
           }
           fullResponse = buffer.toString();
+          if (currentToolSteps.isNotEmpty && currentToolSteps.last['name'] == 'web_search') {
+             currentToolSteps[currentToolSteps.length - 1] = {
+               ...currentToolSteps.last,
+               'output': 'Found relevant web sources and summarized.',
+               'running': false,
+               'success': true,
+             };
+          }
         } catch (e) {
           fullResponse = 'Search failed: $e';
         }
@@ -2247,7 +2706,7 @@ class ChatController extends GetxController {
           messages: apiMessages,
           imageBase64: imgBase64,
           temperature:
-              (settings.temperature.value + (isSecond ? 0.1 : 0.0)).clamp(0.0, 1.0),
+              (settings.temperature.value + ((isSecond || isThird) ? 0.1 : 0.0)).clamp(0.0, 1.0),
           maxTokens:
               settings.autoTuneParams.value ? null : settings.maxTokens.value,
           onToken: bufferToken,
@@ -2304,8 +2763,31 @@ class ChatController extends GetxController {
     }
   }
 
+  /// Learns durable user facts from a user turn into ROM-backed
+  /// MemoryService — model-free heuristics (no extra generation, safe
+  /// on 1GB-RAM devices). Deduplicates both ways, max 2 per turn.
+  /// Review/delete anytime on the Memory page.
   Future<void> _extractMemories(String userMsg, String aiMsg) async {
-    // ... same as before ...
+    try {
+      if (!Get.isRegistered<MemoryService>()) return;
+      final mem = Get.find<MemoryService>();
+      if (!mem.isEnabled.value) return;
+      final cands = extractFacts(userMsg);
+      if (cands.isEmpty) return;
+      final existing =
+          mem.getAllMemories().map((e) => e.toLowerCase()).toList();
+      var added = 0;
+      for (final c in cands) {
+        if (added >= 2) break;
+        final lc = c.toLowerCase();
+        if (existing.any((e) => e.contains(lc) || lc.contains(e))) {
+          continue;
+        }
+        await mem.replaceTopic(factTopic(c), c);
+        existing.add(lc);
+        added++;
+      }
+    } catch (_) {}
   }
 
   Future<void> _generateSuggestions(String lastAnswer) async {
@@ -2329,6 +2811,7 @@ class ChatController extends GetxController {
         );
       } else {
         if (!inference.isModelLoaded.value) return;
+        if (!_bgGenAllowed()) return;
         raw = await inference.generate(
           prompt: prompt,
           source: 'suggestions',
@@ -2564,7 +3047,9 @@ class ChatController extends GetxController {
   void insertTemplate(String body) {
     final cur = textController.text;
     final clean = sanitizeUtf16(body);
-    textController.text = cur.isEmpty ? clean : '$cur\n$clean';
+    withoutPasteWatch(() {
+      textController.text = cur.isEmpty ? clean : '$cur\n$clean';
+    });
     try {
       textController.selection =
           TextSelection.collapsed(offset: textController.text.length);
@@ -3023,7 +3508,7 @@ class ChatController extends GetxController {
           timestamp: oldAssistant.timestamp,
         );
         messages[msgIdx + 1] = updatedAssistant;
-        _hive.saveMessage(updatedAssistant.id, updatedAssistant.toMap());
+        unawaited(_hive.saveMessage(updatedAssistant.id, updatedAssistant.toMap()));
       } else {
         _hive.deleteMessage(messages[msgIdx + 1].id);
         messages.removeAt(msgIdx + 1);
@@ -3121,6 +3606,21 @@ class ChatController extends GetxController {
     if (messages.isEmpty && hasOlderMessages.value) {
       unawaited(loadOlderMessages());
     }
+  }
+
+  void toggleMessagePin(ChatMessage msg) {
+    final idx = messages.indexWhere((m) => m.id == msg.id);
+    if (idx < 0) return;
+    final updated = msg.copyWithPinned(!msg.isPinned);
+    messages[idx] = updated;
+    _hive.saveMessage(updated.id, updated.toMap());
+    
+    Get.snackbar(
+      updated.isPinned ? 'Message Pinned' : 'Message Unpinned',
+      updated.isPinned ? 'This message will stay in context.' : 'Removed from pinned context.',
+      snackPosition: SnackPosition.BOTTOM,
+      duration: const Duration(seconds: 2),
+    );
   }
 
   void saveStreamingDraft() {
@@ -3294,12 +3794,14 @@ class ChatController extends GetxController {
   String _attachmentTypeForExtension(String extension) {
     const imageExtensions = {'png', 'jpg', 'jpeg', 'webp', 'gif', 'heic'};
     const audioExtensions = {'mp3', 'm4a', 'wav', 'aac', 'ogg', 'flac'};
+    const videoExtensions = {'mp4', 'mov', 'avi', 'mkv'};
     const textExtensions = {
       'txt', 'md', 'json', 'csv', 'log', 'yaml', 'yml', 'xml',
       'dart', 'kt', 'java', 'js', 'ts', 'py',
     };
     if (imageExtensions.contains(extension)) return 'image';
     if (audioExtensions.contains(extension)) return 'audio';
+    if (videoExtensions.contains(extension)) return 'video';
     if (extension == 'pdf') return 'pdf';
     if (extension == 'docx') return 'docx';
     if (textExtensions.contains(extension)) return 'text';
@@ -3316,6 +3818,8 @@ class ChatController extends GetxController {
         return 'Summarize this document.';
       case 'audio':
         return 'Transcribe or analyze this audio.';
+      case 'video':
+        return 'Summarize this video content based on visual frames.';
       case 'text':
         return 'Review this file.';
       default:

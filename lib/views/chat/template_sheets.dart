@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../controllers/chat_controller.dart';
 import '../../controllers/settings_controller.dart';
+import '../../controllers/vision_live_controller.dart';
 import '../../services/inference_service.dart';
 import '../../services/local_image_service.dart';
 import '../../theme/design_tokens.dart';
@@ -251,6 +252,53 @@ void showAddToChatSheet(
                 },
                 trailing: const Icon(LucideIcons.chevronRight,
                     size: 18, color: Dt.textSecondary),
+              ),
+              const SizedBox(height: 10),
+              Obx(() {
+                final on = _c.isSearchMode.value;
+                return AppSheetRowCard(
+                  leading: const AppIconCircle(icon: LucideIcons.search),
+                  title: 'Deep Search',
+                  subtitle: on
+                      ? 'Perplexity-style answers on'
+                      : 'Perplexity-style answers off',
+                  trailing: Switch(
+                    value: on,
+                    onChanged: (v) => _c.isSearchMode.value = v,
+                  ),
+                );
+              }),
+              const SizedBox(height: 10),
+              Obx(() {
+                final vision = Get.isRegistered<VisionLiveController>()
+                    ? Get.find<VisionLiveController>()
+                    : null;
+                final on = vision?.isLive.value ?? false;
+                return AppSheetRowCard(
+                  leading: const AppIconCircle(icon: LucideIcons.video),
+                  title: 'Live Vision',
+                  subtitle: on
+                      ? 'Snapshot loop running'
+                      : 'Snapshot loop off',
+                  trailing: Switch(
+                    value: on,
+                    onChanged: vision == null
+                        ? null
+                        : (_) => vision.toggleLive(),
+                  ),
+                );
+              }),
+              const SizedBox(height: 10),
+              AppSheetRowCard(
+                leading: const AppIconCircle(icon: LucideIcons.sparkles),
+                title: 'Polish Prompt',
+                subtitle: 'AI-rewrite the composer draft',
+                trailing: const Icon(LucideIcons.chevronRight,
+                    size: 18, color: Dt.textSecondary),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  _c.polishPrompt();
+                },
               ),
               const SizedBox(height: 10),
               Obx(() => AppSheetRowCard(

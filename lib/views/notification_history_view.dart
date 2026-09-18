@@ -19,7 +19,7 @@ class NotificationHistoryView extends StatelessWidget {
     final svc = Get.find<NotificationHistoryService>();
 
     return Scaffold(
-      backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor:
             (isDark ? Dt.canvasDark : Dt.canvas).withValues(alpha: 0.8),

@@ -26,7 +26,7 @@ class ServerView extends GetView<ServerController> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-      backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: (isDark ? Dt.canvasDark : Dt.canvas).withValues(alpha: 0.8),
         flexibleSpace: ClipRRect(

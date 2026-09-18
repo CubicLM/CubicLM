@@ -18,23 +18,136 @@ import 'chat_format.dart';
 
 ChatController get _c => Get.find<ChatController>();
 
+/// Placement choices for the context-window indicator.
+class ContextWindowStyle {
+  static const header = 'header';
+  static const composer = 'composer';
+  static const ring = 'ring';
+}
+
+/// One snapshot of context usage, shared by the header bar, the
+/// composer bar and the ring. Pure data — unit tested.
+class ContextWindowData {
+  final bool isLocal;
+  final int used;
+  final int total;
+  final double progress;
+  final String label;
+  final String value;
+  final bool warn;
+
+  const ContextWindowData({
+    required this.isLocal,
+    required this.used,
+    required this.total,
+    required this.progress,
+    required this.label,
+    required this.value,
+    required this.warn,
+  });
+
+  /// Short "380 / 512" form for tooltips.
+  String get shortfall =>
+      isLocal ? '$used / $total' : value;
+
+  /// Percent text for the ring center.
+  String get percentLabel =>
+      '${(progress * 100).round()}%';
+
+  static ContextWindowData local({
+    required int used,
+    required int total,
+  }) {
+    final t = total <= 0 ? 1 : total;
+    final u = used.clamp(0, t);
+    final pct = (u / t).clamp(0.0, 1.0).toDouble();
+    return ContextWindowData(
+      isLocal: true,
+      used: u,
+      total: t,
+      progress: pct,
+      label: 'Local Context Window',
+      value: '${fmtK(u)} / ${fmtK(t)} tokens',
+      warn: pct >= 0.8,
+    );
+  }
+
+  static ContextWindowData cloud({
+    required String providerLabel,
+    required String modelName,
+    required int sessionTokens,
+  }) {
+    return ContextWindowData(
+      isLocal: false,
+      used: sessionTokens,
+      total: -1,
+      progress: 0,
+      label: '$providerLabel · $modelName',
+      value: '${fmtK(sessionTokens)} session tokens',
+      warn: false,
+    );
+  }
+}
+
+/// Reads the current snapshot, or null when no active session exists.
+/// Single source of truth for all three placements.
+ContextWindowData? readContextWindow() {
+  if (_c.currentSessionId.value.isEmpty || _c.messages.isEmpty) {
+    return null;
+  }
+  final settings = Get.find<SettingsController>();
+  final isLocal = settings.inferenceMode.value == 'local';
+  if (isLocal) {
+    final inf = Get.find<InferenceService>();
+    final total = inf.contextTokensTotal.value > 0
+        ? inf.contextTokensTotal.value
+        : settings.contextSize.value;
+    final est = _c.messages.fold<int>(0, (s, m) => s + m.content.length);
+    final used = (inf.contextTokensUsed.value > 0
+            ? inf.contextTokensUsed.value
+            : (est / 4).ceil())
+        .clamp(0, total)
+        .toInt();
+    return ContextWindowData.local(used: used, total: total);
+  }
+  final totalChars =
+      _c.messages.fold<int>(0, (s, m) => s + m.content.length);
+  final providerId = settings.cloudProvider.value;
+  final providerLabel = providerId == 'custom'
+      ? settings.customCloudName.value
+      : providerId.capitalizeFirst ?? providerId;
+  return ContextWindowData.cloud(
+    providerLabel: providerLabel,
+    modelName: settings.selectedCloudModelName,
+    sessionTokens: (totalChars / 4).ceil(),
+  );
+}
+
+/// Placement-aware visibility: only the chosen surface renders.
+bool showContextAt(String placement) {
+  try {
+    return Get.find<SettingsController>().contextWindowStyle.value ==
+        placement;
+  } catch (_) {
+    return placement == ContextWindowStyle.header;
+  }
+}
+
 Widget findBar(BuildContext context, bool isDark) {
   return Container(
     margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
     decoration: BoxDecoration(
-      color: isDark ? Dt.cardDark : Dt.card,
+      color: Theme.of(context).cardColor,
       borderRadius: BorderRadius.circular(14),
       border: Border.all(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.08)
-            : Colors.black.withValues(alpha: 0.06),
+        color: Theme.of(context).dividerColor,
       ),
     ),
     child: Row(
       children: [
         Icon(LucideIcons.search,
-            size: 18, color: isDark ? AppColors.textPrimary : Dt.iconDefault),
+            size: 18, color: Theme.of(context).colorScheme.onSurface),
         const SizedBox(width: 8),
         Expanded(
           child: TextField(
@@ -101,7 +214,7 @@ Widget notificationBell(BuildContext context, bool isDark) {
       tooltip: 'Notifications',
       icon: Icon(LucideIcons.bell,
           size: Dt.iconSize - 2,
-          color: isDark ? AppColors.textPrimary : Dt.iconDefault),
+          color: Theme.of(context).colorScheme.onSurface),
       onPressed: () => Get.to(() => const NotificationHistoryView(),
           transition: Transition.rightToLeft,
           duration: const Duration(milliseconds: 260),
@@ -118,7 +231,7 @@ Widget notificationBell(BuildContext context, bool isDark) {
           tooltip: 'Notifications',
           icon: Icon(LucideIcons.bell,
               size: Dt.iconSize - 2,
-              color: isDark ? AppColors.textPrimary : Dt.iconDefault),
+              color: Theme.of(context).colorScheme.onSurface),
           onPressed: () {
             svc.markAllRead();
             Get.to(() => const NotificationHistoryView(),
@@ -135,10 +248,10 @@ Widget notificationBell(BuildContext context, bool isDark) {
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
               constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
               decoration: BoxDecoration(
-                color: Dt.accent,
+                color: Theme.of(context).primaryColor,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                    color: isDark ? Dt.canvasDark : Dt.canvas, width: 1.5),
+                    color: Theme.of(context).scaffoldBackgroundColor, width: 1.5),
               ),
               child: Center(
                 child: Text(
@@ -170,28 +283,26 @@ Widget modelLoadingBar(BuildContext context, bool isDark) {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
           decoration: BoxDecoration(
-            color: (isDark ? AppColors.surface : Colors.white)
-                .withValues(alpha: 0.8),
+            color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.8),
             border: Border(
                 bottom: BorderSide(
-                    color:
-                        isDark ? AppColors.border : AppColors.borderLightMode,
+                    color: Theme.of(context).dividerColor,
                     width: 1)),
           ),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              const SizedBox(
+              SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2.5, color: AppColors.primary)),
+                      strokeWidth: 2.5, color: Theme.of(context).primaryColor)),
               const SizedBox(width: 12),
               Expanded(
                 child: Text("${'chat_sync_intelligence'.tr} $pct%",
                     style: GoogleFonts.plusJakartaSans(
                         fontSize: 14,
-                        color: isDark ? AppColors.textPrimary : Dt.textPrimary,
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.w800)),
               ),
             ]),
@@ -203,8 +314,8 @@ Widget modelLoadingBar(BuildContext context, bool isDark) {
                     child: LinearProgressIndicator(
                         value: inf.modelLoadProgress.value,
                         backgroundColor:
-                            isDark ? Dt.pillMutedDark : Dt.pillMuted,
-                        color: AppColors.primary,
+                            Theme.of(context).colorScheme.surfaceContainerHighest,
+                        color: Theme.of(context).primaryColor,
                         minHeight: 6)),
                 if (inf.modelLoadProgress.value > 0.05)
                   Positioned.fill(
@@ -216,7 +327,7 @@ Widget modelLoadingBar(BuildContext context, bool isDark) {
                           decoration: BoxDecoration(
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primary.withValues(alpha: 0.4),
+                                color: Theme.of(context).primaryColor.withValues(alpha: 0.4),
                                 blurRadius: 10,
                                 spreadRadius: 1,
                               )
@@ -238,58 +349,117 @@ Widget modelLoadingBar(BuildContext context, bool isDark) {
 // ── Context Bar ──
 Widget contextBar(BuildContext context, bool isDark) {
   return Obx(() {
-    final settings = Get.find<SettingsController>();
-    final inf = Get.find<InferenceService>();
-    final active =
-        _c.currentSessionId.value.isNotEmpty && _c.messages.isNotEmpty;
-    if (!active) return const SizedBox.shrink();
-
-    final isLocal = settings.inferenceMode.value == 'local';
-
-    if (isLocal) {
-      final total = inf.contextTokensTotal.value > 0
-          ? inf.contextTokensTotal.value
-          : settings.contextSize.value;
-      final est = _c.messages.fold<int>(0, (s, m) => s + m.content.length);
-      final used = (inf.contextTokensUsed.value > 0
-              ? inf.contextTokensUsed.value
-              : (est / 4).ceil())
-          .clamp(0, total)
-          .toInt();
-      final pct = total == 0 ? 0.0 : (used / total).clamp(0.0, 1.0).toDouble();
-      final warn = pct >= 0.8;
-      final accent = warn ? AppColors.warning : AppColors.primary;
-
-      return _buildModernBar(
-        context,
-        isDark,
-        icon: Icons.memory_rounded,
-        label: 'Local Context Window',
-        value: '${fmtK(used)} / ${fmtK(total)} tokens',
-        progress: pct,
-        accent: accent,
-      );
-    } else {
-      // Cloud Mode Usage
-      final totalChars =
-          _c.messages.fold<int>(0, (s, m) => s + m.content.length);
-      final sessionTokens = (totalChars / 4).ceil();
-      final providerId = settings.cloudProvider.value;
-      final providerName = providerId == 'custom'
-          ? settings.customCloudName.value
-          : providerId.capitalizeFirst ?? providerId;
-      final modelName = settings.selectedCloudModelName;
-
-      return _buildModernBar(
-        context,
-        isDark,
-        icon: Icons.cloud_done_rounded,
-        label: '$providerName · $modelName',
-        value: '${fmtK(sessionTokens)} session tokens',
-        accent: Dt.accent,
-      );
+    if (!showContextAt(ContextWindowStyle.header)) {
+      return const SizedBox.shrink();
     }
+    final data = readContextWindow();
+    if (data == null) return const SizedBox.shrink();
+
+    final accent = data.isLocal
+        ? (data.warn ? AppColors.warning : AppColors.primary)
+        : Dt.accent;
+    return _buildModernBar(
+      context,
+      isDark,
+      icon: data.isLocal ? Icons.memory_rounded : Icons.cloud_done_rounded,
+      label: data.label,
+      value: data.value,
+      progress: data.isLocal ? data.progress : null,
+      accent: accent,
+    );
   });
+}
+
+/// Compact ring indicator (percentage circle, ~34dp). Lives in the chat
+/// header when the ring placement is chosen. Long-press shows the
+/// numbers via tooltip; tap opens the full details sheet.
+Widget contextRingButton(BuildContext context, bool isDark) {
+  return Obx(() {
+    if (!showContextAt(ContextWindowStyle.ring)) {
+      return const SizedBox.shrink();
+    }
+    final data = readContextWindow();
+    if (data == null) return const SizedBox.shrink();
+
+    final accent = data.isLocal
+        ? (data.warn ? AppColors.warning : AppColors.primary)
+        : Dt.accent;
+    return Tooltip(
+      message: 'Context window: ${data.shortfall} tokens',
+      child: GestureDetector(
+        onTap: () => _showContextDetails(context, isDark, data),
+        child: Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 30,
+                height: 30,
+                child: CircularProgressIndicator(
+                  value: data.isLocal ? data.progress : null,
+                  strokeWidth: 3,
+                  backgroundColor: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.08),
+                  valueColor: AlwaysStoppedAnimation<Color>(accent),
+                ),
+              ),
+              Text(
+                data.isLocal ? data.percentLabel : '∞',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: accent),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  });
+}
+
+void _showContextDetails(
+    BuildContext context, bool isDark, ContextWindowData data) {
+  final accent = data.isLocal
+      ? (data.warn ? AppColors.warning : AppColors.primary)
+      : Dt.accent;
+  showModalBottomSheet(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildModernBar(
+              ctx,
+              isDark,
+              icon: data.isLocal
+                  ? Icons.memory_rounded
+                  : Icons.cloud_done_rounded,
+              label: data.label,
+              value: data.value,
+              progress: data.isLocal ? data.progress : null,
+              accent: accent,
+            ),
+            if (data.warn) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Context is nearly full — start a new chat or raise Context size in Settings → Parameters.',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12, color: AppColors.warning),
+              ),
+            ],
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 Widget _buildModernBar(

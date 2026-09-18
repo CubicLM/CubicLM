@@ -17,13 +17,104 @@ import '../terminal/terminal_view.dart';
 /// Explore Toolkit tab cards.
 /// Extracted from views/model_view.dart (one responsibility per file).
 
-Widget buildToolkitTab(BuildContext context) {
+class _ToolSpec {
+  final IconData icon;
+  final String title;
+  final String description;
+  final Widget Function() open;
+
+  const _ToolSpec({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.open,
+  });
+}
+
+List<_ToolSpec> _toolSpecs() => [
+      _ToolSpec(
+        icon: LucideIcons.bot,
+        title: 'Agent Workspace',
+        description:
+            'General coding agent: describe any task — explore, edit, test, commit — with tool approvals, per-file undo and checkpoint rollback. Cloud or on-device.',
+        open: () => const AgentWorkspaceView(),
+      ),
+      _ToolSpec(
+        icon: LucideIcons.terminal,
+        title: 'Terminal',
+        description:
+            'Sandboxed on-device shell with streaming output and history. Destructive commands are blocked automatically.',
+        open: () => const TerminalView(),
+      ),
+      _ToolSpec(
+        icon: LucideIcons.package,
+        title: 'Runtime & Toolchains',
+        description:
+            'One core Ubuntu runtime, then only the stacks you need — Node, Python, Android, C++, PHP. Isolated agent + terminal execution, on-device.',
+        open: () => const RuntimeSetupView(),
+      ),
+      _ToolSpec(
+        icon: LucideIcons.swords,
+        title: 'Battle Arena',
+        description:
+            'Race up to 4 cloud models on one prompt — same-time or one-by-one (on-device allowed). Live monitor ranks finish, speed and length, then declares an overall winner.',
+        open: () => const BattleArenaView(),
+      ),
+      _ToolSpec(
+        icon: LucideIcons.presentation,
+        title: 'Slide Maker',
+        description:
+            'AI designs every slide from a topic — Docs / Slides / PDF views, freehand move + resize, manual photos, per-slide regen. Exports Markdown, PDF and web slides.',
+        open: () => const SlideDeckView(),
+      ),
+      _ToolSpec(
+        icon: LucideIcons.terminalSquare,
+        title: 'CubicWeb Builder',
+        description:
+            'Agent IDE: tell AI what to build — websites in any framework, live preview, console-error auto-fix, file explorer. Static + ESM runs on-device.',
+        open: () => const AgentIdeView(),
+      ),
+      _ToolSpec(
+        icon: LucideIcons.smartphone,
+        title: 'CubicApp Builder',
+        description:
+            'Build Android apps with AI — pick a template, describe your app, export ZIP with GitHub Actions workflow. Push to GitHub for automatic APK build.',
+        open: () => const CubicAppBuilderView(),
+      ),
+      _ToolSpec(
+        icon: LucideIcons.tableProperties,
+        title: 'CubicDataSheet',
+        description:
+            'Personal sheets + docs workspace: formulas, cell locks with unlock mode, per-cell copy, notes and history. Stored on this device only.',
+        open: () => const DataSheetHomeView(),
+      ),
+      _ToolSpec(
+        icon: LucideIcons.globe,
+        title: 'CubicWeb Browser',
+        description:
+            'Private in-app browser: ads and trackers blocked from a built-in list, no history saved. Extract any page into chat for the local model.',
+        open: () => const BrowserView(),
+      ),
+    ];
+
+Widget buildToolkitTab(BuildContext context, {String query = ''}) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
+  final q = query.trim().toLowerCase();
+  final specs = _toolSpecs();
+  final shown = q.isEmpty
+      ? specs
+      : specs
+          .where((t) =>
+              t.title.toLowerCase().contains(q) ||
+              t.description.toLowerCase().contains(q))
+          .toList();
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        'AI power tools — same engine as chat, focused workspaces.',
+        q.isEmpty
+            ? 'AI power tools — same engine as chat, focused workspaces.'
+            : '${shown.length} result${shown.length == 1 ? '' : 's'} for "$query"',
         style: GoogleFonts.plusJakartaSans(
           fontSize: 12.5,
           color: Theme.of(context).hintColor,
@@ -31,104 +122,30 @@ Widget buildToolkitTab(BuildContext context) {
         ),
       ),
       const SizedBox(height: 12),
-      _toolkitCard(
-        context,
-        isDark,
-        icon: LucideIcons.bot,
-        title: 'Agent Workspace',
-        experimental: true,
-        description:
-            'General coding agent: describe any task — explore, edit, test, commit — with tool approvals, per-file undo and checkpoint rollback. Cloud or on-device.',
-        onTap: () => Get.to(() => const AgentWorkspaceView()),
-      ),
-      const SizedBox(height: 10),
-      _toolkitCard(
-        context,
-        isDark,
-        icon: LucideIcons.terminal,
-        title: 'Terminal',
-        experimental: true,
-        description:
-            'Sandboxed on-device shell with streaming output and history. Destructive commands are blocked automatically.',
-        onTap: () => Get.to(() => const TerminalView()),
-      ),
-      const SizedBox(height: 10),
-      _toolkitCard(
-        context,
-        isDark,
-        icon: LucideIcons.package,
-        title: 'Runtime & Toolchains',
-        experimental: true,
-        description:
-            'One core Ubuntu runtime, then only the stacks you need — Node, Python, Android, C++, PHP. Isolated agent + terminal execution, on-device.',
-        onTap: () => Get.to(() => const RuntimeSetupView()),
-      ),
-      const SizedBox(height: 10),
-      _toolkitCard(
-        context,
-        isDark,
-        icon: LucideIcons.swords,
-        title: 'Battle Arena',
-        experimental: true,
-        description:
-            'Race up to 4 cloud models on one prompt — same-time or one-by-one (on-device allowed). Live monitor ranks finish, speed and length, then declares an overall winner.',
-        onTap: () => Get.to(() => const BattleArenaView()),
-      ),
-      const SizedBox(height: 10),
-      _toolkitCard(
-        context,
-        isDark,
-        icon: LucideIcons.presentation,
-        title: 'Slide Maker',
-        experimental: true,
-        description:
-            'AI designs every slide from a topic — Docs / Slides / PDF views, freehand move + resize, manual photos, per-slide regen. Exports Markdown, PDF and web slides.',
-        onTap: () => Get.to(() => const SlideDeckView()),
-      ),
-      const SizedBox(height: 10),
-      _toolkitCard(
-        context,
-        isDark,
-        icon: LucideIcons.terminalSquare,
-        title: 'CubicWeb Builder',
-        experimental: true,
-        description:
-            'Agent IDE: tell AI what to build — websites in any framework, live preview, console-error auto-fix, file explorer. Static + ESM runs on-device.',
-        onTap: () => Get.to(() => const AgentIdeView()),
-      ),
-      const SizedBox(height: 10),
-      _toolkitCard(
-        context,
-        isDark,
-        icon: LucideIcons.smartphone,
-        title: 'CubicApp Builder',
-        experimental: true,
-        description:
-            'Build Android apps with AI — pick a template, describe your app, export ZIP with GitHub Actions workflow. Push to GitHub for automatic APK build.',
-        onTap: () => Get.to(() => const CubicAppBuilderView()),
-      ),
-      const SizedBox(height: 10),
-      _toolkitCard(
-        context,
-        isDark,
-        icon: LucideIcons.tableProperties,
-        title: 'CubicDataSheet',
-        experimental: true,
-        description:
-            'Personal sheets + docs workspace: formulas, cell locks with unlock mode, per-cell copy, notes and history. Stored on this device only.',
-        onTap: () => Get.to(() => const DataSheetHomeView()),
-      ),
-      const SizedBox(height: 10),
-      _toolkitCard(
-        context,
-        isDark,
-        icon: LucideIcons.globe,
-        title: 'CubicWeb Browser',
-        experimental: true,
-        description:
-            'Private in-app browser: ads and trackers blocked from a built-in list, no history saved. Extract any page into chat for the local model.',
-        onTap: () => Get.to(() => const BrowserView()),
-      ),
+      for (int i = 0; i < shown.length; i++) ...[
+        if (i > 0) const SizedBox(height: 10),
+        _toolkitCard(
+          context,
+          isDark,
+          icon: shown[i].icon,
+          title: shown[i].title,
+          experimental: true,
+          description: shown[i].description,
+          onTap: () => Get.to(shown[i].open),
+        ),
+      ],
+      if (shown.isEmpty) ...[
+        const SizedBox(height: 32),
+        Center(
+          child: Text(
+            'No tools match your search.',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              color: Theme.of(context).hintColor,
+            ),
+          ),
+        ),
+      ],
     ],
   );
 }

@@ -61,7 +61,6 @@ class _ThoughtDisclosureState extends State<ThoughtDisclosure>
       _liveSeconds = 0;
       _animController.forward();
     } else if (!widget.isThinking && oldWidget.isThinking) {
-      // Don't auto-collapse when done thinking, let user decide
       _liveSeconds = widget.durationSeconds ?? _liveSeconds;
     }
 
@@ -119,7 +118,6 @@ class _ThoughtDisclosureState extends State<ThoughtDisclosure>
                 if (widget.isThinking)
                   Padding(
                     padding: const EdgeInsets.only(right: 10),
-                    // Random thinking orbs instead of a spinner.
                     child: Obx(() {
                       final sel = Get.find<SettingsController>()
                           .orbAnalysisAnim
@@ -165,9 +163,6 @@ class _ThoughtDisclosureState extends State<ThoughtDisclosure>
         // Content
         SizeTransition(
           sizeFactor: _expandAnimation,
-          // `alignment` exists only on newer Flutter; axisAlignment keeps
-          // this compiling on stable 3.38 and CI's newer SDK alike.
-          // ignore: deprecated_member_use
           axisAlignment: -1.0,
           child: Container(
             margin: const EdgeInsets.only(top: 4, bottom: 12),
@@ -184,10 +179,17 @@ class _ThoughtDisclosureState extends State<ThoughtDisclosure>
                 ),
               ),
             ),
-            child: MarkdownBody(
-              data: widget.thought.trim(),
-              selectable: true,
-              styleSheet: widget.styleSheet,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.isThinking)
+                  _ReasoningSteps(thought: widget.thought, isDark: isDark),
+                MarkdownBody(
+                  data: widget.thought.trim(),
+                  selectable: true,
+                  styleSheet: widget.styleSheet,
+                ),
+              ],
             ),
           ),
         ),
@@ -198,8 +200,59 @@ class _ThoughtDisclosureState extends State<ThoughtDisclosure>
   String get _label {
     final seconds = widget.durationSeconds ?? _liveSeconds;
     if (widget.isThinking) {
-      return seconds > 0 ? 'Analyzing Path (${seconds}s)…' : 'Initializing…';
+      return seconds > 0 ? 'Deep Reasoning (${seconds}s)…' : 'Initializing…';
     }
-    return seconds > 0 ? 'Analysis Complete (${seconds}s)' : 'Process Logs';
+    return seconds > 0 ? 'Thought Complete (${seconds}s)' : 'Process Logs';
+  }
+}
+
+class _ReasoningSteps extends StatelessWidget {
+  final String thought;
+  final bool isDark;
+  const _ReasoningSteps({required this.thought, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = thought.split('\n');
+    final steps = lines
+        .where((l) =>
+            l.trim().startsWith('#') ||
+            l.trim().startsWith('-') ||
+            l.trim().startsWith('* '))
+        .take(5)
+        .toList();
+
+    if (steps.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: steps.map((s) {
+          final clean = s.replaceAll(RegExp(r'[#*-]'), '').trim();
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle_outline_rounded,
+                    size: 12, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    clean,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white70 : Colors.black87),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 }

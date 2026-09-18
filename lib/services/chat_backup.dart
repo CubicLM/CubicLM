@@ -102,6 +102,7 @@ Future<String?> exportAllChats(
       text: jsonStr,
       fileName: 'cubiclm_chat_backup_$stamp.json',
       mimeType: 'application/json',
+      category: 'backup',
     );
     return saved == null ? 'error' : null;
   } catch (e) {
@@ -120,6 +121,7 @@ Future<String?> _exportChatsDesktop(String jsonStr) async {
       text: jsonStr,
       fileName: 'cubiclm_chat_backup_$stamp.json',
       mimeType: 'application/json',
+      category: 'backup',
     );
     if (outPath == null) return 'error';
     Get.snackbar(
@@ -235,6 +237,7 @@ Future<String?> exportSettings(HiveService hive) async {
       text: jsonStr,
       fileName: fileName,
       mimeType: 'application/json',
+      category: 'backup',
     );
     if (outPath == null) return 'error';
     Get.find<AppLogService>().info('Settings exported',

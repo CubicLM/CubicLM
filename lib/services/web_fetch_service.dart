@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/web_source.dart';
+import '../controllers/chat_controller.dart';
 import 'app_log_service.dart';
 
 /// Lightweight web access for chat.
@@ -52,9 +53,18 @@ class WebFetchService {
 
     final buffer = StringBuffer(text);
     final sources = <WebSource>[];
-    var fetched = 0;
+    var fetchedCount = 0;
 
     for (final url in urls) {
+      final domain = WebSource.domainFromUrl(url);
+      try {
+        Get.find<ChatController>().addToolStep(
+          name: 'fetch_url', 
+          args: {'url': url, 'domain': domain},
+          running: true
+        );
+      } catch (_) {}
+
       final rawHtml = await _fetchRawHtml(url);
       String? page;
       String title = '';
@@ -66,9 +76,19 @@ class WebFetchService {
         page = _truncate(page);
         if (page.trim().isEmpty) page = null;
       }
-      final domain = WebSource.domainFromUrl(url);
       final favicon = WebSource.faviconFor(url);
       if (page == null || page.isEmpty) {
+        try {
+          final ctrl = Get.find<ChatController>();
+          if (ctrl.currentToolSteps.isNotEmpty) {
+            ctrl.currentToolSteps[ctrl.currentToolSteps.length - 1] = {
+              ...ctrl.currentToolSteps.last,
+              'output': 'Failed to fetch content from $url',
+              'running': false,
+              'success': false,
+            };
+          }
+        } catch (_) {}
         sources.add(WebSource(
             url: url,
             domain: domain,
@@ -77,7 +97,18 @@ class WebFetchService {
             success: false));
         continue;
       }
-      fetched++;
+      fetchedCount++;
+      try {
+          final ctrl = Get.find<ChatController>();
+          if (ctrl.currentToolSteps.isNotEmpty) {
+            ctrl.currentToolSteps[ctrl.currentToolSteps.length - 1] = {
+              ...ctrl.currentToolSteps.last,
+              'output': 'Successfully fetched and parsed content (Title: $title)',
+              'running': false,
+              'success': true,
+            };
+          }
+        } catch (_) {}
       sources.add(WebSource(
           url: url,
           domain: domain,
@@ -88,15 +119,17 @@ class WebFetchService {
       buffer
         ..writeln()
         ..writeln()
-        ..writeln('--- Web content from $url ---')
+        ..writeln('--- Web content from [Source #$fetchedCount]: $url ---')
+        ..writeln('Title: $title')
         ..writeln(page)
-        ..writeln('--- End of web content ---');
+        ..writeln('--- End of [Source #$fetchedCount] ---');
     }
 
-    if (fetched > 0) {
+    if (fetchedCount > 0) {
+      buffer.writeln('\n[Instruction: If you use information from these sources, cite them using [cite:N] where N is the Source #.]');
       try {
         Get.find<AppLogService>().info(
-          'Web access: fetched $fetched page(s)',
+          'Web access: fetched $fetchedCount page(s)',
           details: urls.join(', '),
           category: LogCategory.chat,
         );

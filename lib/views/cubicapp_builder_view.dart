@@ -197,6 +197,7 @@ Output ONLY the JSON block. No explanation needed.''';
         bytes: Uint8List.fromList(out),
         fileName: name,
         mimeType: 'application/zip',
+        category: 'cubicapp',
       );
       AppSnackbar.showTop('Exported', '$name saved successfully.');
     } catch (e) {

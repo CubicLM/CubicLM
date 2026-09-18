@@ -65,6 +65,7 @@ import 'services/deploy_service.dart';
 import 'services/update_service.dart';
 import 'services/vector_service.dart';
 import 'services/code_interpreter_service.dart';
+import 'services/tool_service.dart';
 import 'services/memory_service.dart';
 import 'core/constants.dart';
 import 'core/languages.dart';
@@ -495,6 +496,7 @@ Future<void> _initDeferredServices(
       timeout: const Duration(seconds: 4));
   Get.put(VectorService());
   Get.put(CodeInterpreterService());
+  Get.put(ToolService());
   // Kick off auto-check (3s delay + 24h throttle inside the service),
   // honoring the Update-center "Check automatically" pref.
   try {

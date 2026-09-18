@@ -43,3 +43,43 @@ ThoughtParts splitThoughtTags(String text) {
     isThinking: false,
   );
 }
+
+/// Actionable guidance appended when a generation produced no text.
+const String emptyResponseHintLocal =
+    'Try: Settings → Parameters → raise Output tokens / Context size (if RAM allows), '
+    'ask in smaller steps, use a larger model, or switch to Cloud mode.';
+
+/// Same, for cloud mode (no RAM framing, no "switch to cloud").
+const String emptyResponseHintCloud =
+    'Try: Settings → Parameters → check Output tokens (if Auto Tune is off), '
+    'ask in smaller steps, switch to a non-thinking or larger model, '
+    'or try another provider.';
+
+/// Returns the content to save when a generation produced no visible
+/// text — a thinking model burning its whole budget reasoning, or a
+/// tiny context/output limit cutting a big ask (e.g. a full game file).
+/// Keeps any reasoning visible (closing an unclosed think block first
+/// so the notice doesn't get swallowed into the thought) and makes the
+/// guidance the answer. Returns null when the response already has
+/// visible content (or artifacts/tool steps render instead).
+/// Pure — unit tested.
+String? emptyResponseReplacement({
+  required String rawResponse,
+  required String cleanContent,
+  required bool hasArtifacts,
+  required bool hasToolSteps,
+  required bool isCloud,
+}) {
+  if (cleanContent.trim().isNotEmpty || hasArtifacts || hasToolSteps) {
+    return null;
+  }
+  final hint = isCloud ? emptyResponseHintCloud : emptyResponseHintLocal;
+  final parts = splitThoughtTags(rawResponse);
+  if (!parts.hasThought) {
+    return '⚠️ The model returned an empty response.\n\n$hint';
+  }
+  final thoughtClosed = parts.isThinking
+      ? '${rawResponse.trim()}</think>'
+      : rawResponse.trim();
+  return '$thoughtClosed\n\n> ⚠️ The model only produced reasoning and stopped before writing the answer — usually the output limit was too small for the task.\n>\n> $hint';
+}

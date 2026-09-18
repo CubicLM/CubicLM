@@ -40,10 +40,9 @@ class _DataSheetPaletteViewState extends State<DataSheetPaletteView> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isCommand = _text.startsWith('>');
     return Scaffold(
-      backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: TextField(
           controller: _query,
@@ -198,6 +197,7 @@ class _DataSheetPaletteViewState extends State<DataSheetPaletteView> {
             fileName:
                 'cubicdatasheet_backup_${DateTime.now().toIso8601String().split('T').first}.json',
             mimeType: 'application/json',
+            category: 'datasheet',
           );
         },
       ),

@@ -816,6 +816,7 @@ class SlideDeckController extends GetxController {
         fileName: 'cubiclm_slides_$stamp.html',
         mimeType: 'text/html',
         shareText: html,
+        category: 'slides',
       );
     } catch (e) {
       AppSnackbar.showTop('prompt_export_failed'.tr, '$e');
@@ -849,6 +850,7 @@ class SlideDeckController extends GetxController {
         fileName: 'cubiclm_slides_$stamp.pptx',
         mimeType:
             'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        category: 'slides',
       );
     } catch (e) {
       AppSnackbar.showTop('prompt_export_failed'.tr, '$e');

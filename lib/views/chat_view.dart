@@ -30,16 +30,49 @@ import '../widgets/voice_overlay.dart';
 import '../core/colors.dart';
 import '../services/tts_service.dart';
 
+/// Per-mounted-instance Scaffold key for [ChatView]. ChatView can exist
+/// twice in the tree at once (home IndexedStack + a pushed route) — a
+/// single shared GlobalKey then duplicates and corrupts the tree
+/// ("Duplicate GlobalKey … ChatView"). Each mounted element owns its
+/// key and registers it as the controller's active one; unmount clears
+/// it again so history-search always targets a live Scaffold.
+class _ChatViewElement extends StatelessElement {
+  final scaffoldKey = GlobalKey<ScaffoldState>();
+
+  _ChatViewElement(super.widget);
+
+  @override
+  void mount(Element? parent, Object? newSlot) {
+    super.mount(parent, newSlot);
+    try {
+      Get.find<ChatController>().chatScaffoldKey = scaffoldKey;
+    } catch (_) {}
+  }
+
+  @override
+  void unmount() {
+    try {
+      final c = Get.find<ChatController>();
+      if (identical(c.chatScaffoldKey, scaffoldKey)) {
+        c.chatScaffoldKey = null;
+      }
+    } catch (_) {}
+    super.unmount();
+  }
+}
+
 // ignore: must_be_immutable
 class ChatView extends GetView<ChatController> {
   const ChatView({super.key});
 
   @override
+  StatelessElement createElement() => _ChatViewElement(this);
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      key: controller.chatScaffoldKey,
-      backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
+      key: (context as _ChatViewElement).scaffoldKey,
       drawer: ChatSidebar(isDark: isDark),
       appBar: _appBar(context, isDark),
       body: Stack(
@@ -159,7 +192,7 @@ class ChatView extends GetView<ChatController> {
                                   child: FloatingActionButton.small(
                                     onPressed: controller.jumpToBottom,
                                     backgroundColor: isDark ? Dt.cardDark : Dt.card,
-                                    foregroundColor: AppColors.primary,
+                                    foregroundColor: Theme.of(context).primaryColor,
                                     elevation: 4,
                                     child: const Icon(Icons.arrow_downward_rounded,
                                         size: 20),
@@ -229,7 +262,7 @@ class ChatView extends GetView<ChatController> {
   PreferredSizeWidget _appBar(BuildContext context, bool isDark) {
     return AppBar(
       backgroundColor:
-          (isDark ? Dt.canvasDark : Dt.canvas).withValues(alpha: 0.8),
+          Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.8),
       flexibleSpace: ClipRRect(
         child: Obx(() => BackdropFilter(
           filter: ImageFilter.blur(sigmaX: AppColors.blurSigma, sigmaY: AppColors.blurSigma),
@@ -272,7 +305,7 @@ class ChatView extends GetView<ChatController> {
         }
         final statusColor = isLocal
             ? (isLocalReady ? AppColors.success : AppColors.warning)
-            : AppColors.primary;
+            : Theme.of(context).primaryColor;
         final title = sid.isEmpty
             ? 'CubicLM'
             : controller.sessions.firstWhereOrNull((s) => s.id == sid)?.title ??
@@ -326,6 +359,7 @@ class ChatView extends GetView<ChatController> {
         ),
       ),
       actions: [
+        contextRingButton(context, isDark),
         notificationBell(context, isDark),
         Obx(() {
           final hasSession = controller.currentSessionId.value.isNotEmpty;
@@ -340,20 +374,20 @@ class ChatView extends GetView<ChatController> {
               if (v == 'find') controller.toggleFind(true);
               if (v == 'export') _exportCurrentSession(context);
               if (v == 'select') controller.toggleSelectionMode();
-              if (v == 'dual') controller.toggleDualMode();
+              if (v == 'arena') controller.toggleResponseMode();
             },
             itemBuilder: (_) => [
               PopupMenuItem(
-                value: 'dual',
+                value: 'arena',
                 child: Row(children: [
                   Icon(LucideIcons.gitCompare,
-                      size: 16,
-                      color: controller.dualResponseMode.value ? Dt.accent : null),
+                      size: 16, 
+                      color: controller.responseMode.value > 0 ? Theme.of(context).primaryColor : null),
                   const SizedBox(width: 10),
                   Text(
-                      controller.dualResponseMode.value
-                          ? 'Dual Response: ON'
-                          : 'Dual Response: OFF',
+                      controller.responseMode.value == 0
+                          ? 'Compare Mode: OFF'
+                          : (controller.responseMode.value == 1 ? 'Dual Mode' : 'Triple Mode'),
                       style: GoogleFonts.plusJakartaSans(fontSize: 14)),
                 ]),
               ),
@@ -391,7 +425,7 @@ class ChatView extends GetView<ChatController> {
                           : LucideIcons.listChecks,
                       size: 16,
                       color:
-                          selecting ? Dt.accent : (hasSession ? null : muted)),
+                          selecting ? Theme.of(context).primaryColor : (hasSession ? null : muted)),
                   const SizedBox(width: 10),
                   Text(selecting ? 'Done selecting' : 'Select messages',
                       style: GoogleFonts.plusJakartaSans(
@@ -407,7 +441,7 @@ class ChatView extends GetView<ChatController> {
               tooltip: 'New Chat',
               icon: Icon(LucideIcons.messageSquarePlus,
                   size: Dt.iconSize - 2,
-                  color: isDark ? AppColors.primary : Dt.accent),
+                  color: isDark ? Theme.of(context).primaryColor : Theme.of(context).primaryColor),
               onPressed: () => controller.createNewChat()),
         ),
       ],
@@ -496,7 +530,7 @@ class ChatView extends GetView<ChatController> {
                                                 },
                                                 extensionSet: _eliteMdExtensionSet,
                                               ))),
-                                const BlinkingCursor(color: Dt.accent),
+                                BlinkingCursor(color: Theme.of(context).primaryColor),
                               ]),
                       ],
                     );
@@ -520,13 +554,13 @@ class ChatView extends GetView<ChatController> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: AppColors.primary.withValues(alpha: 0.1),
+                                    color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text('${tps.toStringAsFixed(1)} tok/s',
                                       style: GoogleFonts.plusJakartaSans(
                                           fontSize: 10,
-                                          color: AppColors.primary,
+                                          color: Theme.of(context).primaryColor,
                                           fontWeight: FontWeight.w700)),
                                 ),
                               if (tps > 0 && duration > 0) const SizedBox(width: 8),
@@ -535,7 +569,7 @@ class ChatView extends GetView<ChatController> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: AppColors.primary.withValues(alpha: 0.08),
+                                    color: Theme.of(context).primaryColor.withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Row(
@@ -546,7 +580,7 @@ class ChatView extends GetView<ChatController> {
                                       Text('${duration}s',
                                           style: GoogleFonts.plusJakartaSans(
                                               fontSize: 10,
-                                              color: AppColors.primary,
+                                              color: Theme.of(context).primaryColor,
                                               fontWeight: FontWeight.w800)),
                                     ],
                                   ),
@@ -597,8 +631,8 @@ class ChatView extends GetView<ChatController> {
           color: isDark
               ? Colors.white.withValues(alpha: 0.03)
               : Colors.black.withValues(alpha: 0.03),
-          border: const Border(
-              left: BorderSide(color: AppColors.primary, width: 3)),
+          border: Border(
+              left: BorderSide(color: Theme.of(c).primaryColor, width: 3)),
           borderRadius:
               const BorderRadius.horizontal(right: Radius.circular(8)),
         ),

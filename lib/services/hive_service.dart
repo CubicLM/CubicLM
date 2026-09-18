@@ -7,7 +7,69 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../core/constants.dart';
+import '../utils/memory_extract.dart';
 import 'secure_key_store.dart';
+
+/// Worker for [HiveService.recallPastTurns] — must stay top-level for
+/// `compute()`. Args: {'rows': [[content, role, chatId, title]],
+/// 'keywords', 'maxHits', 'snippetChars'}. Returns [{role, chat, text}].
+List<Map<String, String>> _recallWorker(Map<String, dynamic> args) {
+  final rows = (args['rows'] as List).cast<List>();
+  final kws = (args['keywords'] as List)
+      .map((e) => e.toString().toLowerCase())
+      .where((e) => e.isNotEmpty)
+      .toList();
+  final maxHits = args['maxHits'] as int? ?? 3;
+  final snippetChars = args['snippetChars'] as int? ?? 300;
+  final scored = <Map<String, dynamic>>[];
+  var order = 0;
+  for (final r in rows) {
+    order++;
+    final content = r[0].toString();
+    final low = content.toLowerCase();
+    var score = 0;
+    for (final k in kws) {
+      var idx = 0;
+      var n = 0;
+      while (n < 5) {
+        idx = low.indexOf(k, idx);
+        if (idx < 0) break;
+        n++;
+        idx += k.length;
+      }
+      score += n;
+    }
+    if (score <= 0) continue;
+    scored.add({
+      'score': score,
+      'order': order,
+      'role': r[1].toString(),
+      'chatId': r[2].toString(),
+      'chat': r[3].toString(),
+      'text': centeredSnippet(content, kws, snippetChars),
+    });
+  }
+  scored.sort((a, b) {
+    final c = (b['score'] as int).compareTo(a['score'] as int);
+    if (c != 0) return c;
+    return (b['order'] as int).compareTo(a['order'] as int);
+  });
+  // Diversity over depth: one hit per chat so three hits cover three
+  // conversations instead of one long thread.
+  final seenChats = <String>{};
+  final out = <Map<String, String>>[];
+  for (final e in scored) {
+    if (out.length >= maxHits) break;
+    final cid = '${e['chatId']}';
+    if (!seenChats.add(cid)) continue;
+    out.add({
+      'role': '${e['role']}',
+      'chat': '${e['chat']}',
+      'text': '${e['text']}',
+    });
+  }
+  return out;
+}
 
 /// Worker for [HiveService.searchMessages] — must stay top-level for
 /// `compute()`. Args: {'rows': List<List<String>> [content, chatId], 'q'}.
@@ -770,6 +832,64 @@ class HiveService extends GetxService {
       return await compute(_searchRows, {'rows': rows, 'q': q});
     } catch (_) {
       return <String>{};
+    }
+  }
+
+  /// Auto-recall for long-term memory: keyword-scored turns from OTHER
+  /// (visible, recent-first) sessions, newest message per hit truncated
+  /// to a snippet. Bounded (sessions × messages × chars) and scored
+  /// off-thread — safe to call once per turn on 1GB-RAM devices.
+  /// Returns [{role, chat, text}]. Never throws.
+  Future<List<Map<String, String>>> recallPastTurns({
+    required List<String> keywords,
+    required String excludeChatId,
+    int maxSessions = 12,
+    int perSession = 8,
+    int maxHits = 3,
+    int snippetChars = 300,
+  }) async {
+    if (keywords.isEmpty) return [];
+    try {
+      if (!_isBoxUsable(_sessionsBox) || !_isBoxUsable(_messagesBox)) {
+        return [];
+      }
+      final sess = getAllSessions().where((s) {
+        final m = Map<String, dynamic>.from(s);
+        if ('${m['id'] ?? ''}' == excludeChatId) return false;
+        if (m['archived'] == true || m['hidden'] == true) return false;
+        return true;
+      }).toList();
+      sess.sort((a, b) => '${b['updatedAt'] ?? ''}'
+          .compareTo('${a['updatedAt'] ?? ''}'));
+      final rows = <List<String>>[]; // [content, role, chatId, title]
+      for (final s in sess.take(maxSessions)) {
+        final m = Map<String, dynamic>.from(s);
+        final id = '${m['id'] ?? ''}';
+        final title = '${m['title'] ?? ''}';
+        if (id.isEmpty) continue;
+        final msgs = getMessagesForChat(id);
+        final recent =
+            msgs.length > perSession ? msgs.sublist(msgs.length - perSession) : msgs;
+        for (final mm in recent) {
+          if (mm['imageBase64'] != null) continue; // text recall only
+          var c = '${mm['content'] ?? ''}'.trim();
+          if (c.isEmpty) continue;
+          if (c.length > 6000) c = c.substring(0, 6000);
+          rows.add([c, '${mm['role'] ?? 'user'}', id, title]);
+        }
+      }
+      if (rows.isEmpty) return [];
+      final hits = await compute(_recallWorker, {
+        'rows': rows,
+        'keywords': keywords,
+        'maxHits': maxHits,
+        'snippetChars': snippetChars,
+      });
+      return hits
+          .map((e) => Map<String, String>.from(e as Map))
+          .toList();
+    } catch (_) {
+      return [];
     }
   }
 

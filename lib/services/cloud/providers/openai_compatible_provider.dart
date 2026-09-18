@@ -207,6 +207,35 @@ abstract class OpenAICompatibleProvider extends CloudProvider {
     return apiMessages;
   }
 
+  /// Picks reasoning text off a response/delta message. Thinking
+  /// models (DeepSeek Reasoner, NVIDIA Nemotron Think, QwQ, …) put
+  /// their chain-of-thought in `reasoning_content` (sometimes
+  /// `reasoning`) while `content` may stay empty — even for the whole
+  /// turn when the output budget dies inside reasoning.
+  /// Pure — unit tested.
+  static String? pickReasoning(Map? message) {
+    if (message == null) return null;
+    for (final k in ['reasoning_content', 'reasoning']) {
+      final v = message[k]?.toString() ?? '';
+      if (v.trim().isNotEmpty) return v;
+    }
+    return null;
+  }
+
+  /// Falls back to a `<think>`-wrapped reasoning block when the visible
+  /// content is empty, so the chat thought-pipeline (and the empty
+  /// guard) sees it instead of silent blank. Reasoning is capped to
+  /// protect context. Pure — unit tested.
+  static String withReasoningFallback(String content, String? reasoning) {
+    if (content.trim().isNotEmpty) return content;
+    final r = (reasoning ?? '').trim();
+    if (r.isEmpty) return content;
+    final capped = r.length > 6000
+        ? '${r.substring(0, 6000)}\n…(reasoning truncated)'
+        : r;
+    return '<think>$capped</think>';
+  }
+
   Future<String> _handleToolCalls(
     List<Map<String, String>> messages,
     String apiKey,
@@ -344,7 +373,11 @@ abstract class OpenAICompatibleProvider extends CloudProvider {
           '${runtimeType.toString()} tool follow-up error: ${resp2.statusCode} ${resp2.body}');
     }
     final data2 = jsonDecode(resp2.body);
-    return data2['choices'][0]['message']['content']?.toString() ?? '';
+    final finalText =
+        data2['choices'][0]['message']['content']?.toString() ?? '';
+    // The follow-up itself can come back content-empty while the first
+    // turn carried reasoning — preserve it instead of blank.
+    return withReasoningFallback(finalText, pickReasoning(firstMessage));
   }
 
   @override
@@ -389,7 +422,8 @@ abstract class OpenAICompatibleProvider extends CloudProvider {
     if (toolCalls != null && toolCalls.isNotEmpty && mcpTools != null) {
       return _handleToolCalls(messages, apiKey, model, message, toolCalls);
     }
-    return message['content']?.toString() ?? '';
+    return withReasoningFallback(
+        message['content']?.toString() ?? '', pickReasoning(message));
   }
 
   @override
@@ -432,6 +466,12 @@ abstract class OpenAICompatibleProvider extends CloudProvider {
     // If MCP tools are active, we need to detect tool_calls in the stream.
     final List<Map<String, dynamic>> pendingToolCalls = [];
 
+    // Thinking models stream chain-of-thought in reasoning deltas while
+    // content may stay empty for the whole turn. Accumulate it (never
+    // yield raw) and fall back to it at the end instead of blank.
+    final reasoningBuf = StringBuffer();
+    var sawContent = false;
+
     String buffer = '';
     await for (final chunk in streamedResponse.stream.transform(
         utf8.decoder)) {
@@ -447,11 +487,21 @@ abstract class OpenAICompatibleProvider extends CloudProvider {
           // Tool handling will happen after loop if needed.
           if (pendingToolCalls.isNotEmpty) {
             final finalAnswer = await _handleToolCalls(
-                messages, apiKey, model, {'content': ''}, pendingToolCalls);
+                messages,
+                apiKey,
+                model,
+                {
+                  'content': '',
+                  if (reasoningBuf.isNotEmpty)
+                    'reasoning_content': reasoningBuf.toString(),
+                },
+                pendingToolCalls);
             // Yield final answer chunked.
             for (final word in finalAnswer.split(' ')) {
               if (word.isNotEmpty) yield '$word ';
             }
+          } else if (!sawContent && reasoningBuf.isNotEmpty) {
+            yield withReasoningFallback('', reasoningBuf.toString());
           }
           return;
         }
@@ -462,7 +512,13 @@ abstract class OpenAICompatibleProvider extends CloudProvider {
           final delta = choice?['delta'];
           if (delta == null) continue;
           final content = delta['content'];
-          if (content != null) yield content.toString();
+          if (content != null) {
+            sawContent = true;
+            yield content.toString();
+          }
+          final deltaReasoning =
+              pickReasoning(delta is Map ? delta : null);
+          if (deltaReasoning != null) reasoningBuf.write(deltaReasoning);
 
           // Tool calls in streaming delta.
           final toolCallsDelta = delta['tool_calls'] as List?;
@@ -504,17 +560,32 @@ abstract class OpenAICompatibleProvider extends CloudProvider {
         try {
           final data = jsonDecode(trimmed.substring(6));
           final delta = data['choices']?[0]?['delta']?['content'];
-          if (delta != null) yield delta.toString();
+          if (delta != null) {
+            sawContent = true;
+            yield delta.toString();
+          }
         } catch (_) {}
       }
     }
 
     if (pendingToolCalls.isNotEmpty) {
       final finalAnswer = await _handleToolCalls(
-          messages, apiKey, model, {'content': ''}, pendingToolCalls);
+          messages,
+          apiKey,
+          model,
+          {
+            'content': '',
+            if (reasoningBuf.isNotEmpty)
+              'reasoning_content': reasoningBuf.toString(),
+          },
+          pendingToolCalls);
       for (final word in finalAnswer.split(' ')) {
         if (word.isNotEmpty) yield '$word ';
       }
+    } else if (!sawContent && reasoningBuf.isNotEmpty) {
+      // Content never arrived (budget died in reasoning) — emit the
+      // reasoning as thought instead of ending blank.
+      yield withReasoningFallback('', reasoningBuf.toString());
     }
   }
 

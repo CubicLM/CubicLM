@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -170,6 +171,69 @@ void confirmDownload(BuildContext context, AiModel model,
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 8),
+          FutureBuilder<String>(
+            future: Get.isRegistered<DownloadService>()
+                ? Get.find<DownloadService>().modelsDir
+                : Future.value(''),
+            builder: (ctx2, snap) {
+              final full = snap.data ?? '';
+              if (full.isEmpty) return const SizedBox.shrink();
+              // Shorten the app-private prefix; full path on copy.
+              final short = full.replaceFirst(
+                  RegExp(r'^/data/(user/\d+/|data/)com\.cubiclm\.app/'),
+                  'app-private/');
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx2)
+                      .colorScheme
+                      .surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.folder_outlined, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            short,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.firaCode(fontSize: 11),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'App-private — Android lets AI runtimes live only here.',
+                            style: GoogleFonts.plusJakartaSans(
+                                fontSize: 10,
+                                color: Theme.of(ctx2).hintColor),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Copy full path',
+                      icon: const Icon(Icons.copy, size: 16),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () async {
+                        await Clipboard.setData(
+                            ClipboardData(text: full));
+                        Get.snackbar('Copied', 'Model folder path copied.',
+                            snackPosition: SnackPosition.BOTTOM,
+                            duration: const Duration(seconds: 2));
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
           const SizedBox(height: 16),
           Container(

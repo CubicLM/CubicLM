@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/colors.dart';
 
 class CitationChip extends StatelessWidget {
   final int index;
   final String source;
   final int? page;
+  final String? url;
   final VoidCallback? onTap;
 
   const CitationChip({
@@ -13,6 +15,7 @@ class CitationChip extends StatelessWidget {
     required this.index,
     required this.source,
     this.page,
+    this.url,
     this.onTap,
   });
 
@@ -21,7 +24,13 @@ class CitationChip extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return InkWell(
-      onTap: onTap ?? () => _showSourceDialog(context, isDark),
+      onTap: onTap ?? () {
+        if (url != null) {
+          launchUrl(Uri.parse(url!), mode: LaunchMode.externalApplication);
+        } else {
+          _showSourceDialog(context, isDark);
+        }
+      },
       borderRadius: BorderRadius.circular(4),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
@@ -57,9 +66,17 @@ class CitationChip extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'File: $source',
+              url != null ? 'Source: $source' : 'File: $source',
               style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
             ),
+            if (url != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                url!,
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12, color: Colors.blue),
+              ),
+            ],
             if (page != null) ...[
               const SizedBox(height: 4),
               Text(
@@ -70,6 +87,12 @@ class CitationChip extends StatelessWidget {
           ],
         ),
         actions: [
+          if (url != null)
+            TextButton(
+              onPressed: () => launchUrl(Uri.parse(url!),
+                  mode: LaunchMode.externalApplication),
+              child: const Text('Open Link'),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Close'),

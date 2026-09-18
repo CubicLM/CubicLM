@@ -667,14 +667,15 @@ class InferenceService extends GetxService {
     }
 
     if (isGenerating.value) {
-      // Wait for previous generation
-      for (int i = 0; i < 10; i++) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (!isGenerating.value) break;
-      }
-      if (isGenerating.value) {
+      // A previous generation is still running: first give it a chance
+      // to finish on its own, otherwise stop it and wait for TRUE idle
+      // (not a fixed delay) before touching the native engine again.
+      // Starting a new native generation while the old one still tears
+      // down can abort the process on low-RAM devices.
+      final settled = await waitForIdle(timeout: const Duration(seconds: 5));
+      if (!settled) {
         await stopGeneration();
-        await Future.delayed(const Duration(milliseconds: 300));
+        await waitForIdle(timeout: const Duration(seconds: 4));
       }
     }
 
@@ -683,6 +684,16 @@ class InferenceService extends GetxService {
     tokensPerSecond.value = 0.0;
     generationSource.value = source;
     streamingText.value = '';
+
+    // Kill-proof breadcrumb for user-visible turns only (background
+    // jobs would churn the file on every turn): if the process dies
+    // mid-generation, next boot reports it instead of silence.
+    if (source == 'chat') {
+      try {
+        await Get.find<AppLogService>()
+            .setBreadcrumb('generation-start', loadedModelName.value);
+      } catch (_) {}
+    }
 
     final startTime = DateTime.now();
     DateTime? firstVisibleTokenAt;
@@ -726,12 +737,49 @@ class InferenceService extends GetxService {
           ) ??
           AppConstants.defaultRepeatPenalty;
 
+      // ── Context-overflow guard ──────────────────────────────
+      // Filling KV past n_ctx aborts the process natively (no Dart
+      // exception possible) — this is the "dies right after answering"
+      // crash on small-context devices. Estimate room up front, cap
+      // this call's budget to fit, refuse when nothing fits, and stop
+      // early if the estimate says we're about to hit the wall.
+      var effMaxTokens = maxTokens;
+      var ctxTotal = 0;
+      var promptEst = 0;
+      try {
+        final info = await _engine!.getContextInfo();
+        if (info != null && info.contextSize > 0) {
+          ctxTotal = info.contextSize;
+          contextTokensTotal.value = ctxTotal;
+          var histChars = 0;
+          final hist = conversationHistory;
+          if (hist != null) {
+            for (final m in hist) {
+              histChars += (m['content'] ?? '').length;
+            }
+          }
+          promptEst = (prompt.length +
+                  (systemPrompt ?? AppConstants.systemPrompt).length +
+                  histChars) ~/
+              4;
+          final room = ctxTotal - info.tokensUsed - promptEst;
+          if (room <= 64) {
+            return '⚠️ Context is full (${info.tokensUsed}/$ctxTotal tokens used) — '
+                'this turn cannot fit. Start a new chat, or raise Context size '
+                'in Settings → Parameters (if RAM allows).';
+          }
+          final capped = room - 64;
+          if (capped < effMaxTokens) effMaxTokens = capped < 64 ? 64 : capped;
+        }
+      } catch (_) {}
+      var overflowCut = false;
+
       final result = await _engine!.generate(
         prompt: prompt,
         conversationHistory: conversationHistory,
         systemPrompt: systemPrompt ?? AppConstants.systemPrompt,
         modelName: loadedModelName.value,
-        maxTokens: maxTokens,
+        maxTokens: effMaxTokens,
         temperature: temperature,
         topP: topP,
         topK: topK,
@@ -742,6 +790,16 @@ class InferenceService extends GetxService {
           firstVisibleTokenAt ??= DateTime.now();
           tokenCount.value++;
           streamingText.value += token;
+          // Live overflow trip-wire: estimated KV use passed 95% of the
+          // window — stop now (partial answer survives) instead of
+          // letting the native layer abort the process a few tokens
+          // later. Sync callback: fire-and-forget the async stop.
+          if (!overflowCut &&
+              ctxTotal > 0 &&
+              promptEst + tokenCount.value >= (ctxTotal * 0.95).floor()) {
+            overflowCut = true;
+            unawaited(stopGeneration());
+          }
           final speedStart = firstVisibleTokenAt ?? startTime;
           final elapsedSeconds =
               DateTime.now().difference(speedStart).inMilliseconds / 1000.0;
@@ -773,6 +831,12 @@ class InferenceService extends GetxService {
           loadedModelName.value.toLowerCase().contains('gemma')) {
         final isTensor = _getIsTensorSoC();
         if (isTensor) {
+          if (source == 'chat') {
+            try {
+              await Get.find<AppLogService>().setBreadcrumb(
+                  'generation-failed', 'gemma-tensor-empty');
+            } catch (_) {}
+          }
           return '⚠️ This Gemma model is incompatible with your Pixel\'s Google Tensor chip. '
               'The Q4_K_M quantization format has a known bug on Tensor SoC that produces empty responses.\n\n'
               'Try one of these fixes:\n'
@@ -782,6 +846,20 @@ class InferenceService extends GetxService {
         }
       }
 
+      // Context guard trip: keep the partial answer and say why it
+      // stopped, instead of letting the next tokens kill the process.
+      if (overflowCut && result.trim().isNotEmpty) {
+        return '$result\n\n> ⚠️ Stopped early: the context window was about to fill up '
+            '(~$ctxTotal tokens). Start a new chat or raise Context size in '
+            'Settings → Parameters to continue.';
+      }
+
+      if (source == 'chat') {
+        try {
+          await Get.find<AppLogService>()
+              .setBreadcrumb('generation-done', loadedModelName.value);
+        } catch (_) {}
+      }
       return result;
     } catch (e) {
       isGenerating.value = false;
@@ -789,6 +867,12 @@ class InferenceService extends GetxService {
       streamingText.value = '';
       tokenFlushTimer?.cancel();
       flushTokenBuffer();
+      if (source == 'chat') {
+        try {
+          await Get.find<AppLogService>().setBreadcrumb(
+              'generation-failed', '${e.toString().length > 120 ? e.toString().substring(0, 120) : e}');
+        } catch (_) {}
+      }
       Get.find<AppLogService>().error('Local generation failed', details: e, category: LogCategory.model);
       return 'ERROR: $e';
     }
@@ -805,6 +889,21 @@ class InferenceService extends GetxService {
             (_) {},
           ));
     }
+  }
+
+  /// Waits until no generation is in flight. Returns true when idle,
+  /// false on timeout. A fresh user turn waits on this after stopping
+  /// stale background work — starting a new native generation while
+  /// the old one still tears down can abort the process on low-RAM
+  /// devices.
+  Future<bool> waitForIdle(
+      {Duration timeout = const Duration(seconds: 4)}) async {
+    final deadline = DateTime.now().add(timeout);
+    while (isGenerating.value) {
+      if (DateTime.now().isAfter(deadline)) return false;
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    return true;
   }
 
   /// Reset the native conversation context. Call this whenever the user
@@ -878,7 +977,7 @@ class InferenceService extends GetxService {
       if (result.success ||
           !markLiteRtGpuPending ||
           liteRtPerformanceMode != 'auto_fast') {
-        return result;
+      return result;
       }
 
       await _hive.setSetting(AppConstants.keyLiteRtGpuLoadPending, false);

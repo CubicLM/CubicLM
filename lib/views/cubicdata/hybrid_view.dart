@@ -260,7 +260,7 @@ class _HybridEditorViewState extends State<HybridEditorView> {
         );
       }
       return Scaffold(
-        backgroundColor: isDark ? Dt.canvasDark : Dt.canvas,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
           title: Text(f.name,
               style: GoogleFonts.plusJakartaSans(

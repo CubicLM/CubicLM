@@ -113,13 +113,20 @@ class AppConstants {
   static const String keyBrowserHibernationEnabled = 'browser_hibernation_enabled';
   static const String keyBrowserSiteAiRules = 'browser_site_ai_rules';
   static const String keyBrowserAutoRenameDownloads = 'browser_auto_rename_downloads';
+  static const String keyLongPasteToFile = 'long_paste_to_file';
   static const String keyBrowserRamLimit = 'browser_ram_limit';
   static const String keyBrowserCpuLimit = 'browser_cpu_limit';
   static const String keyBrowserLimiterEnabled = 'browser_limiter_enabled';
   static const String keyBrowserHomepage = 'browser_homepage';
   static const String keyBrowserTextZoom = 'browser_text_zoom';
-  static const String keyBrowserDownloads = 'browser_downloads';  static const String keyComposerUpsellDismissed =
+  static const String keyBrowserDownloads = 'browser_downloads';
+  static const String keyComposerUpsellDismissed =
       'composer_upsell_dismissed';
+  static const String keyShowDeepSearch = 'show_deep_search';
+  static const String keyShowWebAccess = 'show_web_access';
+  static const String keyShowLiveVision = 'show_live_vision';
+  static const String keyShowPolishPrompt = 'show_polish_prompt';
+  static const String keyContextWindowStyle = 'context_window_style';
   static const String keyLocalModelPath = 'local_model_path';
   static const String keyLocalModelName = 'local_model_name';
   static const String keyLocalModelRuntime = 'local_model_runtime';
@@ -228,7 +235,8 @@ class AppConstants {
   // System Prompt (compact for small context models)
   static const String systemPrompt =
       '''You are CubicLM AI Chat, a helpful and friendly assistant. Be concise, accurate, and conversational. Answer questions directly without unnecessary preamble.
-Use <artifact title="Title" type="html|mermaid|csv|javascript|code">...</artifact> tags for large code blocks, HTML, diagrams, or tables to show them in the side panel.''';
+Use <artifact title="Title" type="html|mermaid|csv|javascript|code">...</artifact> tags for large code blocks, HTML, diagrams, or tables to show them in the side panel.
+When the user asks for a complete file or program (for example a game in a single HTML file), write the ENTIRE file in ONE code block or a single artifact — never split the deliverable across multiple blocks, never truncate it with "..." placeholders or "rest of the code" notes. Put explanations in normal text around it; only genuinely separate examples may use extra blocks.''';
 
   // System Prompt for Uncensored Models
   static const String uncensoredSystemPrompt =

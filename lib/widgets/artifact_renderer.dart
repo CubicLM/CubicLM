@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -9,6 +11,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../controllers/chat_controller.dart';
 import '../controllers/settings_controller.dart';
 import '../services/code_interpreter_service.dart';
+import '../services/hive_service.dart';
 import '../core/colors.dart';
 import '../theme/design_tokens.dart';
 import '../utils/prompt_export.dart';
@@ -37,7 +40,10 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
   bool _isEditing = false;
   bool _isRunning = false;
   bool _showPreview = true;
+  bool _showDiff = false;
+  bool _showChart = false;
   bool _showConsole = false;
+  bool _ideMode = false;
   late TextEditingController _editController;
   String _consoleOutput = '';
   Timer? _debounce;
@@ -53,6 +59,9 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
     _currentIndex = widget.versions.length - 1;
     _editController =
         TextEditingController(text: widget.versions[_currentIndex]['content']);
+    _editController.addListener(() {
+      if (mounted) setState(() {});
+    });
 
     final type = widget.versions[_currentIndex]['type'];
     if (type == 'code' || type == 'text') {
@@ -81,8 +90,20 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
 
   // ── Save with Hive persistence ──────────────────────────
 
-  void _save() {
+  void _save() async {
     final ctrl = Get.find<ChatController>();
+    
+    if (_ideMode && ctrl.activeProjectFile.value != null) {
+      try {
+        await File(ctrl.activeProjectFile.value!).writeAsString(_editController.text);
+        setState(() => _isEditing = false);
+        Get.snackbar('Saved', 'File updated on disk', snackPosition: SnackPosition.BOTTOM);
+        return;
+      } catch (e) {
+        Get.snackbar('Save Error', e.toString());
+      }
+    }
+
     ctrl.updateArtifact(widget.id, _editController.text);
 
     setState(() => _isEditing = false);
@@ -144,6 +165,55 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
     });
   }
 
+  void _syncToDisk() async {
+    final ctrl = Get.find<ChatController>();
+    final current = widget.versions[_currentIndex];
+    final title = current['title'] ?? 'artifact.txt';
+    final content = _editController.text;
+
+    final projectId = ctrl.currentProjectId.value;
+    if (projectId == null) {
+      Get.snackbar('Project Required', 'Please select or create a project first.',
+          snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+
+    final project = ctrl.projects.firstWhereOrNull((p) => p.id == projectId);
+    if (project == null) return;
+
+    String? root = project.rootPath;
+
+    if (root == null || root.isEmpty) {
+      // Pick folder if not set
+      final selected = await Get.find<ChatController>().pickProjectRoot(project);
+      if (selected == null) return;
+      root = selected;
+    }
+
+    try {
+      final fileName = title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+      final file = File('$root${Platform.pathSeparator}$fileName');
+      await file.writeAsString(content);
+      
+      Get.snackbar('Synced', 'Saved to $root',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.success.withValues(alpha: 0.9),
+          colorText: Colors.white);
+      
+      // Update project file list if new
+      if (!project.filePaths.contains(file.path)) {
+         final updated = project.copyWith(filePaths: [...project.filePaths, file.path]);
+         ctrl.projects[ctrl.projects.indexOf(project)] = updated;
+         Get.find<HiveService>().saveProject(project.id, updated.toMap());
+         ctrl.invalidateProjectCache(project.id);
+      }
+    } catch (e) {
+      Get.snackbar('Sync Failed', e.toString(),
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.error.withValues(alpha: 0.9));
+    }
+  }
+
   void _refreshPreview(String content) {
     if (_webController == null) return;
     final type = widget.versions[_currentIndex]['type'];
@@ -188,10 +258,12 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
           if (widget.versions.length > 1) _historyBar(isDark),
           // Main content area.
           Expanded(
-            child: _isEditing
-                ? _editingLayout(
-                    context, isDark, current['content'] ?? '', type)
-                : _body(context, isDark, current['content'] ?? '', type),
+            child: _ideMode 
+                ? _ideLayout(context, isDark)
+                : (_isEditing
+                    ? _editingLayout(
+                        context, isDark, current['content'] ?? '', type)
+                    : _body(context, isDark, current['content'] ?? '', type)),
           ),
           // Console panel.
           if (_showConsole && _consoleOutput.isNotEmpty) _consolePanel(isDark),
@@ -199,6 +271,70 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
           if (_showAskAi) _askAiBar(isDark),
         ],
       ),
+    );
+  }
+
+  Widget _ideLayout(BuildContext context, bool isDark) {
+    final ctrl = Get.find<ChatController>();
+    final projectId = ctrl.currentProjectId.value;
+    final project = ctrl.projects.firstWhereOrNull((p) => p.id == projectId);
+    
+    return Row(
+      children: [
+        // File Tree Sidebar
+        Container(
+          width: 200,
+          decoration: BoxDecoration(
+            border: Border(right: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.1))),
+          ),
+          child: project == null || project.filePaths.isEmpty
+              ? const Center(child: Text('No files', style: TextStyle(fontSize: 10)))
+              : ListView(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  children: project.filePaths.map((path) {
+                    final name = path.split(Platform.pathSeparator).last;
+                    final active = ctrl.activeProjectFile.value == path;
+                    return ListTile(
+                      dense: true,
+                      selected: active,
+                      selectedTileColor: AppColors.primary.withValues(alpha: 0.1),
+                      leading: Icon(LucideIcons.fileCode, size: 14, color: active ? AppColors.primary : Dt.textSecondary),
+                      title: Text(name, style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: active ? FontWeight.bold : FontWeight.normal)),
+                      onTap: () async {
+                        try {
+                          final content = await File(path).readAsString();
+                          setState(() {
+                            ctrl.activeProjectFile.value = path;
+                            _editController.text = content;
+                            _isEditing = false;
+                            _showPreview = false;
+                          });
+                        } catch (e) {
+                          Get.snackbar('Error', 'Could not read file: $e');
+                        }
+                      },
+                    );
+                  }).toList(),
+                ),
+        ),
+        // Editor/Preview Area
+        Expanded(
+          child: Column(
+            children: [
+              if (ctrl.activeProjectFile.value == null)
+                const Expanded(child: Center(child: Text('Select a file to edit')))
+              else ...[
+                _tabBar(isDark, ctrl.activeProjectFile.value?.split('.').last),
+                Expanded(
+                  child: _isEditing
+                      ? _editingLayout(context, isDark, _editController.text, ctrl.activeProjectFile.value?.split('.').last)
+                      : _body(context, isDark, _editController.text, ctrl.activeProjectFile.value?.split('.').last),
+                ),
+              ]
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -509,7 +645,6 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
         type == 'table' ||
         type == 'javascript' ||
         type == 'js';
-    if (!canPreview) return const SizedBox.shrink();
 
     return Container(
       width: double.infinity,
@@ -524,23 +659,46 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
         ),
       ),
       child: Center(
-        child: SegmentedButton<bool>(
-          segments: const [
-            ButtonSegment(
-                value: true,
-                label: Text('Preview'),
-                icon: Icon(LucideIcons.eye, size: 14)),
-            ButtonSegment(
-                value: false,
-                label: Text('Code'),
-                icon: Icon(LucideIcons.code, size: 14)),
-          ],
-          selected: {_showPreview},
-          onSelectionChanged: (s) => setState(() => _showPreview = s.first),
-          showSelectedIcon: false,
-          style: SegmentedButton.styleFrom(
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SegmentedButton<String>(
+            segments: [
+              if (canPreview)
+                const ButtonSegment(
+                    value: 'preview',
+                    label: Text('Preview'),
+                    icon: Icon(LucideIcons.eye, size: 14)),
+              const ButtonSegment(
+                  value: 'code',
+                  label: Text('Code'),
+                  icon: Icon(LucideIcons.code, size: 14)),
+              if (widget.versions.length > 1)
+                const ButtonSegment(
+                    value: 'diff',
+                    label: Text('Diff'),
+                    icon: Icon(LucideIcons.diff, size: 14)),
+              if (type == 'csv' || type == 'table')
+                const ButtonSegment(
+                    value: 'chart',
+                    label: Text('Chart'),
+                    icon: Icon(LucideIcons.barChart, size: 14)),
+            ],
+            selected: {
+              _showChart
+                  ? 'chart'
+                  : (_showDiff ? 'diff' : (_showPreview ? 'preview' : 'code'))
+            },
+            onSelectionChanged: (s) => setState(() {
+              final val = s.first;
+              _showDiff = val == 'diff';
+              _showChart = val == 'chart';
+              _showPreview = val == 'preview';
+            }),
+            showSelectedIcon: false,
+            style: SegmentedButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
           ),
         ),
       ),
@@ -549,6 +707,8 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
 
   Widget _body(
       BuildContext context, bool isDark, String content, String? type) {
+    if (_showChart) return _chartPreview(content, isDark);
+    if (_showDiff) return _diffView(isDark);
     if (!_showPreview) return _content(context, isDark, content, type);
 
     switch (type) {
@@ -565,6 +725,141 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
       default:
         return _content(context, isDark, content, type);
     }
+  }
+
+  Widget _chartPreview(String content, bool isDark) {
+    final chartHtml = '''
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+          body { background: transparent; padding: 20px; font-family: sans-serif; }
+          #container { width: 100%; height: 400px; }
+        </style>
+      </head>
+      <body>
+        <div id="container"><canvas id="canvas"></canvas></div>
+        <script>
+          try {
+            const raw = `${content.replaceAll('`', '\\`')}`;
+            const lines = raw.trim().split('\\n');
+            const labels = lines[0].split(/[|,]/).map(s => s.trim());
+            const dataPoints = lines.slice(1).map(l => l.split(/[|,]/).map(s => s.trim()));
+            
+            const datasets = labels.slice(1).map((label, i) => ({
+              label: label,
+              data: dataPoints.map(row => parseFloat(row[i+1]) || 0),
+              borderColor: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'][i % 4],
+              backgroundColor: ['#3B82F622', '#10B98122', '#F59E0B22', '#EF444422'][i % 4],
+              tension: 0.3
+            }));
+
+            new Chart(document.getElementById('canvas'), {
+              type: 'line',
+              data: {
+                labels: dataPoints.map(row => row[0]),
+                datasets: datasets
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { labels: { color: '${isDark ? "#ffffff" : "#000000"}' } }
+                },
+                scales: {
+                  y: { grid: { color: '${isDark ? "#ffffff11" : "#00000011"}' }, ticks: { color: '${isDark ? "#ffffff88" : "#00000088"}' } },
+                  x: { grid: { color: '${isDark ? "#ffffff11" : "#00000011"}' }, ticks: { color: '${isDark ? "#ffffff88" : "#00000088"}' } }
+                }
+              }
+            });
+          } catch(e) {
+            document.body.innerHTML = '<div style="color:red">Error parsing data for chart: ' + e.message + '</div>';
+          }
+        </script>
+      </body>
+      </html>
+    ''';
+
+    return InAppWebView(
+      initialData: InAppWebViewInitialData(data: chartHtml),
+      initialSettings: InAppWebViewSettings(transparentBackground: true),
+    );
+  }
+
+  Widget _diffView(bool isDark) {
+    if (_currentIndex == 0) {
+      return const Center(child: Text('No previous version to compare.'));
+    }
+    final oldText = widget.versions[_currentIndex - 1]['content'] ?? '';
+    final newText = widget.versions[_currentIndex]['content'] ?? '';
+
+    final oldLines = oldText.split('\n');
+    final newLines = newText.split('\n');
+
+    return Container(
+      color: isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF9F9F9),
+      child: ListView.builder(
+        itemCount: max(oldLines.length, newLines.length),
+        itemBuilder: (context, i) {
+          final o = i < oldLines.length ? oldLines[i] : null;
+          final n = i < newLines.length ? newLines[i] : null;
+
+          if (o == n) {
+            return _diffLine(i + 1, n ?? '', Colors.transparent, isDark);
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (o != null)
+                _diffLine(i + 1, o, Colors.red.withValues(alpha: 0.15), isDark,
+                    prefix: '-'),
+              if (n != null)
+                _diffLine(i + 1, n, Colors.green.withValues(alpha: 0.15), isDark,
+                    prefix: '+'),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _diffLine(int num, String text, Color bg, bool isDark,
+      {String prefix = ' '}) {
+    final clr = prefix == '+'
+        ? Colors.green
+        : (prefix == '-' ? Colors.red : Dt.textSecondary);
+    return Container(
+      color: bg,
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 40,
+            child: Text('$num',
+                textAlign: TextAlign.right,
+                style: GoogleFonts.firaCode(fontSize: 10, color: Dt.textMuted)),
+          ),
+          const SizedBox(width: 8),
+          Text(prefix,
+              style: GoogleFonts.firaCode(
+                  fontSize: 13, color: clr, fontWeight: FontWeight.bold)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.firaCode(
+                fontSize: 13,
+                height: 1.5,
+                color: isDark ? AppColors.textPrimary : Dt.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _htmlPreview(String content) {
@@ -712,8 +1007,29 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
     );
   }
 
+  /// Compact header icon button (40px targets instead of Material's
+  /// 48px) so the 6-7 action buttons + title fit 360dp chat bubbles
+  /// without a RenderFlex overflow.
+  Widget _hbtn({
+    required Widget icon,
+    required VoidCallback? onPressed,
+    required String tooltip,
+  }) {
+    return IconButton(
+      icon: icon,
+      onPressed: onPressed,
+      tooltip: tooltip,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
   Widget _header(
       BuildContext context, bool isDark, String title, String? type) {
+    final ctrl = Get.find<ChatController>();
+    final hasProject = ctrl.currentProjectId.value != null;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -727,11 +1043,21 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
       ),
       child: Row(
         children: [
+          if (hasProject)
+            _hbtn(
+              icon: Icon(_ideMode ? LucideIcons.layout : LucideIcons.folderTree,
+                  size: 18,
+                  color: _ideMode ? AppColors.primary : Dt.textSecondary),
+              onPressed: () => setState(() => _ideMode = !_ideMode),
+              tooltip: _ideMode ? 'Artifact Mode' : 'Project IDE Mode',
+            ),
           Icon(_getIcon(type), size: 18, color: AppColors.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              title,
+              _ideMode 
+                ? (ctrl.activeProjectFile.value?.split(Platform.pathSeparator).last ?? 'Project Explorer')
+                : title,
               style: GoogleFonts.plusJakartaSans(
                 fontWeight: FontWeight.w700,
                 fontSize: 15,
@@ -742,14 +1068,31 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
             ),
           ),
           if (_isEditing) ...[
+            if (_editController.selection.isValid &&
+                !_editController.selection.isCollapsed)
+              _hbtn(
+                icon: const Icon(LucideIcons.scissors,
+                    size: 18, color: AppColors.primary),
+                onPressed: () {
+                  final sel = _editController.selection;
+                  final text = _editController.text.substring(sel.start, sel.end);
+                  setState(() {
+                    _showAskAi = true;
+                    _askAiCtrl.text = 'Regarding this selection: "$text"\n\n';
+                    _askAiCtrl.selection = TextSelection.collapsed(
+                        offset: _askAiCtrl.text.length);
+                  });
+                },
+                tooltip: 'Ask about selection',
+              ),
             // Ask AI button.
-            IconButton(
+            _hbtn(
               icon: const Icon(LucideIcons.sparkles,
                   size: 18, color: AppColors.primary),
               onPressed: () => setState(() => _showAskAi = !_showAskAi),
               tooltip: 'Ask AI to iterate',
             ),
-            IconButton(
+            _hbtn(
               icon: const Icon(LucideIcons.save,
                   size: 20, color: AppColors.success),
               onPressed: _save,
@@ -758,13 +1101,19 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
           ] else ...[
             // HTML artifacts open in a full page (games need the space).
             if (type == 'html')
-              IconButton(
+              _hbtn(
                 icon: const Icon(LucideIcons.maximize2,
                     size: 18, color: AppColors.primary),
                 onPressed: () => _openFullPreview(title),
                 tooltip: 'Open full page',
               ),
-            IconButton(
+            _hbtn(
+              icon: const Icon(LucideIcons.save,
+                  size: 18, color: AppColors.primary),
+              onPressed: _syncToDisk,
+              tooltip: 'Save to Project Disk',
+            ),
+            _hbtn(
               icon: const Icon(LucideIcons.copy, size: 18),
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: _editController.text));
@@ -773,7 +1122,7 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
               },
               tooltip: 'Copy content',
             ),
-            IconButton(
+            _hbtn(
               icon: const Icon(LucideIcons.download, size: 18),
               onPressed: () => PromptExport.shareAsMarkdown(
                   _editController.text,
@@ -781,13 +1130,13 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
               tooltip: 'Download as Markdown',
             ),
             // Ask AI (also available in view mode).
-            IconButton(
+            _hbtn(
               icon: const Icon(LucideIcons.sparkles,
                   size: 18, color: AppColors.primary),
               onPressed: () => setState(() => _showAskAi = !_showAskAi),
               tooltip: 'Ask AI to iterate',
             ),
-            IconButton(
+            _hbtn(
               icon: const Icon(LucideIcons.edit3, size: 18),
               onPressed: () => setState(() => _isEditing = true),
               tooltip: 'Edit artifact',

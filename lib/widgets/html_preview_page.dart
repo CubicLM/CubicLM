@@ -9,9 +9,12 @@ import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../controllers/browser_controller.dart';
 import '../core/colors.dart';
+import '../services/app_log_service.dart';
 import '../theme/design_tokens.dart';
 import '../utils/export_file.dart';
+import '../views/cubicweb/browser_view.dart';
 
 /// Full-screen live preview for self-contained HTML documents ("build a
 /// game in a single HTML file"). Opened as a new page from chat code
@@ -70,12 +73,46 @@ class _HtmlPreviewPageState extends State<HtmlPreviewPage> {
         fileName: HtmlPreviewPage.fileNameFor(widget.title),
         mimeType: 'text/html',
         shareText: widget.title.isEmpty ? 'HTML file' : widget.title,
+        category: 'chat',
       );
     } catch (e) {
       if (mounted) {
         Get.snackbar('Save failed', '$e',
             snackPosition: SnackPosition.BOTTOM);
       }
+    }
+  }
+
+  Future<void> _openInBrowser() async {
+    // Second way: when the inline frame isn't enough, run the same file
+    // in the full CubicWeb Browser engine (proper tab, full settings).
+    try {
+      final file = await _writeTempHtml();
+      final url = 'file://${file.path}';
+      final browser = Get.isRegistered<BrowserController>()
+          ? Get.find<BrowserController>()
+          : Get.put(BrowserController());
+      final ok = browser.addTab(url: url);
+      if (!ok) {
+        if (mounted) {
+          Get.snackbar('Tab limit',
+              'Close a browser tab first (max ${BrowserController.maxTabs}).',
+              snackPosition: SnackPosition.BOTTOM);
+        }
+        return;
+      }
+      Get.to(() => const BrowserView());
+    } catch (e) {
+      if (mounted) {
+        Get.snackbar('Cannot open in browser', '$e',
+            snackPosition: SnackPosition.BOTTOM);
+      }
+      try {
+        if (Get.isRegistered<AppLogService>()) {
+          Get.find<AppLogService>().error('HTML preview → browser failed',
+              details: e, category: LogCategory.chat);
+        }
+      } catch (_) {}
     }
   }
 
@@ -159,6 +196,11 @@ class _HtmlPreviewPageState extends State<HtmlPreviewPage> {
               tooltip: 'preview_open_external'.tr,
               icon: const Icon(Icons.open_in_new_rounded, size: 20),
               onPressed: _openExternally,
+            ),
+            IconButton(
+              tooltip: 'Open in Browser',
+              icon: const Icon(Icons.language_rounded, size: 22),
+              onPressed: _openInBrowser,
             ),
             IconButton(
               tooltip: 'preview_share'.tr,
@@ -262,6 +304,15 @@ class _HtmlPreviewPageState extends State<HtmlPreviewPage> {
                     '${'preview_load_failed'.tr}: ${error.description}';
               });
             }
+            // No screenshots needed: page errors land in System Logs.
+            try {
+              if (Get.isRegistered<AppLogService>()) {
+                Get.find<AppLogService>().error('HTML preview load failed',
+                    details:
+                        '${error.description} (${request.url})',
+                    category: LogCategory.chat);
+              }
+            } catch (_) {}
           },
           onConsoleMessage: (_, consoleMessage) {
             // Surface JS errors without spamming: keep the latest one.
@@ -271,6 +322,15 @@ class _HtmlPreviewPageState extends State<HtmlPreviewPage> {
                 msg.isNotEmpty &&
                 mounted) {
               setState(() => _loadError = msg);
+              try {
+                if (Get.isRegistered<AppLogService>()) {
+                  Get.find<AppLogService>().error('HTML preview JS error',
+                      details: msg.length > 500
+                          ? msg.substring(0, 500)
+                          : msg,
+                      category: LogCategory.chat);
+                }
+              } catch (_) {}
             }
           },
         ),
@@ -286,6 +346,8 @@ class _HtmlPreviewPageState extends State<HtmlPreviewPage> {
   }
 
   Widget _buildCodeTab(bool isDark) {
+    final chars = widget.code.length;
+    final lines = widget.code.isEmpty ? 0 : '\n'.allMatches(widget.code).length + 1;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       decoration: BoxDecoration(
@@ -298,16 +360,41 @@ class _HtmlPreviewPageState extends State<HtmlPreviewPage> {
           width: 0.5,
         ),
       ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(14),
-        child: SelectableText(
-          widget.code,
-          style: GoogleFonts.firaCode(
-            fontSize: 12,
-            height: 1.6,
-            color: isDark ? const Color(0xFFCDD6F4) : Dt.textPrimary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+            child: Text(
+              '$lines lines · $chars chars',
+              style: GoogleFonts.firaCode(
+                fontSize: 10,
+                color: isDark
+                    ? const Color(0xFF6C7086)
+                    : Dt.textSecondary,
+              ),
+            ),
           ),
-        ),
+          Expanded(
+            // Vertical + horizontal scroll: minified single-line files
+            // would otherwise clip or break text layout entirely
+            // (blank code tab while preview renders fine).
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SelectableText(
+                  widget.code,
+                  style: GoogleFonts.firaCode(
+                    fontSize: 12,
+                    height: 1.6,
+                    color: isDark ? const Color(0xFFCDD6F4) : Dt.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

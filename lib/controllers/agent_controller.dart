@@ -2502,6 +2502,7 @@ class AgentController extends GetxController {
         bytes: Uint8List.fromList(out),
         fileName: name,
         mimeType: 'application/zip',
+        category: 'agent',
       );
     } catch (e) {
       AppSnackbar.showTop('prompt_export_failed'.tr, '$e');

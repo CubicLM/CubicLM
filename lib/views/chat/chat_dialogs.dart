@@ -229,6 +229,7 @@ Future<void> _doExport(BuildContext context, ChatSession session,
           mimeType: 'application/pdf',
           shareText: buildMarkdownForSession(session, msgs),
           shareSubject: session.title,
+          category: 'chat',
         );
         if (saved == null) return; // save failed (snackbar already shown)
       } catch (_) {
@@ -283,6 +284,7 @@ Future<void> _doExport(BuildContext context, ChatSession session,
         mimeType: mimeType,
         shareText: body,
         shareSubject: session.title,
+        category: 'chat',
       );
       if (saved == null) return; // save failed (snackbar already shown)
     } catch (_) {
