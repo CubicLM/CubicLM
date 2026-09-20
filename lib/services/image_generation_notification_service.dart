@@ -21,6 +21,15 @@ class ImageGenerationNotificationService {
 
   Future<void> init() async {
     if (_initialized) return;
+    // This service drives Android progress notifications (local image
+    // generation is Android-only). flutter_local_notifications throws
+    // on Windows when no Windows settings are supplied, so don't touch
+    // the plugin off Android at all — every other method already
+    // early-returns on non-Android.
+    if (!Platform.isAndroid) {
+      _initialized = true;
+      return;
+    }
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const settings = InitializationSettings(android: android);
     await _notifications.initialize(settings: settings);

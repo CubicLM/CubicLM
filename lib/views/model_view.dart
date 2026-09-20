@@ -484,40 +484,49 @@ class ModelView extends GetView<ModelController> {
   /// Device advice row: recommended quantization for this phone's RAM
   /// tier + the fastest benchmarked download (if any).
   Widget _buildDeviceAdvice(BuildContext context) {
+    final hint = Theme.of(context).hintColor;
+    // Desktop/Web ship no on-device engine: benchmark + quantization
+    // advice would be noise — set cloud expectations instead. Checked
+    // OUTSIDE Obx on purpose: supportsLocalInference is static per
+    // launch, and returning before any Rx read trips GetX's
+    // improper-use (empty reactive scope) error on desktop.
+    if (!controller.supportsLocalInference) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: hint.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.cloud,
+                size: 14, color: hint.withValues(alpha: 0.7)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'On-device models need the Android app — chat via Cloud mode',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: hint,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return Obx(() {
       final settings = Get.find<SettingsController>();
-      final hint = Theme.of(context).hintColor;
-      // Desktop/Web ship no on-device engine: benchmark + quantization
-      // advice would be noise — set cloud expectations instead.
-      if (!controller.supportsLocalInference) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: hint.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.cloud,
-                  size: 14, color: hint.withValues(alpha: 0.7)),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'On-device models need the Android app — chat via Cloud mode',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: hint,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-      final quant = settings.recommendedQuantization;
+      // Guarded: recommendedQuantization does an unguarded
+      // Get.find<DeviceInfoService>() — must never red-screen the Hub
+      // on platforms where that service isn't registered.
+      var quant = 'Q4_K_M';
+      try {
+        quant = settings.recommendedQuantization;
+      } catch (_) {}
       final best = controller.bestBenchmarkedFilename();
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
