@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../controllers/cloud_model_controller.dart';
+import '../../models/cloud_provider_info.dart';
 import '../../controllers/model_controller.dart';
 import '../../controllers/settings_controller.dart';
 import '../../core/colors.dart';

@@ -1726,7 +1726,7 @@ class MainActivity : FlutterFragmentActivity() {
         val clean = subfolder
             .split('/')
             .map { it.trim().replace(Regex("""[\\:*?"<>|]"""), "") }
-            .filter { it.isNotEmpty && it != "." && it != ".." }
+            .filter { it.isNotEmpty() && it != "." && it != ".." }
             .joinToString("/")
         return clean.ifBlank { "CubicLM" }
     }

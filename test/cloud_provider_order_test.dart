@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
 import 'package:cubiclm/controllers/cloud_model_controller.dart';
+import 'package:cubiclm/models/cloud_provider_info.dart';
 import 'package:cubiclm/controllers/settings_controller.dart';
 import 'package:cubiclm/services/cloud/cloud_provider_registry.dart';
 import 'package:cubiclm/services/hive_service.dart';

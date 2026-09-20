@@ -1447,21 +1447,48 @@ lib/
 │   ├── ai_model.dart                      # AI model data class
 │   ├── chat_message.dart                  # Chat message (revision history + webSources + usedSkills)
 │   ├── chat_session.dart                  # Chat session model
+│   ├── cloud_provider_info.dart           # Cloud provider metadata (split from cloud_model_controller)
 │   ├── folder_model.dart                  # Chat folder/label model
 │   ├── notification_entry.dart            # Model-switch history entry
+│   ├── preview_step.dart                  # Preview-pipeline step value type (split from agent_controller)
 │   ├── project_model.dart                 # CubicWeb project model
 │   ├── skill_model.dart                   # Skill (name/description/content/enabled/isBuiltIn/source)
 │   ├── task_model.dart                    # Automated task model
 │   └── web_source.dart                    # Web source (url/domain/favicon/title/success)
-├── controllers/
-│   ├── agent_controller.dart              # Agent/skill lifecycle
+├── controllers/                           # Big controllers are split: main + `part` files (one per feature)
+│   ├── agent_controller.dart              # Agent-IDE orchestrator (main: fields, lifecycle)
+│   │   ├── agent_controller_workspace.dart  # console, assets, symbols, attachments, mentions
+│   │   ├── agent_controller_chat.dart       # transcript, build steps, terminal buffer
+│   │   ├── agent_controller_streaming.dart  # streaming merge, fidelity checks, file ops
+│   │   ├── agent_controller_generation.dart # project generation, plan, repair
+│   │   └── agent_controller_runtime.dart    # preview serve, dev server, terminal, CLI
 │   ├── battle_arena_controller.dart       # Side-by-side model comparison
-│   ├── chat_controller.dart               # Chat logic, streaming, per-prompt skill/web-source tracking
-│   ├── cloud_model_controller.dart        # Cloud model selection
+│   ├── chat_controller.dart               # Chat logic (main) + 7 part files
+│   │   ├── chat_controller_sessions.dart    # sessions, folders, model pins
+│   │   ├── chat_controller_messages.dart    # selection, revisions, compare, export
+│   │   ├── chat_controller_generation.dart  # send pipeline, context budget, web, skills
+│   │   ├── chat_controller_attachments.dart # image/photo/file picking, text extraction
+│   │   ├── chat_controller_voice.dart       # TTS playback, voice mode, speech-to-text
+│   │   ├── chat_controller_templates.dart   # prompt templates (built-ins + custom)
+│   │   └── chat_controller_find.dart        # find-in-page + history search
+│   ├── cloud_model_controller.dart        # Cloud selection (main) + 4 part files
+│   │   ├── cloud_providers.dart             # registry, ordering, filters, pins, key verify
+│   │   ├── cloud_models.dart                # per-provider models, custom profiles
+│   │   ├── cloud_health.dart                # health probes, test-all, persistence
+│   │   └── cloud_sync_parse.dart            # auto-sync + model-list sync/parse
 │   ├── home_controller.dart               # Tab navigation, model resume (520ms delay, async file check, 90s crash guard)
-│   ├── model_controller.dart              # Model download/import management
+│   ├── model_controller.dart              # Local models (main) + 4 part files
+│   │   ├── model_catalog.dart               # OTA/bundled catalog + custom URL models
+│   │   ├── model_downloads.dart             # downloads, pause/resume/cancel, delete
+│   │   ├── model_loading.dart               # load + file validation (SafeTensors/LiteRT)
+│   │   └── model_safety.dart                # RAM-guard confirmations + dialogs
 │   ├── server_controller.dart             # Local API server
-│   ├── settings_controller.dart           # App settings + locale, effectiveSystemPromptForPrompt, autoLoadLastModel
+│   ├── settings_controller.dart           # Settings (main) + 5 part files
+│   │   ├── settings_loading.dart            # startup load, migration, persistence
+│   │   ├── settings_cloud.dart              # providers, API keys, sync, shared generation
+│   │   ├── settings_browser.dart            # parameters, browser opts, bookmarks, defaults
+│   │   ├── settings_media.dart              # SD/WebGPU, cameras, TTS/STT, vision, audio
+│   │   └── settings_appearance.dart         # fonts, themes, lock, export, reset, dev tools
 │   ├── slide_deck_controller.dart         # Slide Maker engine
 │   ├── task_controller.dart               # Automated task execution
 │   └── vision_live_controller.dart        # Live vision camera
@@ -1601,9 +1628,20 @@ lib/
 │   ├── task_view.dart                     # Automated tasks
 │   ├── toolkit_view.dart                  # Toolkit hub (Battle Arena, Slide Maker, CubicWeb Builder)
 │   ├── battle_arena_view.dart             # Side-by-side model comparison
-│   ├── agent_ide_view.dart                # Agent IDE
+│   ├── agent_ide_view.dart                # Agent IDE (main) + 7 part files + markdown builders
+│   │   ├── agent_ide_mentions.dart          # @-mention overlay + picker
+│   │   ├── agent_ide_sheets.dart            # system prompt, assets, brand, voice sheets
+│   │   ├── agent_ide_command.dart           # command palette, ask-bar, bottom meter
+│   │   ├── agent_ide_panes.dart             # preview, dev-tools, terminal, status panes
+│   │   ├── agent_ide_chat.dart              # chat pane, actions, templates
+│   │   ├── agent_ide_dialogs.dart           # asset-gen + global-search dialogs, file tabs
+│   │   ├── agent_ide_files.dart             # files pane, tree, console, editor
+│   │   └── agent_ide_markdown.dart          # architecture/component markdown builders
 │   ├── gallery_view.dart                  # Image gallery
-│   ├── slide_deck_view.dart               # Slide Maker composer
+│   ├── slide_deck_view.dart               # Slide Maker composer (main) + 3 part files
+│   │   ├── slide_deck_sheets.dart           # style/plus/theme/translate/data/URL sheets
+│   │   ├── slide_deck_browser.dart          # sorter, deck bar, carousel, slide cards
+│   │   └── slide_deck_canvas.dart           # slide canvases + image controls
 │   ├── update_view.dart                   # Update checker
 │   ├── update_settings_view.dart          # Update settings
 │   ├── chat/                              # Chat decomposition
@@ -1627,6 +1665,8 @@ lib/
 │   ├── cubicweb/                          # CubicWeb Builder views
 │   │   ├── agent_preview.dart
 │   │   ├── browser_view.dart
+│   │   ├── browser_sheets.dart              # bottom sheets + dialogs (split from browser_view)
+│   │   ├── browser_home.dart                # home-tab content (split from browser_view)
 │   │   ├── chat_cards.dart
 │   │   ├── component_card.dart
 │   │   ├── diff_view.dart
@@ -1659,12 +1699,19 @@ lib/
 │   ├── artifact_renderer.dart             # Markdown/artifact rendering
 │   ├── attachment_preview.dart            # Attachment preview chips
 │   ├── chat_branch_timeline.dart          # Branch history timeline
-│   ├── chat_bubble.dart                   # Message bubble + _sanitizeUtf16
+│   ├── chat_bubble.dart                   # Message bubble (main) + 3 part files
+│   │   ├── chat_bubble_actions.dart         # action bar, branch picker, TTS controls
+│   │   ├── chat_bubble_bars.dart            # context menu, artifact/recall/skills/source bars
+│   │   └── chat_bubble_helpers.dart         # badges, time/cost formatting, text cleanup
 │   ├── citation_chip.dart                 # Source citation chip (favicon + domain)
+│   ├── citation_link_builder.dart         # Citation-link markdown builder (split from chat_bubble)
 │   ├── cli_sheets.dart                    # CLI terminal sheets
 │   ├── code_block.dart                    # Syntax-highlighted code blocks
 │   ├── image_viewer.dart                  # Full-screen image viewer
-│   ├── model_switcher_sheet.dart          # In-chat model switcher
+│   ├── model_switcher_sheet.dart          # In-chat model switcher (main) + 3 part files
+│   │   ├── model_switcher_widgets.dart      # rows, headers, scope toggle
+│   │   ├── model_switcher_local.dart        # local-model tab
+│   │   └── model_switcher_cloud.dart        # cloud-model tab
 │   ├── thinking_orb.dart                  # 3D particle sphere animation (9 states)
 │   ├── thought_disclosure.dart            # Reasoning tag expansion
 │   ├── typing_indicator.dart              # Typing animation
@@ -1753,6 +1800,8 @@ docs/
 ├── web_builder_nextjs.md                 # Next.js pipeline doc
 └── web_builder_react(vite).md            # Vite/React pipeline doc
 ```
+
+> 🧩 **File-split convention (two-dev + AI workflow):** files over ~500 lines are split into a small `main` + one `part` file per feature (`part of` + `extension … on …`), so two developers + AI agents can work without merge conflicts. Every part file carries a `Contains:` header listing its methods — check it before editing. Behavior stays identical: splits move code only, verified by `flutter analyze` (0 issues) + full test suite.
 
 </details>
 
