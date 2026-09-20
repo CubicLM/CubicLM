@@ -486,9 +486,39 @@ class ModelView extends GetView<ModelController> {
   Widget _buildDeviceAdvice(BuildContext context) {
     return Obx(() {
       final settings = Get.find<SettingsController>();
+      final hint = Theme.of(context).hintColor;
+      // Desktop/Web ship no on-device engine: benchmark + quantization
+      // advice would be noise — set cloud expectations instead.
+      if (!controller.supportsLocalInference) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: hint.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.cloud,
+                  size: 14, color: hint.withValues(alpha: 0.7)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'On-device models need the Android app — chat via Cloud mode',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: hint,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
       final quant = settings.recommendedQuantization;
       final best = controller.bestBenchmarkedFilename();
-      final hint = Theme.of(context).hintColor;
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(

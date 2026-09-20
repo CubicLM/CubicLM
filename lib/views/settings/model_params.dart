@@ -18,8 +18,35 @@ import 'apple_widgets.dart';
 
 SettingsController get _c => Get.find<SettingsController>();
 
+/// Desktop/Web ship no on-device engine: local-acceleration controls
+/// would be dead toggles there — callers show an honest note instead.
+bool get _hasLocalEngine {
+  try {
+    return Get.find<InferenceService>().supportsLocalInference;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Honest placeholder for engine-only cards on platforms without one.
+Widget _noLocalEngineTile(BuildContext context, bool isDark) {
+  return appleGroupedCard(context, isDark, children: [
+    appleListTile(
+      context,
+      isDark,
+      leading: iconBox(Dt.accent, LucideIcons.smartphone),
+      title: 'On-device settings need Android',
+      subtitle: 'This device runs Cloud mode',
+      trailing: null,
+      showDivider: false,
+      onTap: () {},
+    ),
+  ]);
+}
+
 // ── Apple grouped card container ──
 Widget buildLiteRtCard(BuildContext context, bool isDark) {
+  if (!_hasLocalEngine) return _noLocalEngineTile(context, isDark);
   final modes = [
     (
       value: 'auto_fast',
@@ -60,6 +87,7 @@ Widget buildLiteRtCard(BuildContext context, bool isDark) {
 /// GGUF (llama.cpp) acceleration override: Auto / CPU only / Force GPU.
 /// Applies on the next model load — the resident model is not reloaded.
 Widget buildGgufAccelCard(BuildContext context, bool isDark) {
+  if (!_hasLocalEngine) return _noLocalEngineTile(context, isDark);
   final modes = [
     (
       value: 'auto',
@@ -101,6 +129,7 @@ Widget buildGgufAccelCard(BuildContext context, bool isDark) {
 /// offload, caps threads at 2, always evicts other residents. RAM gate
 /// still applies. Takes effect on the next model load.
 Widget buildLargeModelCard(BuildContext context, bool isDark) {
+  if (!_hasLocalEngine) return _noLocalEngineTile(context, isDark);
   return appleGroupedCard(context, isDark, children: [
     appleListTile(
       context,

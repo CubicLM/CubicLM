@@ -515,7 +515,8 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                               _ramFitDot(context, model),
                           ],
                         ),
-                        if (isDownloaded) ...[
+                        if (isDownloaded &&
+                            _c.supportsLocalInference) ...[
                           const SizedBox(height: 6),
                           _benchmarkRow(context, model, disableActions),
                         ],
