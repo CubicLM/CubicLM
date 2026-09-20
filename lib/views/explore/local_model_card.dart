@@ -92,6 +92,65 @@ Widget _ramFitDot(BuildContext context, AiModel model) {
   });
 }
 
+/// Stored speed-benchmark line + one-tap Benchmark action. Rebuilds off
+/// the `benchmarking` map; the Hive result is re-read on every rebuild,
+/// so the line appears as soon as a run finishes.
+Widget _benchmarkRow(
+    BuildContext context, AiModel model, bool disableActions) {
+  return Obx(() {
+    final running = _c.benchmarking[model.filename] == true;
+    final res = _c.benchmarkFor(model.filename);
+    final hint = Theme.of(context).hintColor;
+    String label;
+    if (running) {
+      label = 'Benchmarking…';
+    } else if (res != null) {
+      final gpu = (res['gpuLayers'] ?? 0) as int;
+      label =
+          '${(res['tps'] ?? 0)} tok/s · TTFT ${res['ttftMs'] ?? '?'}ms${gpu > 0 ? ' · GPU' : ''}';
+    } else {
+      label = 'Not benchmarked on this device';
+    }
+    return Row(
+      children: [
+        if (running)
+          const SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        else
+          Icon(LucideIcons.zap,
+              size: 12, color: hint.withValues(alpha: 0.5)),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.firaCode(
+              fontSize: 11,
+              color: hint.withValues(alpha: 0.7),
+              fontWeight: FontWeight.w500,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        TextButton(
+          onPressed: (disableActions || running || !_c.supportsLocalInference)
+              ? null
+              : () => _c.runBenchmark(model.filename),
+          style: TextButton.styleFrom(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: const Text('Benchmark'),
+        ),
+      ],
+    );
+  });
+}
+
 /// Load guarded end-to-end: any Dart-side throw (even before the first
 /// await) becomes a persisted log row + snackbar instead of a silent
 /// zone error. Native kills are covered by the load breadcrumb.
@@ -400,6 +459,23 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                                         fontWeight: FontWeight.w800,
                                         color: AppColors.success)),
                               ),
+                            if (!isActive &&
+                                _c.bestBenchmarkedFilename() ==
+                                    model.filename)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color:
+                                      Dt.accent.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text('⚡ BEST ON DEVICE',
+                                    style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                        color: Dt.accent)),
+                              ),
                           ],
                         ),
                         const SizedBox(height: 6),
@@ -439,6 +515,10 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                               _ramFitDot(context, model),
                           ],
                         ),
+                        if (isDownloaded) ...[
+                          const SizedBox(height: 6),
+                          _benchmarkRow(context, model, disableActions),
+                        ],
                         // Quant picker — only for catalog entries that
                         // ship variants, and only before anything is
                         // downloaded (state below is filename-keyed).

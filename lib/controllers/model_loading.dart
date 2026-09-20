@@ -2,6 +2,7 @@
 ///
 /// Split from `model_controller.dart` - behavior is unchanged.
 /// Contains: loadModel(), _modelFileBytes(), _hasValidSafetensorsHeader(), _hasLikelyValidLiteRtFile()
+///   bestBenchmarkedFilename(), _benchmarkKey(), benchmarkFor(), runBenchmark()
 part of 'model_controller.dart';
 
 extension ModelControllerLoading on ModelController {
@@ -413,7 +414,7 @@ extension ModelControllerLoading on ModelController {
       }
 
       // Note: We intentionally DO NOT allow standard TFLite models starting with 'TFL3' at offset 4
-      // if they lack the 'LITERTLM' container header, because the native LiteRT-LM engine 
+      // if they lack the 'LITERTLM' container header, because the native LiteRT-LM engine
       // strictly expects the .litertlm conversational bundle structure and will crash with a
       // SIGABRT native assert check failure if it is not present.
       return false;
@@ -421,6 +422,90 @@ extension ModelControllerLoading on ModelController {
       return false;
     } finally {
       await raf?.close();
+    }
+  }
+
+  /// Filename of the fastest benchmarked download (highest tok/s), or
+  /// null when nothing has a stored benchmark yet. Powers the
+  /// "Best on this device" badge.
+  String? bestBenchmarkedFilename() {
+    String? best;
+    var bestTps = 0.0;
+    for (final f in downloadedFiles) {
+      final res = benchmarkFor(f);
+      final tps = (res?['tps'] as num?)?.toDouble() ?? 0.0;
+      if (tps > bestTps) {
+        bestTps = tps;
+        best = f;
+      }
+    }
+    return best;
+  }
+
+  static String _benchmarkKey(String filename) => 'benchmark_$filename';
+
+  /// Last stored benchmark for [filename], or null when never benchmarked.
+  /// Shape: {tps, ttftMs, at, gpuLayers}.
+  Map<String, dynamic>? benchmarkFor(String filename) {
+    final raw = _hive.getSetting<Map>(_benchmarkKey(filename));
+    if (raw == null) return null;
+    return Map<String, dynamic>.from(raw);
+  }
+
+  /// Speed-benchmark [filename] on this device: loads it if needed (with
+  /// the normal RAM gate), runs one fixed short prompt, and stores
+  /// tok/s + time-to-first-token in Hive for the model card.
+  Future<void> runBenchmark(String filename) async {
+    if (!supportsLocalInference) {
+      Get.snackbar('Benchmark Unavailable',
+          'On-device benchmark needs the Android app.',
+          snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+    if (benchmarking[filename] == true || _inference.isGenerating.value) {
+      Get.snackbar('Benchmark Busy', 'Wait for the current job to finish.',
+          snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+    benchmarking[filename] = true;
+    try {
+      if (_inference.loadedModelName.value != filename) {
+        await loadModel(filename);
+        if (_inference.loadedModelName.value != filename) return;
+      }
+      const prompt =
+          'Explain in exactly one short sentence why the sky looks blue.';
+      final t0 = DateTime.now();
+      DateTime? firstTokenAt;
+      int tokens = 0;
+      final out = await _inference.generate(
+        prompt: prompt,
+        source: 'benchmark',
+        onToken: (_) {
+          firstTokenAt ??= DateTime.now();
+          tokens++;
+        },
+      );
+      if (out.startsWith('ERROR')) {
+        Get.snackbar('Benchmark Failed', out,
+            snackPosition: SnackPosition.BOTTOM);
+        return;
+      }
+      final totalMs = DateTime.now().difference(t0).inMilliseconds;
+      final ttftMs = firstTokenAt?.difference(t0).inMilliseconds ?? totalMs;
+      final tps =
+          totalMs > 0 ? tokens / (totalMs / 1000.0) : 0.0;
+      await _hive.setSetting(_benchmarkKey(filename), {
+        'tps': double.parse(tps.toStringAsFixed(1)),
+        'ttftMs': ttftMs,
+        'at': DateTime.now().toIso8601String(),
+        'gpuLayers': _inference.gpuLayersUsed.value,
+      });
+      Get.snackbar(
+          'Benchmark Done', '$filename: ${tps.toStringAsFixed(1)} tok/s',
+          snackPosition: SnackPosition.BOTTOM);
+    } finally {
+      benchmarking[filename] = false;
     }
   }
 }

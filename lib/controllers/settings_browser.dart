@@ -1,7 +1,7 @@
 /// Parameters, browser options, bookmarks, defaults, and composer upsell.
 ///
 /// Split from `settings_controller.dart` - behavior is unchanged.
-/// Contains: setTemperature(), setTopP(), setTopK(), setRepeatPenalty(), setMaxTokens(), setContextSize()
+/// Contains: setTemperature(), setGgufAccelMode(), setLargeModelMode(), setTopP(), setTopK(), setRepeatPenalty(), setMaxTokens(), setContextSize()
 ///   effectiveContextSize, effectiveMaxTokens, _applyAutoTune(), setAutoTuneParams()
 ///   setWebFetchEnabled(), setAdblockEnabled(), setBrowserSearchEngine(), setBrowserForcedDark()
 ///   setBrowserHttpsOnly(), setBrowserDntEnabled(), setBrowserBlockThirdPartyCookies()
@@ -27,6 +27,24 @@ extension SettingsControllerBrowser on SettingsController {
   Future<void> setTemperature(double value) async {
     temperature.value = value;
     await _hive.setSetting(AppConstants.keyTemperature, value);
+  }
+
+  /// GGUF acceleration override ('auto' | 'cpu' | 'gpu'). Takes effect on
+  /// the next model load — the resident model keeps its current offload.
+  Future<void> setGgufAccelMode(String mode) async {
+    final normalized = switch (mode) {
+      'cpu' => 'cpu',
+      'gpu' => 'gpu',
+      _ => AppConstants.defaultGgufAccelMode,
+    };
+    ggufAccelMode.value = normalized;
+    await _hive.setSetting(AppConstants.keyGgufAccelMode, normalized);
+  }
+
+  /// Experimental large-model mode toggle (13B+ attempts on phones).
+  Future<void> setLargeModelMode(bool value) async {
+    largeModelMode.value = value;
+    await _hive.setSetting(AppConstants.keyLargeModelMode, value);
   }
 
   Future<void> setTopP(double value) async {

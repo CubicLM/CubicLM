@@ -137,6 +137,20 @@ class GgufEngine {
     return halved < 512 ? 512 : halved;
   }
 
+  /// Acceleration override (pure logic, public for unit tests).
+  ///
+  /// 'cpu' always disables offload; 'gpu' forces full offload when Vulkan
+  /// is present (else CPU fallback); anything else keeps [autoLayers].
+  static int resolveGpuLayers({
+    required String mode,
+    required int autoLayers,
+    required bool vulkanSupported,
+  }) {
+    if (mode == 'cpu') return 0;
+    if (mode == 'gpu') return vulkanSupported ? 99 : 0;
+    return autoLayers;
+  }
+
   double _availableRamGb() {
     try {
       if (Get.isRegistered<DeviceInfoService>()) {
@@ -344,10 +358,12 @@ class GgufEngine {
     // ── GPU Detection ──
     int gpuLayers = 0;
     String gpuNameStr = '';
+    var vulkanSupported = false;
 
     try {
       final gpu = await _controller!.detectGpu();
       gpuNameStr = gpu.gpuName;
+      vulkanSupported = gpu.vulkanSupported;
 
       print('[Inference] GPU: ${gpu.gpuName}');
       print('[Inference]   Vulkan: ${gpu.vulkanSupported}');
@@ -372,10 +388,32 @@ class GgufEngine {
       print('[Inference] GPU detection failed: $e — CPU fallback');
     }
 
+    // ── User acceleration override (Settings › Parameters) ──
+    // 'cpu' forces CPU (stability / diagnosing GPU crashes), 'gpu' forces
+    // full offload when Vulkan is present, 'auto' keeps the tier heuristic.
+    // Large-model mode forces CPU regardless. Takes effect on load — a
+    // resident model is NOT reloaded automatically.
+    final settings = Get.find<SettingsController>();
+    final largeMode = settings.largeModelMode.value;
+    try {
+      final accelMode =
+          largeMode ? 'cpu' : settings.ggufAccelMode.value;
+      final resolved = GgufEngine.resolveGpuLayers(
+        mode: accelMode,
+        autoLayers: gpuLayers,
+        vulkanSupported: vulkanSupported,
+      );
+      if (resolved != gpuLayers) {
+        print('[Inference] Accel mode $accelMode — GPU layers $gpuLayers → $resolved');
+        gpuLayers = resolved;
+      }
+    } catch (e) {
+      print('[Inference] Accel override unread: $e — keeping auto result');
+    }
+
     // ── Thread Tuning ──
     int threads;
-    final settings = Get.find<SettingsController>();
-    
+
     if (settings.autoAdjustThreads.value) {
       threads = settings.recommendedThreads;
     } else if (gpuLayers > 0) {
@@ -408,8 +446,9 @@ class GgufEngine {
     // <3GB free: a second resident model plus this load's page-in spike
     // is what kills the process on 4–6GB phones (instant death, no
     // catch possible) — free the others BEFORE touching native memory.
+    // Large-model mode forces the same treatment unconditionally.
     final availGb = _availableRamGb();
-    final lowRam = shouldEvictPoolForRam(availGb);
+    final lowRam = shouldEvictPoolForRam(availGb) || largeMode;
     var evicted = 0;
     if (lowRam) {
       evicted = await _evictOtherResidents(modelPath);
@@ -429,6 +468,12 @@ class GgufEngine {
           '[Inference] Low-RAM load (${availGb.toStringAsFixed(1)}GB free) — threads $threads → $clampedThreads');
     }
     threads = clampedThreads;
+    // Large-model mode: cap at 2 threads on top — each extra thread
+    // grows the native compute buffer that big models can't spare.
+    if (largeMode && threads > 2) {
+      print('[Inference] Large-model mode — threads $threads → 2');
+      threads = 2;
+    }
     // Flush the load profile to disk BEFORE the native call: if the
     // process dies inside it, this is the post-mortem evidence of what
     // the low-RAM path actually did (in-memory prints die with it).

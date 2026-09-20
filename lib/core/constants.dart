@@ -136,6 +136,8 @@ class AppConstants {
       'litert_gpu_warning_accepted';
   static const String keyLiteRtGpuLoadPending = 'litert_gpu_load_pending';
   static const String keyLiteRtGpuCrashDetected = 'litert_gpu_crash_detected';
+  static const String keyGgufAccelMode = 'gguf_accel_mode'; // 'auto' | 'cpu' | 'gpu'
+  static const String keyLargeModelMode = 'large_model_mode';
   static const String keyImageModelPath = 'image_model_path';
   static const String keyImageModelName = 'image_model_name';
   static const String keyTemperature = 'temperature';
@@ -222,6 +224,8 @@ class AppConstants {
   static const int defaultMaxTokens = 1024;
   static const int defaultContextSize = 2048;
   static const String defaultLiteRtPerformanceMode = 'auto_fast';
+  static const String defaultGgufAccelMode = 'auto';
+  static const bool defaultLargeModelMode = false;
   static const int defaultImageSteps = 1;
   static const bool defaultImageGenForceCpu = true;
   static const int defaultImageGenGpuGuardMb = 1843; // 1.8 GB

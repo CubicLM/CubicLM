@@ -8,17 +8,22 @@ import 'package:get/get.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../core/constants.dart';
 import '../utils/memory_extract.dart';
+import '../utils/semantic_vectors.dart';
 import 'secure_key_store.dart';
 
 /// Worker for [HiveService.recallPastTurns] — must stay top-level for
 /// `compute()`. Args: {'rows': [[content, role, chatId, title]],
-/// 'keywords', 'maxHits', 'snippetChars'}. Returns [{role, chat, text}].
+/// 'keywords', 'query', 'maxHits', 'snippetChars'}.
+/// Scoring fuses keyword hits (dominant) with trigram-vector semantics
+/// (rerank + paraphrase rescue). Returns [{role, chat, text}].
 List<Map<String, String>> _recallWorker(Map<String, dynamic> args) {
   final rows = (args['rows'] as List).cast<List>();
   final kws = (args['keywords'] as List)
       .map((e) => e.toString().toLowerCase())
       .where((e) => e.isNotEmpty)
       .toList();
+  final query = (args['query'] ?? '').toString();
+  final qv = kws.isEmpty ? null : semanticVector(query);
   final maxHits = args['maxHits'] as int? ?? 3;
   final snippetChars = args['snippetChars'] as int? ?? 300;
   final scored = <Map<String, dynamic>>[];
@@ -39,9 +44,15 @@ List<Map<String, String>> _recallWorker(Map<String, dynamic> args) {
       }
       score += n;
     }
-    if (score <= 0) continue;
+    var sem = 0.0;
+    if (qv != null) {
+      sem = cosineSimilarity(qv, semanticVector(content));
+    }
+    final fused = fusedRelevance(keywordScore: score, cosine: sem);
+    final rescued = score == 0 && sem >= semanticRescueThreshold;
+    if (fused <= 0 && !rescued) continue;
     scored.add({
-      'score': score,
+      'score': fused,
       'order': order,
       'role': r[1].toString(),
       'chatId': r[2].toString(),
@@ -839,10 +850,12 @@ class HiveService extends GetxService {
   /// (visible, recent-first) sessions, newest message per hit truncated
   /// to a snippet. Bounded (sessions × messages × chars) and scored
   /// off-thread — safe to call once per turn on 1GB-RAM devices.
-  /// Returns [{role, chat, text}]. Never throws.
+  /// [query] enables trigram-vector semantic rerank + paraphrase rescue
+  /// on top of keyword scoring. Returns [{role, chat, text}]. Never throws.
   Future<List<Map<String, String>>> recallPastTurns({
     required List<String> keywords,
     required String excludeChatId,
+    String query = '',
     int maxSessions = 12,
     int perSession = 8,
     int maxHits = 3,
@@ -882,6 +895,7 @@ class HiveService extends GetxService {
       final hits = await compute(_recallWorker, {
         'rows': rows,
         'keywords': keywords,
+        'query': query,
         'maxHits': maxHits,
         'snippetChars': snippetChars,
       });

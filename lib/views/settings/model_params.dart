@@ -57,6 +57,68 @@ Widget buildLiteRtCard(BuildContext context, bool isDark) {
   ]);
 }
 
+/// GGUF (llama.cpp) acceleration override: Auto / CPU only / Force GPU.
+/// Applies on the next model load — the resident model is not reloaded.
+Widget buildGgufAccelCard(BuildContext context, bool isDark) {
+  final modes = [
+    (
+      value: 'auto',
+      title: 'Auto',
+      subtitle: 'Device-tier heuristic (recommended)',
+      icon: LucideIcons.sparkles
+    ),
+    (
+      value: 'cpu',
+      title: 'CPU only',
+      subtitle: 'Stability — no GPU offload',
+      icon: LucideIcons.shield
+    ),
+    (
+      value: 'gpu',
+      title: 'Force GPU',
+      subtitle: 'Full offload when Vulkan is present',
+      icon: LucideIcons.zap
+    ),
+  ];
+  return appleGroupedCard(context, isDark, children: [
+    for (var i = 0; i < modes.length; i++)
+      appleListTile(
+        context,
+        isDark,
+        leading: iconBox(Dt.accent, modes[i].icon),
+        title: modes[i].title,
+        subtitle: modes[i].subtitle,
+        trailing: _c.ggufAccelMode.value == modes[i].value
+            ? const Icon(LucideIcons.checkCircle, size: 20, color: Dt.accent)
+            : null,
+        showDivider: i < modes.length - 1,
+        onTap: () => _c.setGgufAccelMode(modes[i].value),
+      ),
+  ]);
+}
+
+/// Experimental large-model mode (13B+ attempts on phones): forces CPU
+/// offload, caps threads at 2, always evicts other residents. RAM gate
+/// still applies. Takes effect on the next model load.
+Widget buildLargeModelCard(BuildContext context, bool isDark) {
+  return appleGroupedCard(context, isDark, children: [
+    appleListTile(
+      context,
+      isDark,
+      leading: iconBox(Dt.accent, LucideIcons.flaskConical),
+      title: 'Large-model mode',
+      subtitle: 'Experimental 13B+ attempts — slower but safer loads',
+      trailing: Switch(
+        value: _c.largeModelMode.value,
+        activeThumbColor: Dt.accent,
+        onChanged: (v) => _c.setLargeModelMode(v),
+      ),
+      showDivider: false,
+      onTap: () => _c.setLargeModelMode(!_c.largeModelMode.value),
+    ),
+  ]);
+}
+
 Widget buildModelParametersCard(BuildContext context, bool isDark) {
   return appleGroupedCard(context, isDark, children: [
     modelParameterSlider(

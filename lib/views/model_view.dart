@@ -113,6 +113,8 @@ class ModelView extends GetView<ModelController> {
                 _buildImportingProgress(context),
                 _buildLocalFilterChips(context),
                 const SizedBox(height: 12),
+                _buildDeviceAdvice(context),
+                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -477,6 +479,45 @@ class ModelView extends GetView<ModelController> {
         ),
       ],
     );
+  }
+
+  /// Device advice row: recommended quantization for this phone's RAM
+  /// tier + the fastest benchmarked download (if any).
+  Widget _buildDeviceAdvice(BuildContext context) {
+    return Obx(() {
+      final settings = Get.find<SettingsController>();
+      final quant = settings.recommendedQuantization;
+      final best = controller.bestBenchmarkedFilename();
+      final hint = Theme.of(context).hintColor;
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: hint.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.memory,
+                size: 14, color: hint.withValues(alpha: 0.7)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                best == null
+                    ? 'This device: $quant recommended — Benchmark a model to crown the fastest'
+                    : 'This device: $quant recommended · ⚡ $best is fastest here',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: hint,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   Widget _buildLocalFilterChips(BuildContext context) {

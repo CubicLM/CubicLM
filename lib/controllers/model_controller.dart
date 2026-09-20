@@ -74,6 +74,8 @@ class ModelController extends GetxController {
   final importTotalBytes = 0.obs;
   final importBytesPerSecond = 0.0.obs;
   final sortSmallestFirst = true.obs;
+  /// Filenames currently running a speed benchmark (one at a time enforced).
+  final benchmarking = <String, bool>{}.obs;
   final externalDownloadId = Rx<int?>(null);
 
   void toggleSort() {

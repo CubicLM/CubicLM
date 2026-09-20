@@ -1,8 +1,11 @@
 /// Offline, model-free memory helpers for persistent conversation
 /// memory (ROM, not RAM): fact extraction from user turns, keyword
-/// search terms, and relevance ranking. No network, no embeddings —
-/// safe on 1GB-RAM devices. Pure — unit tested.
+/// search terms, and relevance ranking. No network — keyword scoring
+/// fused with trigram-vector semantics (`semantic_vectors.dart`;
+/// still no model download). Pure — unit tested.
 library;
+
+import 'semantic_vectors.dart';
 
 /// Common English stopwords skipped when building search keywords.
 const Set<String> _stopwords = {
@@ -299,9 +302,11 @@ String centeredSnippet(String text, List<String> keywords, int maxChars) {
   return '$prefix$cut$suffix';
 }
 
-/// Ranks stored facts for [query]: keyword hits first, then most
-/// recent (facts are newest-first already when passed that way),
-/// filling at most [maxChars]. Empty query → most recent fill.
+/// Ranks stored facts for [query]: keyword hits first (dominant),
+/// trigram-vector semantics reranks and rescues paraphrases with zero
+/// shared keywords (cosine ≥ threshold); then most recent (facts are
+/// newest-first already when passed that way), filling at most
+/// [maxChars]. Empty query → most recent fill.
 List<String> rankFacts(
   List<String> facts, {
   required String query,
@@ -310,14 +315,33 @@ List<String> rankFacts(
 }) {
   if (facts.isEmpty) return [];
   final kws = extractKeywords(query);
+  // No keywords → pure recency (unchanged legacy path).
+  if (kws.isEmpty) {
+    final picked = <String>[];
+    var chars = 0;
+    for (final f in facts) {
+      if (picked.length >= maxItems) break;
+      if (chars + f.length > maxChars) continue;
+      picked.add(f);
+      chars += f.length;
+    }
+    return picked;
+  }
+  final qv = semanticVector(query);
   final idx = facts.asMap();
   final scored = idx.entries.map((e) {
-    final s = kws.isEmpty ? 0 : memoryScore(e.value, kws);
-    return (fact: e.value, score: s, order: e.key);
+    final kw = memoryScore(e.value, kws);
+    final sem = cosineSimilarity(qv, semanticVector(e.value));
+    return (
+      fact: e.value,
+      fused: fusedRelevance(keywordScore: kw, cosine: sem),
+      rescued: kw == 0 && sem >= semanticRescueThreshold,
+      order: e.key
+    );
   }).toList();
   // Relevance desc; ties keep recency order (stable by index).
   scored.sort((a, b) {
-    final c = b.score.compareTo(a.score);
+    final c = b.fused.compareTo(a.fused);
     if (c != 0) return c;
     return a.order.compareTo(b.order);
   });
@@ -325,9 +349,8 @@ List<String> rankFacts(
   var chars = 0;
   for (final e in scored) {
     if (picked.length >= maxItems) break;
-    // With keywords, skip zero-hit facts (recency fallback only
-    // when the query has no keywords at all).
-    if (kws.isNotEmpty && e.score <= 0) break;
+    // Skip keyword-misses unless semantics rescued them.
+    if (e.fused <= 0 && !e.rescued) break;
     final f = e.fact;
     if (chars + f.length > maxChars) continue;
     picked.add(f);

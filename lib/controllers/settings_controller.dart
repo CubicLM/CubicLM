@@ -231,6 +231,14 @@ class SettingsController extends GetxController {
   final settingsSearching = false.obs;
   final settingsSearchQuery = ''.obs;
   final liteRtPerformanceMode = AppConstants.defaultLiteRtPerformanceMode.obs;
+  /// GGUF (llama.cpp) acceleration override: 'auto' (device-tier heuristic),
+  /// 'cpu' (force CPU — stability / diagnose GPU crashes), 'gpu' (force full
+  /// GPU offload when Vulkan is available, else CPU fallback).
+  final ggufAccelMode = AppConstants.defaultGgufAccelMode.obs;
+  /// Experimental large-model mode (13B+ attempts on phones): forces CPU
+  /// offload, caps threads at 2, always evicts other residents before
+  /// load. RAM gate still applies — unsafe loads stay blocked.
+  final largeModelMode = AppConstants.defaultLargeModelMode.obs;
   final imageSteps = 1.obs;
   final imageGenForceCpu = AppConstants.defaultImageGenForceCpu.obs;
   final imageGenBackend = Backend.cpu.obs;

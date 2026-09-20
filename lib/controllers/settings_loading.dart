@@ -331,6 +331,16 @@ extension SettingsControllerLoading on SettingsController {
           defaultValue: AppConstants.defaultLiteRtPerformanceMode,
         ) ??
         AppConstants.defaultLiteRtPerformanceMode;
+    ggufAccelMode.value = _hive.getSetting(
+          AppConstants.keyGgufAccelMode,
+          defaultValue: AppConstants.defaultGgufAccelMode,
+        ) ??
+        AppConstants.defaultGgufAccelMode;
+    largeModelMode.value = _hive.getSetting(
+          AppConstants.keyLargeModelMode,
+          defaultValue: AppConstants.defaultLargeModelMode,
+        ) ??
+        AppConstants.defaultLargeModelMode;
     imageSteps.value = _hive.getSetting(AppConstants.keyImageSteps,
             defaultValue: AppConstants.defaultImageSteps) ??
         AppConstants.defaultImageSteps;

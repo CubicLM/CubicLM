@@ -747,6 +747,7 @@ extension ChatControllerGeneration on ChatController {
             if (kws.length >= 2) {
               final hits = await Get.find<HiveService>().recallPastTurns(
                 keywords: kws,
+                query: prompt,
                 excludeChatId: currentSessionId.value,
                 maxHits: 3,
               );
