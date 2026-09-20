@@ -43,4 +43,73 @@ void main() {
           12);
     });
   });
+
+  group('resolveAutoGpuLayers', () {
+    const gb = 1024 * 1024 * 1024;
+
+    test('no Vulkan always means CPU', () {
+      expect(
+          GgufEngine.resolveAutoGpuLayers(
+            vulkanSupported: false,
+            gpuNum: 870,
+            recommendedLayers: 40,
+            fileBytes: 2 * gb,
+            kvBytes: 100 * 1024 * 1024,
+            availBytes: 6 * gb,
+          ),
+          0);
+    });
+
+    test('roomy phone gets full offload on any Vulkan GPU', () {
+      expect(
+          GgufEngine.resolveAutoGpuLayers(
+            vulkanSupported: true,
+            gpuNum: 610, // mid-range tier — fit wins over tier table
+            recommendedLayers: 20,
+            fileBytes: 2 * gb,
+            kvBytes: 100 * 1024 * 1024,
+            availBytes: 6 * gb,
+          ),
+          99);
+    });
+
+    test('tight flagship falls back to tier heuristic, not OOM', () {
+      expect(
+          GgufEngine.resolveAutoGpuLayers(
+            vulkanSupported: true,
+            gpuNum: 870,
+            recommendedLayers: 40,
+            fileBytes: 4 * gb,
+            kvBytes: 200 * 1024 * 1024,
+            availBytes: 1 * gb,
+          ),
+          40);
+    });
+
+    test('tight mid-range GPU stays on CPU', () {
+      expect(
+          GgufEngine.resolveAutoGpuLayers(
+            vulkanSupported: true,
+            gpuNum: 610,
+            recommendedLayers: 20,
+            fileBytes: 4 * gb,
+            kvBytes: 200 * 1024 * 1024,
+            availBytes: 1 * gb,
+          ),
+          0);
+    });
+
+    test('unknown RAM or size falls back to tier heuristic', () {
+      expect(
+          GgufEngine.resolveAutoGpuLayers(
+            vulkanSupported: true,
+            gpuNum: 750,
+            recommendedLayers: 30,
+            fileBytes: 0,
+            kvBytes: 0,
+            availBytes: 0,
+          ),
+          30);
+    });
+  });
 }

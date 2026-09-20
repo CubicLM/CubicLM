@@ -20,6 +20,9 @@ class DeviceInfoService extends GetxService {
   final deviceLabel = ''.obs; // e.g. "Xiaomi Redmi K20 Pro"
   final osVersion = ''.obs; // e.g. "Android 11 · SDK 30"
   final cpuInfo = ''.obs; // e.g. "8 cores · arm64-v8a"
+  /// Raw core count behind [cpuInfo] (0 = unknown). Drives
+  /// thread auto-tuning: [SettingsController.recommendedThreads].
+  final cpuCores = 0.obs;
 
   /// Re-read everything (available RAM drifts; cheap enough on demand).
   Future<void> refresh() => refreshMemoryInfo();
@@ -112,6 +115,7 @@ class DeviceInfoService extends GetxService {
     deviceLabel.value = '$brand $model'.trim();
     osVersion.value = (info['osVersion'] as String?) ?? '';
     final cores = (info['cpuCores'] as num?)?.toInt() ?? 0;
+    if (cores > 0) cpuCores.value = cores;
     final abi = (info['cpuAbi'] as String?) ?? '';
     cpuInfo.value = [
       if (cores > 0) '$cores cores',

@@ -151,6 +151,32 @@ class GgufEngine {
     return autoLayers;
   }
 
+  /// Fit-aware auto offload (pure logic, public for unit tests).
+  ///
+  /// Phone GPUs share unified memory with the CPU, so "flagship GPU"
+  /// alone must not force full offload when RAM is tight (instant
+  /// OOM, no catch possible). When the model file + KV cache + 20%
+  /// headroom fits in free RAM → full offload (99) on any Vulkan GPU.
+  /// Otherwise fall back to the tier heuristic ([gpuNum] ≥ 650 keeps
+  /// the plugin's [recommendedLayers]); unknown RAM ([availBytes] ≤ 0)
+  /// also falls back to the heuristic.
+  static int resolveAutoGpuLayers({
+    required bool vulkanSupported,
+    required int gpuNum,
+    required int recommendedLayers,
+    required int fileBytes,
+    required int kvBytes,
+    required int availBytes,
+  }) {
+    if (!vulkanSupported) return 0;
+    if (availBytes > 0 && fileBytes > 0) {
+      final fullNeed = ((fileBytes + kvBytes) * 1.2).round();
+      if (fullNeed <= availBytes) return 99;
+    }
+    if (gpuNum >= 650 && recommendedLayers > 0) return recommendedLayers;
+    return 0;
+  }
+
   double _availableRamGb() {
     try {
       if (Get.isRegistered<DeviceInfoService>()) {
@@ -350,6 +376,7 @@ class GgufEngine {
     required int contextSize,
     required String deviceTier,
     bool isTensorSoC = false,
+    int fileBytes = 0,
     void Function(double)? onProgress,
   }) async {
     _disposed = false;
@@ -370,20 +397,29 @@ class GgufEngine {
       print('[Inference]   Free RAM: ${gpu.freeRamBytes ~/ 1024 ~/ 1024}MB');
       print('[Inference]   Recommended layers: ${gpu.recommendedGpuLayers}');
 
-      if (gpu.vulkanSupported && gpu.recommendedGpuLayers > 0) {
-        final gpuNum = _extractGpuModel(gpu.gpuName);
-        if (gpuNum >= 700) {
-          gpuLayers = 99;
-          print('[Inference] ✓ High-end GPU ($gpuNum) → full offload');
-        } else if (gpuNum >= 650) {
-          gpuLayers = gpu.recommendedGpuLayers;
-          print('[Inference] ✓ Upper-mid GPU ($gpuNum) → $gpuLayers layers');
-        } else {
-          gpuLayers = 0;
-          print(
-              '[Inference] Mid-range GPU ($gpuNum) — CPU is faster, skipping GPU');
+      // Fit-aware auto offload: file + KV + headroom vs free RAM beats
+      // the fixed tier table (a tight flagship falls back instead of
+      // OOM-ing; a roomy upper-mid chip gets full offload). [fileBytes]
+      // arrives from the facade (0 = unknown → tier heuristic).
+      var kvBytes = 0;
+      try {
+        if (Get.isRegistered<DeviceInfoService>()) {
+          kvBytes = Get.find<DeviceInfoService>()
+              .estimatedKvBytes(contextSize);
         }
-      }
+      } catch (_) {}
+      final gpuNum = _extractGpuModel(gpu.gpuName);
+      gpuLayers = GgufEngine.resolveAutoGpuLayers(
+        vulkanSupported: gpu.vulkanSupported,
+        gpuNum: gpuNum,
+        recommendedLayers: gpu.recommendedGpuLayers,
+        fileBytes: fileBytes,
+        kvBytes: kvBytes,
+        availBytes: gpu.freeRamBytes,
+      );
+      print('[Inference] Auto offload → $gpuLayers layers '
+          '(file=${fileBytes ~/ 1024 ~/ 1024}MB, '
+          'kv=${kvBytes ~/ 1024 ~/ 1024}MB, free=${gpu.freeRamBytes ~/ 1024 ~/ 1024}MB)');
     } catch (e) {
       print('[Inference] GPU detection failed: $e — CPU fallback');
     }

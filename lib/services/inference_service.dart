@@ -541,6 +541,7 @@ class InferenceService extends GetxService {
         contextSize: cappedCtx,
         deviceTier: deviceTier,
         isTensorSoC: isTensorSoC,
+        fileBytes: _safeFileBytes(modelFile),
         liteRtPerformanceMode: liteRtMode,
         forceLiteRtCpu: forceLiteRtCpu,
         clearLiteRtCache: hadPendingGpuLoad ||
@@ -936,6 +937,16 @@ class InferenceService extends GetxService {
     }
   }
 
+  /// File size for the engine's fit-aware offload math (0 = unknown,
+  /// engine falls back to the tier heuristic). Never throws.
+  int _safeFileBytes(File f) {
+    try {
+      return f.lengthSync();
+    } catch (_) {
+      return 0;
+    }
+  }
+
   bool _getIsTensorSoC() {
     try {
       final device = Get.find<DeviceInfoService>();
@@ -951,6 +962,7 @@ class InferenceService extends GetxService {
     required int contextSize,
     required String deviceTier,
     bool isTensorSoC = false,
+    int fileBytes = 0,
     required String liteRtPerformanceMode,
     required bool forceLiteRtCpu,
     required bool clearLiteRtCache,
@@ -968,6 +980,7 @@ class InferenceService extends GetxService {
         contextSize: contextSize,
         deviceTier: deviceTier,
         isTensorSoC: isTensorSoC,
+        fileBytes: fileBytes,
         liteRtPerformanceMode: liteRtPerformanceMode,
         forceLiteRtCpu: forceLiteRtCpu,
         clearLiteRtCache: clearLiteRtCache,
@@ -989,6 +1002,7 @@ class InferenceService extends GetxService {
         contextSize: contextSize,
         deviceTier: deviceTier,
         isTensorSoC: isTensorSoC,
+        fileBytes: fileBytes,
         liteRtPerformanceMode: liteRtPerformanceMode,
         forceLiteRtCpu: true,
         clearLiteRtCache: true,
@@ -1007,6 +1021,7 @@ class InferenceService extends GetxService {
             contextSize: contextSize,
             deviceTier: deviceTier,
             isTensorSoC: isTensorSoC,
+            fileBytes: fileBytes,
             liteRtPerformanceMode: liteRtPerformanceMode,
             forceLiteRtCpu: true,
             clearLiteRtCache: true,

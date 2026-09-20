@@ -37,6 +37,7 @@ class InferenceEngine {
     required int contextSize,
     required String deviceTier,
     bool isTensorSoC = false,
+    int fileBytes = 0,
     String liteRtPerformanceMode = 'auto_fast',
     bool forceLiteRtCpu = false,
     bool clearLiteRtCache = false,
@@ -63,6 +64,7 @@ class InferenceEngine {
       contextSize: contextSize,
       deviceTier: deviceTier,
       isTensorSoC: isTensorSoC,
+      fileBytes: fileBytes,
       onProgress: onProgress,
     );
   }

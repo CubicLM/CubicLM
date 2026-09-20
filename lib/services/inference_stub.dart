@@ -28,6 +28,7 @@ class InferenceEngine {
     required int contextSize,
     required String deviceTier,
     bool isTensorSoC = false,
+    int fileBytes = 0,
     String liteRtPerformanceMode = 'cpu_safe',
     bool forceLiteRtCpu = true,
     bool clearLiteRtCache = false,

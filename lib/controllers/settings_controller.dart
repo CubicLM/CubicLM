@@ -267,9 +267,14 @@ class SettingsController extends GetxController {
 
     if (Get.isRegistered<DeviceInfoService>()) {
       final deviceInfo = Get.find<DeviceInfoService>();
-      final cores = deviceInfo.totalRamGB.value > 8 ? 6 : 4; // Simple heuristic
-      // Real core detection would be better if available in cpuInfo
-      return cores;
+      final cores = deviceInfo.cpuCores.value;
+      if (cores > 0) {
+        // Reserve ~2 cores for the OS/UI; clamp to llama.cpp's
+        // sweet spot (more than 6 threads rarely helps on phones).
+        return (cores - 2).clamp(2, 6);
+      }
+      final ram = deviceInfo.totalRamGB.value;
+      return ram > 8 ? 6 : 4; // Legacy fallback when cores unknown
     }
     return 4;
   }
