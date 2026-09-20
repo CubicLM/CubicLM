@@ -27,7 +27,10 @@ Future<List<String>> getDownloadedModels(String modelsDir) async {
           f.path.endsWith('.gguf') ||
           f.path.endsWith('.litertlm') ||
           f.path.endsWith('.safetensors'))
-      .map((f) => f.path.split('/').last)
+      // Basename on BOTH separators: Windows paths use '\', so a
+      // split('/')-only basename leaks the full path as the "filename"
+      // (imported models then fail Load with "Not Downloaded").
+      .map((f) => f.path.split(RegExp(r'[/\\]')).last)
       .toList();
 }
 
