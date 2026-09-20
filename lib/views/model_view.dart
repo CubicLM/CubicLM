@@ -485,12 +485,12 @@ class ModelView extends GetView<ModelController> {
   /// tier + the fastest benchmarked download (if any).
   Widget _buildDeviceAdvice(BuildContext context) {
     final hint = Theme.of(context).hintColor;
-    // Desktop/Web ship no on-device engine: benchmark + quantization
-    // advice would be noise — set cloud expectations instead. Checked
-    // OUTSIDE Obx on purpose: supportsLocalInference is static per
-    // launch, and returning before any Rx read trips GetX's
-    // improper-use (empty reactive scope) error on desktop.
-    if (!controller.supportsLocalInference) {
+    // Platforms with no local runtime at all (Web): benchmark +
+    // quantization advice would be noise — set cloud expectations
+    // instead. Checked OUTSIDE Obx on purpose: canLoadLocal is static
+    // per launch, and returning before any Rx read trips GetX's
+    // improper-use (empty reactive scope) error.
+    if (!controller.canLoadLocal) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(

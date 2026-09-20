@@ -13,6 +13,7 @@ import '../utils/app_snackbar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/download_service.dart';
 import '../services/inference_service.dart';
+import '../services/local_server_service.dart';
 import '../services/local_image_service.dart';
 import '../services/hive_service.dart';
 import '../services/stats_service.dart';
@@ -83,9 +84,15 @@ class ModelController extends GetxController {
   }
 
   /// Whether the current platform can load local models into an on-device
-  /// inference engine. Desktop (Windows) and Web are Cloud-only for now —
-  /// the llama.cpp / LiteRT engines ship Android (and iOS) natives only.
+  /// inference engine. Web is Cloud-only for now — the llama.cpp / LiteRT
+  /// engines ship Android (and iOS) natives only. Windows serves GGUF
+  /// through the llama-server sidecar ([supportsLocalServer]).
   bool get supportsLocalInference => _inference.supportsLocalInference;
+
+  /// True when a local model can actually be loaded here: native engine
+  /// (Android/iOS) or the Windows server sidecar. UI gates (Load button,
+  /// benchmark, advice row) must use this, not [supportsLocalInference].
+  bool get canLoadLocal => supportsLocalInference || supportsLocalServer;
 
   /// Human-readable label for the public Downloads folder on this platform.
   String get saveToDownloadsLabel => Platform.isAndroid

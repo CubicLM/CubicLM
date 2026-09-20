@@ -7,14 +7,14 @@ part of 'model_controller.dart';
 
 extension ModelControllerLoading on ModelController {
   Future<void> loadModel(String filename) async {
-    // Desktop (Windows) and Web ship no on-device inference engine yet
-    // (llama.cpp / LiteRT natives are Android/iOS only). Fail fast with a
-    // clear message instead of letting the user download gigabytes first
-    // and then hitting an opaque native error.
-    if (!supportsLocalInference) {
+    // Desktop (Windows) runs GGUF via the llama-server sidecar; other
+    // non-Android targets (Web) still have no on-device engine. Fail
+    // fast with a clear message instead of letting the user download
+    // gigabytes first and then hitting an opaque native error.
+    if (!supportsLocalInference && !supportsLocalServer) {
       Get.snackbar(
         'Local Models Unavailable',
-        'On-device models need the Android app. On this device, use Cloud mode instead.',
+        'On-device models are not supported on this platform yet. Use Cloud mode instead.',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 5),
       );
@@ -456,9 +456,9 @@ extension ModelControllerLoading on ModelController {
   /// the normal RAM gate), runs one fixed short prompt, and stores
   /// tok/s + time-to-first-token in Hive for the model card.
   Future<void> runBenchmark(String filename) async {
-    if (!supportsLocalInference) {
+    if (!canLoadLocal) {
       Get.snackbar('Benchmark Unavailable',
-          'On-device benchmark needs the Android app.',
+          'On-device benchmark is not supported on this platform yet.',
           snackPosition: SnackPosition.BOTTOM);
       return;
     }

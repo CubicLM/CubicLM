@@ -10,6 +10,7 @@ import '../../ffi/sd_ffi_bindings.dart';
 import '../../services/device_info_service.dart';
 import '../../services/hive_service.dart';
 import '../../services/inference_service.dart';
+import '../../services/local_server_service.dart';
 import '../../theme/design_tokens.dart';
 import 'apple_widgets.dart';
 
@@ -20,9 +21,11 @@ SettingsController get _c => Get.find<SettingsController>();
 
 /// Desktop/Web ship no on-device engine: local-acceleration controls
 /// would be dead toggles there — callers show an honest note instead.
+/// Windows counts as capable (llama-server sidecar honors these).
 bool get _hasLocalEngine {
   try {
-    return Get.find<InferenceService>().supportsLocalInference;
+    return Get.find<InferenceService>().supportsLocalInference ||
+        supportsLocalServer;
   } catch (_) {
     return false;
   }

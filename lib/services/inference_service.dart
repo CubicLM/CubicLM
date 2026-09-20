@@ -3,8 +3,10 @@ import 'dart:io' show File, FileMode, RandomAccessFile;
 import 'dart:typed_data';
 import 'package:get/get.dart';
 import '../controllers/model_controller.dart';
+import '../controllers/settings_controller.dart';
 import 'hive_service.dart';
 import 'inference_types.dart';
+import 'local_server_service.dart';
 import '../core/constants.dart';
 import 'device_info_service.dart';
 import 'app_log_service.dart';
@@ -48,6 +50,15 @@ class InferenceService extends GetxService {
   /// Re-query the native pool for resident model paths.
   Future<void> refreshResidency() async {
     try {
+      if (_serverActive) {
+        // Sidecar serves exactly one model — report it resident so the
+        // switcher marks it (instant-switch path handles the rest).
+        // Split on both separators: server paths are Windows-style.
+        residentTextModels.value = <String>[
+          _server!.loadedModelPath.split(RegExp(r'[/\\]')).last
+        ];
+        return;
+      }
       final paths = await _engine?.residentModels() ?? const <String>[];
       residentTextModels.value = paths
           .map((p) => p.split('/').last)
@@ -66,6 +77,17 @@ class InferenceService extends GetxService {
   // Platform-specific engine
   platform.InferenceEngine? _engine;
   String _sessionNativeRuntime = '';
+
+  // Windows local-server sidecar (llama-server.exe child process).
+  // Null/absent everywhere else; engine stays null on Windows.
+  LocalServerService? _server;
+  int _serverCtx = 0;
+
+  bool get _serverActive =>
+      _server != null && _server!.isRunning && isModelLoaded.value;
+
+  bool _serverServes(String modelPath) =>
+      _serverActive && _server!.loadedModelPath == modelPath;
 
   String get sessionNativeRuntime => _sessionNativeRuntime;
 
@@ -315,7 +337,7 @@ class InferenceService extends GetxService {
     // is gated here so no path can reach the native loader unchecked.
     bool skipGate = false,
   }) async {
-    if (!supportsLocalInference) {
+    if (!supportsLocalInference && !supportsLocalServer) {
       return 'ERROR: Local inference is not available on this platform. Use Cloud mode.';
     }
     if (isLoadingModel.value) return 'ERROR: Model is already loading.';
@@ -414,6 +436,28 @@ class InferenceService extends GetxService {
         final residentMatchesCtx =
             lastLoadedCtx == 0 || lastLoadedCtx == contextSizeSetting;
         if (residentMatchesCtx) {
+          // Windows sidecar serves exactly one model: same path + same
+          // ctx means the server is already serving it — no restart.
+          if (_serverServes(modelPath)) {
+            final requestedName = modelName ?? modelPath.split('/').last;
+            isModelLoaded.value = true;
+            isLoadingModel.value = false;
+            loadingModelName.value = '';
+            modelLoadProgress.value = 1.0;
+            loadedModelName.value = requestedName;
+            loadedModelRuntime.value = 'llama';
+            _sessionNativeRuntime = 'llama';
+            isVisionLoaded.value = false;
+            contextTokensUsed.value = 0;
+            contextTokensTotal.value = contextSizeSetting;
+            await _hive.setSetting(AppConstants.keyLocalModelPath, modelPath);
+            await _hive.setSetting(
+                AppConstants.keyLocalModelName, loadedModelName.value);
+            await _hive.setSetting(
+                AppConstants.keyLocalModelRuntime, 'llama');
+            refreshResidency();
+            return 'Switched to $requestedName instantly (no reload).';
+          }
           final switched = await _engine!.switchActiveModel(modelPath);
           if (switched) {
             final requestedName = modelName ?? modelPath.split('/').last;
@@ -535,21 +579,34 @@ class InferenceService extends GetxService {
             'native-load-start', '$requestedModelName (${sizeMb}MB)');
         await logSvc.flush();
       } catch (_) {}
-      final result = await _loadModelOnEngine(
-        modelPath: modelPath,
-        modelRuntime: modelRuntime,
-        contextSize: cappedCtx,
-        deviceTier: deviceTier,
-        isTensorSoC: isTensorSoC,
-        fileBytes: _safeFileBytes(modelFile),
-        liteRtPerformanceMode: liteRtMode,
-        forceLiteRtCpu: forceLiteRtCpu,
-        clearLiteRtCache: hadPendingGpuLoad ||
-            (isLiteRt && gpuCrashDetected) ||
-            contextChanged,
-        markLiteRtGpuPending: shouldTryLiteRtGpu,
-        enableLiteRtVision: enableLiteRtVision,
-      );
+      // Windows sidecar serves GGUF only (.litertlm stays unsupported
+      // there); the constructed LoadResult flows through the exact same
+      // state updates below as a native load.
+      final LoadResult result;
+      if (supportsLocalServer && !isLiteRt) {
+        result = await _loadViaServer(
+          modelPath: modelPath,
+          modelName: modelName,
+          contextSize: cappedCtx,
+          deviceTier: deviceTier,
+        );
+      } else {
+        result = await _loadModelOnEngine(
+          modelPath: modelPath,
+          modelRuntime: modelRuntime,
+          contextSize: cappedCtx,
+          deviceTier: deviceTier,
+          isTensorSoC: isTensorSoC,
+          fileBytes: _safeFileBytes(modelFile),
+          liteRtPerformanceMode: liteRtMode,
+          forceLiteRtCpu: forceLiteRtCpu,
+          clearLiteRtCache: hadPendingGpuLoad ||
+              (isLiteRt && gpuCrashDetected) ||
+              contextChanged,
+          markLiteRtGpuPending: shouldTryLiteRtGpu,
+          enableLiteRtVision: enableLiteRtVision,
+        );
+      }
 
       // Note: there is deliberately no "model already loaded" recovery path
       // here. The native layer now frees any resident model before loading
@@ -637,6 +694,12 @@ class InferenceService extends GetxService {
       await stopGeneration();
       await engine.dispose();
     }
+    // Windows sidecar has no engine object — stop the child process.
+    if (_server != null) {
+      await stopGeneration();
+      await _server!.stop();
+      _serverCtx = 0;
+    }
     isModelLoaded.value = false;
     isVisionLoaded.value = false;
     loadedModelName.value = '';
@@ -663,7 +726,12 @@ class InferenceService extends GetxService {
     String? audioPath,
     void Function(String token)? onToken,
   }) async {
-    if (!supportsLocalInference || _engine == null || !isModelLoaded.value) {
+    // Windows sidecar counts as a loaded local engine (_engine stays
+    // null there by design).
+    final useServer = supportsLocalServer && _serverActive;
+    if ((!supportsLocalInference && !useServer) ||
+        (!useServer && _engine == null) ||
+        !isModelLoaded.value) {
       return 'ERROR: No model loaded. Go to Models tab to download and load one.';
     }
 
@@ -775,49 +843,82 @@ class InferenceService extends GetxService {
       } catch (_) {}
       var overflowCut = false;
 
-      final result = await _engine!.generate(
-        prompt: prompt,
-        conversationHistory: conversationHistory,
-        systemPrompt: systemPrompt ?? AppConstants.systemPrompt,
-        modelName: loadedModelName.value,
-        maxTokens: effMaxTokens,
-        temperature: temperature,
-        topP: topP,
-        topK: topK,
-        repeatPenalty: repeatPenalty,
-        imagePath: imagePath,
-        audioPath: audioPath,
-        onToken: (token) {
-          firstVisibleTokenAt ??= DateTime.now();
-          tokenCount.value++;
-          streamingText.value += token;
-          // Live overflow trip-wire: estimated KV use passed 95% of the
-          // window — stop now (partial answer survives) instead of
-          // letting the native layer abort the process a few tokens
-          // later. Sync callback: fire-and-forget the async stop.
-          if (!overflowCut &&
-              ctxTotal > 0 &&
-              promptEst + tokenCount.value >= (ctxTotal * 0.95).floor()) {
-            overflowCut = true;
-            unawaited(stopGeneration());
+      // Shared per-token handler for both engines: counters, live
+      // tok/s, overflow trip-wire, LiteRT flush batching.
+      void handleToken(String token) {
+        firstVisibleTokenAt ??= DateTime.now();
+        tokenCount.value++;
+        streamingText.value += token;
+        // Live overflow trip-wire: estimated KV use passed 95% of the
+        // window — stop now (partial answer survives) instead of
+        // letting the native layer abort the process a few tokens
+        // later. Sync callback: fire-and-forget the async stop.
+        if (!overflowCut &&
+            ctxTotal > 0 &&
+            promptEst + tokenCount.value >= (ctxTotal * 0.95).floor()) {
+          overflowCut = true;
+          unawaited(stopGeneration());
+        }
+        final speedStart = firstVisibleTokenAt ?? startTime;
+        final elapsedSeconds =
+            DateTime.now().difference(speedStart).inMilliseconds / 1000.0;
+        if (elapsedSeconds > 0) {
+          tokensPerSecond.value = tokenCount.value / elapsedSeconds;
+        }
+        if (loadedModelRuntime.value == 'litert') {
+          tokenFlushBuffer.write(token);
+          tokenFlushTimer ??= Timer(const Duration(milliseconds: 60), () {
+            tokenFlushTimer = null;
+            flushTokenBuffer();
+          });
+        } else {
+          onToken?.call(token);
+        }
+      }
+
+      // Server-side context accounting: no native info channel, so
+      // track our own window (load-time ctx, usage ≈ prompt + tokens).
+      if (useServer) {
+        ctxTotal = _serverCtx;
+        var histChars = 0;
+        final hist = conversationHistory;
+        if (hist != null) {
+          for (final m in hist) {
+            histChars += (m['content'] ?? '').length;
           }
-          final speedStart = firstVisibleTokenAt ?? startTime;
-          final elapsedSeconds =
-              DateTime.now().difference(speedStart).inMilliseconds / 1000.0;
-          if (elapsedSeconds > 0) {
-            tokensPerSecond.value = tokenCount.value / elapsedSeconds;
-          }
-          if (loadedModelRuntime.value == 'litert') {
-            tokenFlushBuffer.write(token);
-            tokenFlushTimer ??= Timer(const Duration(milliseconds: 60), () {
-              tokenFlushTimer = null;
-              flushTokenBuffer();
-            });
-          } else {
-            onToken?.call(token);
-          }
-        },
-      );
+        }
+        promptEst = (prompt.length +
+                (systemPrompt ?? AppConstants.systemPrompt).length +
+                histChars) ~/
+            4;
+        contextTokensTotal.value = ctxTotal;
+      }
+
+      final result = useServer
+          ? await _generateViaServer(
+              prompt: prompt,
+              systemPrompt: systemPrompt ?? AppConstants.systemPrompt,
+              conversationHistory: conversationHistory,
+              temperature: temperature,
+              topP: topP,
+              maxTokens: effMaxTokens,
+              source: source,
+              onToken: handleToken,
+            )
+          : await _engine!.generate(
+              prompt: prompt,
+              conversationHistory: conversationHistory,
+              systemPrompt: systemPrompt ?? AppConstants.systemPrompt,
+              modelName: loadedModelName.value,
+              maxTokens: effMaxTokens,
+              temperature: temperature,
+              topP: topP,
+              topK: topK,
+              repeatPenalty: repeatPenalty,
+              imagePath: imagePath,
+              audioPath: audioPath,
+              onToken: handleToken,
+            );
       tokenFlushTimer?.cancel();
       flushTokenBuffer();
 
@@ -884,6 +985,7 @@ class InferenceService extends GetxService {
     tokenCount.value = 0;
     generationSource.value = '';
     streamingText.value = '';
+    _server?.abortChat();
     final engine = _engine;
     if (engine != null) {
       unawaited(engine.stop().timeout(const Duration(seconds: 1)).catchError(
@@ -917,6 +1019,12 @@ class InferenceService extends GetxService {
   }
 
   Future<void> refreshContextInfo() async {
+    if (supportsLocalServer && _serverActive) {
+      // No native info channel on the sidecar: keep the load-time
+      // window, usage is estimated per turn in generate().
+      contextTokensTotal.value = _serverCtx;
+      return;
+    }
     if (!supportsLocalInference || _engine == null || !isModelLoaded.value) {
       return;
     }
@@ -937,6 +1045,47 @@ class InferenceService extends GetxService {
     }
   }
 
+  /// Windows generate path: OpenAI-compatible streaming chat against
+  /// the sidecar. [onToken] is the shared handler (counters + trip-wire).
+  Future<String> _generateViaServer({
+    required String prompt,
+    required String systemPrompt,
+    required List<Map<String, String>>? conversationHistory,
+    required double temperature,
+    required double topP,
+    required int maxTokens,
+    required String source,
+    required void Function(String token) onToken,
+  }) async {
+    final server = _server;
+    if (server == null || !server.isRunning) {
+      return 'ERROR: Local server is not running. Reload the model.';
+    }
+    final messages = <Map<String, String>>[
+      {'role': 'system', 'content': systemPrompt},
+      if (conversationHistory != null) ...conversationHistory,
+      {'role': 'user', 'content': prompt},
+    ];
+    try {
+      return await server.chat(
+        messages: messages,
+        temperature: temperature,
+        topP: topP,
+        maxTokens: maxTokens,
+        onToken: onToken,
+      );
+    } catch (e) {
+      if (source != 'benchmark') {
+        Get.find<AppLogService>().error(
+          'Local server generate failed',
+          details: '$e',
+          category: LogCategory.model,
+        );
+      }
+      return 'ERROR: Local server generate failed — $e';
+    }
+  }
+
   /// File size for the engine's fit-aware offload math (0 = unknown,
   /// engine falls back to the tier heuristic). Never throws.
   int _safeFileBytes(File f) {
@@ -944,6 +1093,60 @@ class InferenceService extends GetxService {
       return f.lengthSync();
     } catch (_) {
       return 0;
+    }
+  }
+
+  /// Windows load path: start (or reuse) the llama-server sidecar and
+  /// report it as a LoadResult so all state updates below stay shared.
+  Future<LoadResult> _loadViaServer({
+    required String modelPath,
+    required String? modelName,
+    required int contextSize,
+    required String deviceTier,
+  }) async {
+    _server ??= Get.put(LocalServerService(), permanent: true);
+    final settings = Get.find<SettingsController>();
+    var threads = settings.autoAdjustThreads.value
+        ? settings.recommendedThreads
+        : 4;
+    final largeMode = settings.largeModelMode.value;
+    if (largeMode && threads > 2) threads = 2;
+    final accelMode = largeMode ? 'cpu' : settings.ggufAccelMode.value;
+    // Server asset choice mirrors the accel card: explicit GPU asks for
+    // the Vulkan build, everything else takes the CPU build (ngl 0).
+    // Auto stays CPU-build: guaranteed to run, no driver roulette.
+    final wantGpu = accelMode == 'gpu';
+    final gpuLayers = wantGpu ? 99 : 0;
+    isLoadingModel.value = true;
+    loadingModelName.value = modelName ?? modelPath.split('/').last;
+    try {
+      final port = await _server!.start(
+        modelPath: modelPath,
+        contextSize: contextSize,
+        threads: threads,
+        gpuLayers: gpuLayers,
+        wantGpu: wantGpu,
+      );
+      _serverCtx = contextSize;
+      Get.find<AppLogService>().info(
+        'Local server ready: ${loadingModelName.value} (port $port, '
+        'ctx=$contextSize, threads=$threads, gpu=$gpuLayers)',
+        category: LogCategory.model,
+      );
+      return LoadResult(
+        success: true,
+        message: 'Loaded ${loadingModelName.value} via local server.',
+        gpuName: wantGpu ? 'Vulkan' : 'CPU',
+        gpuLayers: gpuLayers,
+        runtime: 'llama',
+        backend: gpuLayers > 0 ? 'gpu' : 'cpu',
+      );
+    } catch (e) {
+      _serverCtx = 0;
+      return LoadResult(
+        success: false,
+        message: 'ERROR: Local server failed — $e',
+      );
     }
   }
 

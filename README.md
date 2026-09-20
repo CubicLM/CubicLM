@@ -194,7 +194,7 @@ Computational Universe for Building Intelligent Learning Machines
 | 📱 Modern Android phone (2020+) | **arm64-v8a** | Best performance, full GPU acceleration, all models run |
 | 📱 Older / budget Android | **armeabi-v7a** | Smaller install, runs smaller quantized models |
 | 🖥️ Android emulator / Chromebook | **x86_64** | Native architecture for Intel/AMD chips |
-| 💻 Windows 10/11 PC | **windows-x64** | Cloud mode + Skills + MCP; local inference on roadmap |
+| 💻 Windows 10/11 PC | **windows-x64** | Cloud mode + Skills + MCP; local GGUF via llama-server sidecar (auto-downloaded) |
 | 🌐 Any browser | *Coming soon* | Web is `dart:ffi`-blocked; tracked for future release |
 
 > [!NOTE]

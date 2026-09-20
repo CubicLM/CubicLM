@@ -135,7 +135,7 @@ Widget _benchmarkRow(
           ),
         ),
         TextButton(
-          onPressed: (disableActions || running || !_c.supportsLocalInference)
+          onPressed: (disableActions || running || !_c.canLoadLocal)
               ? null
               : () => _c.runBenchmark(model.filename),
           style: TextButton.styleFrom(
@@ -319,9 +319,10 @@ void confirmDownload(BuildContext context, AiModel model,
               ],
             ),
           ),
-          // ── Desktop/Web have no on-device engine: set expectations
-          // before the user downloads gigabytes they cannot load. ──
-          if (!_c.supportsLocalInference) ...[
+          // ── Platforms with no local runtime at all (Web): set
+          // expectations before the user downloads gigabytes they
+          // cannot load. Windows serves GGUF via the local server. ──
+          if (!_c.canLoadLocal) ...[
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
@@ -336,7 +337,7 @@ void confirmDownload(BuildContext context, AiModel model,
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'On-device loading needs the Android app. On this device, chat with models via Cloud mode.',
+                      'On-device loading is not supported on this platform. On this device, chat with models via Cloud mode.',
                       style: GoogleFonts.plusJakartaSans(
                           fontSize: 12, fontWeight: FontWeight.w600),
                     ),
@@ -515,8 +516,7 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                               _ramFitDot(context, model),
                           ],
                         ),
-                        if (isDownloaded &&
-                            _c.supportsLocalInference) ...[
+                        if (isDownloaded && _c.canLoadLocal) ...[
                           const SizedBox(height: 6),
                           _benchmarkRow(context, model, disableActions),
                         ],
@@ -585,12 +585,12 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                             )
                           else
                             Tooltip(
-                              message: _c.supportsLocalInference
+                              message: _c.canLoadLocal
                                   ? 'Load model'
-                                  : 'On-device models need the Android app — use Cloud mode',
+                                  : 'On-device models are not supported on this platform — use Cloud mode',
                               child: FilledButton(
                                 onPressed: (disableActions ||
-                                        !_c.supportsLocalInference)
+                                        !_c.canLoadLocal)
                                     ? null
                                     : () => _guardedLoad(model.filename),
                                 style: FilledButton.styleFrom(
