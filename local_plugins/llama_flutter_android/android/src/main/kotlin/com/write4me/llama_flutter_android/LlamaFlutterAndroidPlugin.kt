@@ -101,6 +101,14 @@ class LlamaFlutterAndroidPlugin : FlutterPlugin, LlamaHostApi {
                         }
                         result.success(true)
                     }
+                    "setBatchSize" -> {
+                        val n = (call.argument<Int>("nBatch")
+                            ?: call.argument<Long>("nBatch")?.toInt()
+                            ?: 512)
+                        nativeSetBatchSize(n)
+                        Log.i(TAG, "Batch size set to $n")
+                        result.success(true)
+                    }
                     else -> result.notImplemented()
                 }
             } catch (t: Throwable) {
@@ -580,6 +588,7 @@ class LlamaFlutterAndroidPlugin : FlutterPlugin, LlamaHostApi {
     )
 
     private external fun nativeStop()
+    private external fun nativeSetBatchSize(nBatch: Int)
     private external fun nativeFreeModel()
     private external fun nativeSelectSlot(slot: Int): Boolean
     private external fun nativeIsSlotLoaded(slot: Int): Boolean

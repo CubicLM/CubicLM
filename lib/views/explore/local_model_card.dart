@@ -85,6 +85,8 @@ Widget _ramFitDot(BuildContext context, AiModel model) {
               color: color,
               fontWeight: FontWeight.w700,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -443,6 +445,8 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                                   fontWeight: FontWeight.w700,
                                   color: isDark ? Colors.white : Colors.black,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (isActive)
@@ -510,10 +514,17 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                                     .withValues(alpha: 0.7),
                                 fontWeight: FontWeight.w500,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(width: 8),
                             if (isDownloaded)
-                              _ramFitDot(context, model),
+                              // Expanded (not Flexible): the dot label gets
+                              // a tight width so its ellipsis can trigger —
+                              // this row overflowed 2px on 393px screens.
+                              Expanded(
+                                  child:
+                                      _ramFitDot(context, model)),
                           ],
                         ),
                         if (isDownloaded && _c.canLoadLocal) ...[

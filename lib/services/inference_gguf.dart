@@ -129,6 +129,16 @@ class GgufEngine {
     return threads <= cap ? threads : cap;
   }
 
+  /// Prompt-processing batch by free RAM (pure logic, unit tested).
+  /// The parallel prompt pass is the biggest transient spike after
+  /// mmap page-in: 512 needs ~3GB+ free, 256 fits ~2GB, 128 survives
+  /// ~1.2GB. Unknown RAM (≤0) keeps the historic 512.
+  static int resolveBatchSize(double availGb) {
+    if (availGb > 0 && availGb < 2.0) return 128;
+    if (availGb > 0 && availGb < 3.0) return 256;
+    return 512;
+  }
+
   /// Halved context for the one-shot load retry (never below 512).
   /// Returns [contextSize] unchanged when already minimal.
   static int reducedContextForRetry(int contextSize) {
@@ -523,6 +533,17 @@ class GgufEngine {
       await log.flush();
     } catch (_) {}
 
+    // ── Prompt batch by free RAM ──
+    // Set before the native load: the parallel prompt pass is the
+    // biggest transient spike, and small batches keep 4-6GB phones
+    // alive through it. No-op where the native side is absent.
+    final batchSize = GgufEngine.resolveBatchSize(availGb);
+    try {
+      await _controller!.setBatchSize(batchSize);
+    } catch (_) {}
+    print('[Inference] Batch size → $batchSize '
+        '(free RAM ${availGb.toStringAsFixed(1)}GB)');
+
     // ── Load Progress ──
     await _loadProgressSub?.cancel();
     _loadProgressSub = null;
@@ -559,6 +580,10 @@ class GgufEngine {
       print(
           '[Inference] Load failed ($e) — retrying once with ctx=$retryCtx, threads=$retryThreads after pool eviction.');
       await _evictOtherResidents(modelPath);
+      try {
+        await _controller!.setBatchSize(
+            batchSize ~/ 2 < 64 ? 64 : batchSize ~/ 2);
+      } catch (_) {}
       try {
         final log = Get.find<AppLogService>();
         log.info(

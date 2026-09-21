@@ -112,4 +112,18 @@ void main() {
           30);
     });
   });
+
+  group('resolveBatchSize', () {
+    test('scales the prompt-parallel batch to free RAM', () {
+      expect(GgufEngine.resolveBatchSize(1.5), 128);
+      expect(GgufEngine.resolveBatchSize(1.99), 128);
+      expect(GgufEngine.resolveBatchSize(2.0), 256);
+      expect(GgufEngine.resolveBatchSize(2.9), 256);
+      expect(GgufEngine.resolveBatchSize(3.0), 512);
+      expect(GgufEngine.resolveBatchSize(8.0), 512);
+      // Unknown RAM keeps the historic default.
+      expect(GgufEngine.resolveBatchSize(0), 512);
+      expect(GgufEngine.resolveBatchSize(-1), 512);
+    });
+  });
 }

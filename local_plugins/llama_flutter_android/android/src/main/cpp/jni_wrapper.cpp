@@ -31,6 +31,9 @@ static std::atomic<bool> g_stop_flag{false};
 static std::mutex g_load_log_mutex;
 static std::string g_load_error;
 static bool g_capture_load_error = false;
+// Prompt-processing batch for the next nativeLoadModel (set from Dart
+// via nativeSetBatchSize; default preserves the historic 512).
+static int g_batch_size = 512;
 
 static ModelSlot* activeSlot() {
     const int i = g_active_slot.load(std::memory_order_acquire);
@@ -318,8 +321,15 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeLoadMo
     ctx_params.n_threads = n_threads;
     ctx_params.n_threads_batch = n_threads;
 
-    // Memory optimization: reduce memory usage by limiting batch processing
-    ctx_params.n_batch = 512;  // Process smaller batches to reduce memory spikes
+    // Memory optimization: prompt-processing batch comes from
+    // nativeSetBatchSize (default 512). Small batches keep the parallel
+    // prompt pass inside free RAM on 4-6GB phones (the spike that kills
+    // the app mid-answer).
+    int batch = g_batch_size;
+    if (batch < 32) batch = 32;
+    if (batch > 2048) batch = 2048;
+    ctx_params.n_batch = (uint32_t) batch;
+    ctx_params.n_ubatch = (uint32_t) batch;
 
     // Create context (using new API)
     target.ctx = llama_init_from_model(target.model, ctx_params);
@@ -646,6 +656,15 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenera
     
     llama_batch_free(batch);
     env->DeleteLocalRef(callbackClass);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeSetBatchSize(
+    JNIEnv* env, jobject thiz, jint n_batch) {
+    if (n_batch < 32) n_batch = 32;
+    if (n_batch > 2048) n_batch = 2048;
+    g_batch_size = n_batch;
+    LOGI("Batch size set to %d", g_batch_size);
 }
 
 extern "C" JNIEXPORT void JNICALL

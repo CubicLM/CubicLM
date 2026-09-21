@@ -91,6 +91,20 @@ class LlamaController implements LlamaFlutterApi {
     }
   }
 
+  /// Prompt-processing batch for the next [loadModel] (prompt-parallel
+  /// width). Small batches keep the parallel prompt pass inside free
+  /// RAM on 4-6GB phones. No-op where the native side is absent.
+  Future<void> setBatchSize(int nBatch) async {
+    try {
+      await _multiChannel.invokeMethod<void>(
+        'setBatchSize',
+        {'nBatch': nBatch},
+      );
+    } on MissingPluginException {
+      // ignore (iOS / non-native engines keep their own default)
+    }
+  }
+
   /// Path of the currently active (generation-target) model.
   Future<String?> activeModel() async {
     try {
