@@ -63,10 +63,7 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
       if (mounted) setState(() {});
     });
 
-    final type = widget.versions[_currentIndex]['type'];
-    if (type == 'code' || type == 'text') {
-      _showPreview = false;
-    }
+    _showPreview = true;
   }
 
   @override
@@ -494,11 +491,15 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
                     style: GoogleFonts.firaCode(
                       fontSize: 13,
                       height: 1.5,
-                      color: isDark ? AppColors.textPrimary : Dt.textPrimary,
+                      color: isDark ? Colors.white : Dt.textPrimary,
                     ),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       border: InputBorder.none,
                       hintText: 'Edit your code here...',
+                      hintStyle: GoogleFonts.firaCode(
+                        fontSize: 13,
+                        color: isDark ? Colors.white38 : Colors.black38,
+                      ),
                       isCollapsed: true,
                     ),
                     inputFormatters: [_BracketAutoCloseFormatter()],
@@ -639,12 +640,7 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
   }
 
   Widget _tabBar(bool isDark, String? type) {
-    final canPreview = type == 'html' ||
-        type == 'mermaid' ||
-        type == 'csv' ||
-        type == 'table' ||
-        type == 'javascript' ||
-        type == 'js';
+    const canPreview = true;
 
     return Container(
       width: double.infinity,
@@ -709,7 +705,7 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
       BuildContext context, bool isDark, String content, String? type) {
     if (_showChart) return _chartPreview(content, isDark);
     if (_showDiff) return _diffView(isDark);
-    if (!_showPreview) return _content(context, isDark, content, type);
+    if (!_showPreview) return _codeView(context, isDark, content, type);
 
     switch (type) {
       case 'html':
@@ -722,8 +718,13 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
       case 'javascript':
       case 'js':
         return _jsConsolePreview(content, isDark);
+      case 'markdown':
+      case 'md':
+      case 'text':
+      case 'doc':
+      case 'document':
       default:
-        return _content(context, isDark, content, type);
+        return _markdownPreview(context, isDark, content);
     }
   }
 
@@ -1201,36 +1202,213 @@ class _ArtifactRendererState extends State<ArtifactRenderer> {
     );
   }
 
-  Widget _content(
-      BuildContext context, bool isDark, String content, String? type) {
-    if (type == 'html') {
-      return InAppWebView(
-        initialData: InAppWebViewInitialData(
-          baseUrl: WebUri('https://localhost/'),
-          data: content,
-          mimeType: 'text/html',
-          encoding: 'utf-8',
-        ),
-        initialSettings: InAppWebViewSettings(
-          transparentBackground: true,
-          supportZoom: true,
-          javaScriptEnabled: true,
-          domStorageEnabled: true,
-        ),
-      );
-    }
+  Widget _markdownPreview(BuildContext context, bool isDark, String content) {
+    final textColor = isDark ? AppColors.textPrimary : Dt.textPrimary;
+    final secondaryTextColor = isDark ? AppColors.textSecondary : Dt.textSecondary;
 
-    return Markdown(
-      data: '```${type ?? ""}\n$content\n```',
-      selectable: true,
-      styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-        codeblockDecoration: BoxDecoration(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.02)
-              : Colors.black.withValues(alpha: 0.02),
-          borderRadius: BorderRadius.circular(8),
+    final baseStyle = GoogleFonts.plusJakartaSans(
+      fontSize: 15,
+      height: 1.6,
+      color: textColor,
+    );
+
+    return Container(
+      color: isDark ? Dt.canvasDark : Dt.canvas,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: MarkdownBody(
+          data: content,
+          selectable: true,
+          styleSheet: MarkdownStyleSheet(
+            p: baseStyle,
+            pPadding: const EdgeInsets.only(bottom: 12),
+            h1: baseStyle.copyWith(
+                fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5, height: 1.3),
+            h2: baseStyle.copyWith(fontSize: 19, fontWeight: FontWeight.bold, height: 1.3),
+            h3: baseStyle.copyWith(fontSize: 17, fontWeight: FontWeight.bold, height: 1.3),
+            h4: baseStyle.copyWith(fontSize: 15, fontWeight: FontWeight.bold),
+            strong: baseStyle.copyWith(fontWeight: FontWeight.bold),
+            em: baseStyle.copyWith(fontStyle: FontStyle.italic),
+            listBullet: baseStyle.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+            listIndent: 24,
+            blockquote: baseStyle.copyWith(color: secondaryTextColor, fontSize: 14),
+            blockquoteDecoration: BoxDecoration(
+              color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.04),
+              border: const Border(left: BorderSide(color: AppColors.primary, width: 3)),
+              borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+            ),
+            blockquotePadding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
+            code: GoogleFonts.firaCode(
+              fontSize: 13,
+              color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+              backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            ),
+            codeblockDecoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.08),
+              ),
+            ),
+            codeblockPadding: const EdgeInsets.all(14),
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _codeView(
+      BuildContext context, bool isDark, String content, String? type) {
+    final codeBg = isDark ? const Color(0xFF181825) : const Color(0xFFF3F3F5);
+    final textColor = isDark ? const Color(0xFFCDD6F4) : const Color(0xFF1E1E2E);
+    final gutterBg = isDark ? const Color(0xFF11111B) : const Color(0xFFE6E6E9);
+
+    final lines = content.split('\n');
+
+    return Column(
+      children: [
+        // Code Header Bar with language tag and copy
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.03)
+                : Colors.black.withValues(alpha: 0.03),
+            border: Border(
+              bottom: BorderSide(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.08),
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  (type ?? 'text').toUpperCase(),
+                  style: GoogleFonts.firaCode(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${lines.length} lines',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  color: Dt.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              InkWell(
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: content));
+                  Get.snackbar('Copied', 'Code copied to clipboard',
+                      snackPosition: SnackPosition.BOTTOM,
+                      duration: const Duration(seconds: 1));
+                },
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(LucideIcons.copy,
+                          size: 13, color: AppColors.primary),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Copy Code',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Monospace Source Code with Line Numbers
+        Expanded(
+          child: Container(
+            color: codeBg,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Line numbers Gutter
+                    Container(
+                      color: gutterBg,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: List.generate(
+                          lines.length,
+                          (i) => SizedBox(
+                            height: 20,
+                            child: Text(
+                              '${i + 1}',
+                              style: GoogleFonts.firaCode(
+                                fontSize: 12,
+                                color:
+                                    isDark ? Colors.white38 : Colors.black38,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.black.withValues(alpha: 0.08),
+                    ),
+                    // Code Text
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: lines
+                            .map((line) => SizedBox(
+                                  height: 20,
+                                  child: SelectableText(
+                                    line.isEmpty ? ' ' : line,
+                                    style: GoogleFonts.firaCode(
+                                      fontSize: 12.5,
+                                      color: textColor,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ))
+                            .toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

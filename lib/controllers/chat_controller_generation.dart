@@ -539,7 +539,7 @@ extension ChatControllerGeneration on ChatController {
         recalledTurns: recalledCount,
         artifacts: artifactsDetected.isEmpty ? null : artifactsDetected.map((e) => {
           'id': e.id ?? _uuid.v4(),
-          'type': e.type ?? 'code',
+          'type': e.type ?? 'markdown',
           'title': e.title ?? 'Artifact',
           'content': e.content,
         }).toList(),

@@ -34,22 +34,43 @@ List<ArtifactParts> parseArtifacts(String text) {
     final typeMatch = RegExp(r'type=["''](.*?)["'']').firstMatch(attrStr);
     final titleMatch = RegExp(r'title=["''](.*?)["'']').firstMatch(attrStr);
     
-    var type = typeMatch?.group(1);
+    var type = typeMatch?.group(1)?.toLowerCase().trim();
     final contentText = content.trim();
     
-    // Auto-detect type from content if missing
-    if (type == null || type.isEmpty) {
-      if (contentText.contains('graph TD') || contentText.contains('sequenceDiagram') || contentText.contains('pie')) {
+    // Auto-detect type from content if missing or generic
+    if (type == null || type.isEmpty || type == 'text' || type == 'application/vnd.ant.markdown') {
+      if (contentText.contains('graph TD') ||
+          contentText.contains('sequenceDiagram') ||
+          contentText.contains('pie') ||
+          contentText.contains('flowchart')) {
         type = 'mermaid';
-      } else if (contentText.startsWith('<!DOCTYPE html') || contentText.contains('<html')) {
+      } else if (contentText.startsWith('<!DOCTYPE html') ||
+          contentText.contains('<html') ||
+          contentText.contains('<body')) {
         type = 'html';
+      } else if (contentText.startsWith('{') || contentText.startsWith('[')) {
+        type = 'json';
+      } else if (contentText.contains('function ') ||
+          contentText.contains('const ') ||
+          contentText.contains('let ') ||
+          contentText.contains('console.log')) {
+        type = 'javascript';
+      } else {
+        // Default documents, recipes, notes, and structured text to markdown
+        type = 'markdown';
       }
     }
+
+    if (type == 'md') type = 'markdown';
+    if (type == 'js') type = 'javascript';
     
     artifacts.add(ArtifactParts(
       id: idMatch?.group(1),
       type: type,
-      title: titleMatch?.group(1) ?? (type != null ? '${type[0].toUpperCase()}${type.substring(1)}' : 'Artifact'),
+      title: titleMatch?.group(1) ??
+          (type.isNotEmpty
+              ? '${type[0].toUpperCase()}${type.substring(1)}'
+              : 'Artifact'),
       content: contentText,
       remainingText: '',
     ));

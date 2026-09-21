@@ -26,6 +26,7 @@ docs+/
 DataSheet/
 Mobile-Harness-main/
 error.txt
+opencode.mcp.json
 #.vscode/
 
 # Flutter/Dart/Pub related
