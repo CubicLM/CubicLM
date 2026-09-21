@@ -480,8 +480,14 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenera
         g_n_past = 0;
     }
 
-    // Process prompt in batches to handle long inputs
-    const int max_batch_size = 512;
+    // Process prompt in batches to handle long inputs. Uses the same
+    // RAM-scaled g_batch_size as context creation (set via
+    // nativeSetBatchSize): a hardcoded 512-token batch here spikes
+    // past free RAM on 4-6GB phones and kills the app the instant a
+    // prompt is sent — before any token is produced.
+    int max_batch_size = g_batch_size;
+    if (max_batch_size < 1) max_batch_size = 1;
+    if (n_ctx > 1 && max_batch_size > n_ctx - 1) max_batch_size = n_ctx - 1;
     int tokens_processed = 0;
     
     llama_batch batch = llama_batch_init(max_batch_size, 0, 1);
