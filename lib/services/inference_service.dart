@@ -754,16 +754,6 @@ class InferenceService extends GetxService {
     generationSource.value = source;
     streamingText.value = '';
 
-    // Kill-proof breadcrumb for user-visible turns only (background
-    // jobs would churn the file on every turn): if the process dies
-    // mid-generation, next boot reports it instead of silence.
-    if (source == 'chat') {
-      try {
-        await Get.find<AppLogService>()
-            .setBreadcrumb('generation-start', loadedModelName.value);
-      } catch (_) {}
-    }
-
     final startTime = DateTime.now();
     DateTime? firstVisibleTokenAt;
     Timer? tokenFlushTimer;
@@ -892,6 +882,23 @@ class InferenceService extends GetxService {
                 histChars) ~/
             4;
         contextTokensTotal.value = ctxTotal;
+      }
+
+      // Kill-proof breadcrumb for user-visible turns only (background
+      // jobs churn the file too much): written right before the native
+      // call with a RAM/backend snapshot, so a mid-generation death
+      // reports actionable context on next boot without adb.
+      if (source == 'chat') {
+        try {
+          var detail = loadedModelName.value;
+          try {
+            final dev = Get.find<DeviceInfoService>();
+            detail = '$detail | free=${dev.availableRamGB.value.toStringAsFixed(1)}GB'
+                ' ctx=$ctxTotal backend=${loadedBackend.value}';
+          } catch (_) {}
+          await Get.find<AppLogService>()
+              .setBreadcrumb('generation-start', detail);
+        } catch (_) {}
       }
 
       final result = useServer

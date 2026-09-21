@@ -30,6 +30,65 @@ enum LogCategory {
   const LogCategory(this.label);
 }
 
+/// Android ApplicationExitInfo reason codes → short names. Pure —
+/// unit tested. Mirrors android.app.ApplicationExitInfo (API 30+).
+String processExitReasonName(int reason) {
+  switch (reason) {
+    case 0:
+      return 'UNKNOWN';
+    case 1:
+      return 'EXIT_SELF';
+    case 2:
+      return 'SIGNALED';
+    case 3:
+      return 'LOW_MEMORY';
+    case 4:
+      return 'CRASH_NATIVE';
+    case 5:
+      return 'CRASH';
+    case 6:
+      return 'ANR';
+    case 7:
+      return 'INIT_FAILURE';
+    case 8:
+      return 'PERMISSION_CHANGE';
+    case 9:
+      return 'EXCESSIVE_RESOURCE_USE';
+    case 10:
+      return 'OTHER';
+    case 11:
+      return 'USER_REQUESTED';
+    case 12:
+      return 'USER_STOPPED';
+    case 13:
+      return 'DEPENDENCY_DIED';
+    case 14:
+      return 'COMPLETED';
+    case 15:
+      return 'CANCELLED';
+    default:
+      return 'REASON_$reason';
+  }
+}
+
+/// Reasons worth a System-Log row: abnormal deaths only. Clean exits
+/// (self/user/completed/permission/other) would spam every upgrade.
+bool isCrashExitReason(int reason) {
+  switch (reason) {
+    case 2: // SIGNALED (kill -9 incl. LMK-adjacent kills)
+    case 3: // LOW_MEMORY (LMK kill)
+    case 4: // CRASH_NATIVE (SIGSEGV/SIGABRT in llama.cpp)
+    case 5: // CRASH (uncaught Java/Kotlin)
+    case 6: // ANR (main-thread stall)
+    case 7: // INIT_FAILURE
+    case 9: // EXCESSIVE_RESOURCE_USE
+    case 13: // DEPENDENCY_DIED
+      return true;
+    default:
+      return false;
+  }
+}
+
 class AppLogEntry {
   /// First occurrence time (kept as `timestamp` for compatibility).
   final DateTime timestamp;
@@ -517,6 +576,20 @@ class AppLogService extends GetxService with WidgetsBindingObserver {
       ]),
     ),
     CrashPattern(
+      id: 'native_crash',
+      title: 'Previous-run native/system death',
+      description:
+          'The OS reported how the last process died (native crash signal, low-memory kill, ANR) — no adb needed.',
+      fix:
+          'Read the hint under the row: NATIVE CRASH during generation means free RAM / smaller quant / Large-model mode; LOW_MEMORY means close background apps.',
+      matcher: (e) => _containsAny(e, const [
+        'CRASH_NATIVE',
+        'LOW_MEMORY',
+        'NATIVE CRASH',
+        '[Previous run]',
+      ]),
+    ),
+    CrashPattern(
       id: 'overlay_issue',
       title: 'Overlay corruption',
       description:
@@ -748,6 +821,93 @@ class AppLogService extends GetxService with WidgetsBindingObserver {
     await _loadPersistedUnresolved();
     await _loadPersistedCrashHistory();
     await _reportUnresolvedBreadcrumb();
+    await _reportProcessExits();
+  }
+
+  static const _exitChannel =
+      MethodChannel('com.cubiclm.app/process_exit');
+  static const _exitSeenFileName = 'cubiclm_exit_seen_ms';
+
+  /// Previous-process forensics via ApplicationExitInfo (Android 11+,
+  /// no logcat permission needed — own deaths only). Logs one row per
+  /// abnormal death newer than the last seen timestamp, newest first,
+  /// so a native SIGSEGV/SIGABRT or LMK kill is reportable from inside
+  /// the app instead of needing adb.
+  Future<void> _reportProcessExits() async {
+    try {
+      if (kIsWeb) return;
+      List<dynamic>? raw;
+      try {
+        raw = await _exitChannel.invokeListMethod<dynamic>(
+            'getRecentExitReasons');
+      } catch (_) {
+        return; // Non-Android or old channel: nothing to report.
+      }
+      if (raw == null || raw.isEmpty) return;
+      final dir = await getApplicationDocumentsDirectory();
+      final seenFile = File('${dir.path}/$_exitSeenFileName');
+      var seenMs = 0;
+      try {
+        if (await seenFile.exists()) {
+          seenMs = int.tryParse(await seenFile.readAsString()) ?? 0;
+        }
+      } catch (_) {}
+      var maxMs = seenMs;
+      var fresh = 0;
+      // Newest first: iterate reversed (channel returns newest first,
+      // so keep order but skip seen).
+      for (final item in raw) {
+        if (item is! Map) continue;
+        final m = Map<String, dynamic>.from(item);
+        final reason = (m['reason'] as num?)?.toInt() ?? 0;
+        final tsMs = (m['timestampMs'] as num?)?.toInt() ?? 0;
+        if (tsMs > maxMs) maxMs = tsMs;
+        if (tsMs <= seenMs) continue;
+        if (!isCrashExitReason(reason)) continue;
+        fresh++;
+        if (fresh > 4) continue; // Cap rows; still advance maxMs above.
+        final name = processExitReasonName(reason);
+        final at = tsMs > 0
+            ? DateTime.fromMillisecondsSinceEpoch(tsMs).toIso8601String()
+            : 'unknown time';
+        final pssMb = ((m['pssKb'] as num?)?.toDouble() ?? 0) / 1024;
+        final rssMb = ((m['rssKb'] as num?)?.toDouble() ?? 0) / 1024;
+        var desc = '${m['description'] ?? ''}';
+        if (desc.length > 1200) desc = '${desc.substring(0, 1200)}…';
+        error(
+          '[Previous run] $name @ $at'
+          '${pssMb > 0 ? ' (pss ${pssMb.toStringAsFixed(0)}MB, rss ${rssMb.toStringAsFixed(0)}MB)' : ''}',
+          details: desc.isEmpty
+              ? 'No system description. '
+                  '${_exitHintFor(reason)}'
+              : '$desc\n${_exitHintFor(reason)}',
+          category: (reason == 4 || reason == 5)
+              ? LogCategory.model
+              : LogCategory.system,
+        );
+      }
+      try {
+        await seenFile.writeAsString('$maxMs', flush: true);
+      } catch (_) {}
+    } catch (_) {}
+  }
+
+  /// Actionable one-liner per death kind (shown under the raw signal).
+  static String _exitHintFor(int reason) {
+    switch (reason) {
+      case 4:
+        return 'Native crash inside on-device inference (often prompt-time OOM on 4-6GB phones): free RAM, use a smaller quant, enable Large-model mode, or Benchmark first.';
+      case 3:
+        return 'System killed the app for memory (LMK): free RAM, close background apps, use a smaller model.';
+      case 2:
+        return 'Process was signal-killed (system/unknown): check free RAM and whether a generation was running.';
+      case 5:
+        return 'Uncaught app exception: copy this row + the rows above it and report.';
+      case 6:
+        return 'Main thread stalled (ANR): note what was open and report.';
+      default:
+        return 'Copy this row and report it with what the app was doing.';
+    }
   }
 
   /// A `-start` breadcrumb with no matching resolution means the previous

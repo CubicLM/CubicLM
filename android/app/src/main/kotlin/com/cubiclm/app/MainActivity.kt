@@ -1,5 +1,6 @@
 package com.cubiclm.app
 
+import android.app.ActivityManager
 import android.app.AlertDialog
 import android.app.AlarmManager
 import android.app.DownloadManager
@@ -31,6 +32,7 @@ import org.json.JSONObject
 
 class MainActivity : FlutterFragmentActivity() {
     private val importChannelName = "com.cubiclm.app/model_import"
+    private val processExitChannelName = "com.cubiclm.app/process_exit"
     private val importRequestCode = 4207
     private val exportFolderRequestCode = 4208
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -70,6 +72,17 @@ class MainActivity : FlutterFragmentActivity() {
         super.configureFlutterEngine(flutterEngine)
         handleShareIntent(intent)
         importChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, importChannelName)
+        // Process-exit forensics for System Logs: ApplicationExitInfo reports
+        // HOW the previous process died (native crash signal, LMK kill, ANR)
+        // with no logcat permission needed (own crashes only, API 30+).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, processExitChannelName)
+            .setMethodCallHandler { call, result ->
+                if (call.method == "getRecentExitReasons") {
+                    result.success(recentExitReasons())
+                } else {
+                    result.notImplemented()
+                }
+            }
         ModelDownloadService.emitter = { filename, copied, total, bps, status ->
             mainHandler.post {
                 importChannel?.invokeMethod(
@@ -1729,5 +1742,29 @@ class MainActivity : FlutterFragmentActivity() {
             .filter { it.isNotEmpty() && it != "." && it != ".." }
             .joinToString("/")
         return clean.ifBlank { "CubicLM" }
+    }
+
+    /// Recent death records for this package (newest first, max 8).
+    /// Each map: reason (int code), timestampMs, importance, status,
+    /// description (signal + fault addr for native crashes), rssKb, pssKb.
+    /// Empty below API 30 or on any failure — Dart treats that as "none".
+    private fun recentExitReasons(): List<Map<String, Any?>> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return emptyList()
+        return try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            am.getHistoricalProcessExitReasons(packageName, 0, 8).map { info ->
+                mapOf(
+                    "reason" to info.reason,
+                    "timestampMs" to info.timestamp,
+                    "importance" to info.importance,
+                    "status" to info.status,
+                    "description" to (info.description ?: ""),
+                    "rssKb" to (info.rss / 1024L),
+                    "pssKb" to (info.pss / 1024L),
+                )
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 }
