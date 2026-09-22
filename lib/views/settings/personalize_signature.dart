@@ -74,7 +74,7 @@ extension _PersonalizeSignature on PersonalizationView {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('CubicLM',
-                        style: _font(
+                        style: PersonalizationView._font(
                             controller.selectedFontFamily.value,
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
