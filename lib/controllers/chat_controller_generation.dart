@@ -227,6 +227,17 @@ extension ChatControllerGeneration on ChatController {
     await _flushOutbox();
     StatsService.tap(StatsService.eventChatSent);
 
+    // Kill-proof breadcrumb at send time (not just generate time): if
+    // the process dies anywhere after the tap — context build, recall,
+    // native prefill — next boot reports it instead of silence.
+    try {
+      final head = effectiveText.length > 60
+          ? '${effectiveText.substring(0, 60)}…'
+          : effectiveText;
+      await Get.find<AppLogService>()
+          .setBreadcrumb('send-start', head.replaceAll('\n', ' '));
+    } catch (_) {}
+
     await _generateAIResponse(
       prompt: effectiveText,
       imagePath: imagePath,
