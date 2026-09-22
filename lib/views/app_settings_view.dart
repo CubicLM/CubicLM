@@ -75,10 +75,6 @@ class _SettingSearchEntry {
 class AppSettingsView extends GetView<SettingsController> {
   AppSettingsView({super.key});
 
-  /// Inline expand state for the Composer-buttons section (no drawer —
-  /// the four visibility switches live right under the header row).
-  final _composerOpen = false.obs;
-
   void _showCodeEditorInfo(BuildContext context) {
     showDialog(
       context: context,
@@ -356,80 +352,6 @@ class AppSettingsView extends GetView<SettingsController> {
                       value: controller.longPasteToFile.value,
                       onChanged: (v) => controller.setLongPasteToFile(v),
                     )),
-                Obx(() => _appleSwitchTile(
-                      context,
-                      isDark,
-                      leading: Icon(LucideIcons.slidersHorizontal,
-                          size: 20, color: Theme.of(context).primaryColor),
-                      title: 'Composer buttons',
-                      subtitle: _composerOpen.value
-                          ? 'Tap to collapse'
-                          : 'Show or hide chat input icons',
-                      value: _composerOpen.value,
-                      onChanged: (v) => _composerOpen.value = v,
-                    )),
-                Obx(() => _composerOpen.value
-                    ? Column(
-                        children: [
-                          _appleSwitchTile(
-                            context,
-                            isDark,
-                            leading: Icon(LucideIcons.globe,
-                                size: 20,
-                                color: Theme.of(context).primaryColor),
-                            title: 'Web access',
-                            subtitle: controller.showWebAccess.value
-                                ? 'Visible in the composer'
-                                : 'Hidden from the composer',
-                            value: controller.showWebAccess.value,
-                            onChanged: (v) =>
-                                controller.setShowWebAccess(v),
-                          ),
-                          _appleSwitchTile(
-                            context,
-                            isDark,
-                            leading: Icon(LucideIcons.search,
-                                size: 20,
-                                color: Theme.of(context).primaryColor),
-                            title: 'Deep Search',
-                            subtitle: controller.showDeepSearch.value
-                                ? 'Visible in the composer'
-                                : 'Hidden from the composer',
-                            value: controller.showDeepSearch.value,
-                            onChanged: (v) =>
-                                controller.setShowDeepSearch(v),
-                          ),
-                          _appleSwitchTile(
-                            context,
-                            isDark,
-                            leading: Icon(LucideIcons.video,
-                                size: 20,
-                                color: Theme.of(context).primaryColor),
-                            title: 'Live Vision',
-                            subtitle: controller.showLiveVision.value
-                                ? 'Visible in the composer'
-                                : 'Hidden from the composer',
-                            value: controller.showLiveVision.value,
-                            onChanged: (v) =>
-                                controller.setShowLiveVision(v),
-                          ),
-                          _appleSwitchTile(
-                            context,
-                            isDark,
-                            leading: Icon(LucideIcons.sparkles,
-                                size: 20,
-                                color: Theme.of(context).primaryColor),
-                            title: 'Polish Prompt',
-                            subtitle: controller.showPolishPrompt.value
-                                ? 'Visible in the composer'
-                                : 'Hidden from the composer',
-                            value: controller.showPolishPrompt.value,
-                            onChanged: (v) =>
-                                controller.setShowPolishPrompt(v),
-                          ),
-                        ],
-                      )
-                    : const SizedBox.shrink()),
                 Obx(() {
                   final style = controller.contextWindowStyle.value;
                   return _appleListTile(
@@ -446,10 +368,70 @@ class AppSettingsView extends GetView<SettingsController> {
                             : 'Bar below the chat header',
                     trailing:
                         const Icon(LucideIcons.chevronRight, size: 20),
-                    onTap: () =>
-                        _showContextWindowSheet(context, isDark),
-                  );
-                }),
+                      onTap: () =>
+                          _showContextWindowSheet(context, isDark),
+                    );
+                  }),
+                ]),
+              const SizedBox(height: 28),
+              _sectionLabel(context, 'COMPOSER BUTTONS'),
+              _appleGroupedCard(context, isDark, children: [
+                Obx(() => _appleSwitchTile(
+                      context,
+                      isDark,
+                      leading: Icon(LucideIcons.globe,
+                          size: 20,
+                          color: Theme.of(context).primaryColor),
+                      title: 'Web access',
+                      subtitle: controller.showWebAccess.value
+                          ? 'Visible in the composer'
+                          : 'Hidden from the composer',
+                      value: controller.showWebAccess.value,
+                      onChanged: (v) =>
+                          controller.setShowWebAccess(v),
+                    )),
+                Obx(() => _appleSwitchTile(
+                      context,
+                      isDark,
+                      leading: Icon(LucideIcons.search,
+                          size: 20,
+                          color: Theme.of(context).primaryColor),
+                      title: 'Deep Search',
+                      subtitle: controller.showDeepSearch.value
+                          ? 'Visible in the composer'
+                          : 'Hidden from the composer',
+                      value: controller.showDeepSearch.value,
+                      onChanged: (v) =>
+                          controller.setShowDeepSearch(v),
+                    )),
+                Obx(() => _appleSwitchTile(
+                      context,
+                      isDark,
+                      leading: Icon(LucideIcons.video,
+                          size: 20,
+                          color: Theme.of(context).primaryColor),
+                      title: 'Live Vision',
+                      subtitle: controller.showLiveVision.value
+                          ? 'Visible in the composer'
+                          : 'Hidden from the composer',
+                      value: controller.showLiveVision.value,
+                      onChanged: (v) =>
+                          controller.setShowLiveVision(v),
+                    )),
+                Obx(() => _appleSwitchTile(
+                      context,
+                      isDark,
+                      leading: Icon(LucideIcons.sparkles,
+                          size: 20,
+                          color: Theme.of(context).primaryColor),
+                      title: 'Polish Prompt',
+                      subtitle: controller.showPolishPrompt.value
+                          ? 'Visible in the composer'
+                          : 'Hidden from the composer',
+                      value: controller.showPolishPrompt.value,
+                      onChanged: (v) =>
+                          controller.setShowPolishPrompt(v),
+                    )),
               ]),
               const SizedBox(height: 28),
               _sectionLabel(context, 'settings_startup'.tr),

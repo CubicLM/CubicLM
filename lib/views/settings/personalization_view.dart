@@ -251,22 +251,10 @@ class PersonalizationView extends GetView<SettingsController> {
               const SizedBox(height: 24),
               _sectionLabel(context, 'pers_more_themes'.tr),
               _appleGroupedCard(context, isDark, children: [
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 4,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      // Cells must fit 58px circle + gap + 1-line label:
-                      // square cells overflowed ~14px vertically.
-                      childAspectRatio: 0.72,
-                    ),
-                    itemCount: themes.length,
-                    itemBuilder: (ctx, i) => _colorSwatch(context, isDark, themes[i]),
-                  ),
+                _HorizontalThemeGrid(
+                  themes: themes,
+                  isDark: isDark,
+                  swatchBuilder: _colorSwatch,
                 ),
                 _appleListTile(
                   context,
@@ -1201,3 +1189,112 @@ class _DynamicPalettePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
+
+/// Horizontal swipeable grid for More Themes.
+/// Groups themes into pages of 8 (2 rows of 4 items each) so users can
+/// swipe left/right to discover all available theme colors.
+class _HorizontalThemeGrid extends StatefulWidget {
+  final List<_ThemeOption> themes;
+  final bool isDark;
+  final Widget Function(BuildContext, bool, _ThemeOption) swatchBuilder;
+
+  const _HorizontalThemeGrid({
+    required this.themes,
+    required this.isDark,
+    required this.swatchBuilder,
+  });
+
+  @override
+  State<_HorizontalThemeGrid> createState() => _HorizontalThemeGridState();
+}
+
+class _HorizontalThemeGridState extends State<_HorizontalThemeGrid> {
+  late final PageController _pageController;
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const itemsPerPage = 8;
+    final pages = <List<_ThemeOption>>[];
+    for (var i = 0; i < widget.themes.length; i += itemsPerPage) {
+      pages.add(widget.themes.sublist(
+        i,
+        (i + itemsPerPage > widget.themes.length) ? widget.themes.length : i + itemsPerPage,
+      ));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 200,
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: pages.length,
+              onPageChanged: (page) {
+                setState(() {
+                  _currentPage = page;
+                });
+              },
+              itemBuilder: (context, pageIndex) {
+                final pageThemes = pages[pageIndex];
+                return GridView.builder(
+                  padding: EdgeInsets.zero,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 0.75,
+                  ),
+                  itemCount: pageThemes.length,
+                  itemBuilder: (ctx, i) =>
+                      widget.swatchBuilder(context, widget.isDark, pageThemes[i]),
+                );
+              },
+            ),
+          ),
+          if (pages.length > 1) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(pages.length, (index) {
+                final isActive = index == _currentPage;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: isActive ? 18 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? Theme.of(context).primaryColor
+                        : (widget.isDark
+                            ? Colors.white.withValues(alpha: 0.2)
+                            : Colors.black.withValues(alpha: 0.15)),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                );
+              }),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
