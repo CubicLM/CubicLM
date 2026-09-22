@@ -28,12 +28,15 @@ class _SheetShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? Theme.of(context).cardColor : Dt.card,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(Dt.rSheet)),
-      ),
+    // Material (not Container+BoxDecoration): ListTiles anywhere inside
+    // the sheet paint their background + ink splashes on the nearest
+    // Material ancestor — a DecoratedBox would hide those effects and
+    // log a framework error for every sheet with tiles.
+    return Material(
+      color: isDark ? Theme.of(context).cardColor : Dt.card,
+      borderRadius:
+          const BorderRadius.vertical(top: Radius.circular(Dt.rSheet)),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -368,6 +371,25 @@ class AppIconCircle extends StatelessWidget {
       height: diameter,
       decoration: const BoxDecoration(color: Dt.pillMuted, shape: BoxShape.circle),
       child: Icon(icon, size: diameter >= 56 ? 22 : 18, color: color ?? Dt.iconDefault),
+    );
+  }
+}
+
+/// Constrains page bodies on wide screens (tablet/desktop/Windows) so
+/// content doesn't stretch edge-to-edge. No-op on phones: below
+/// [maxWidth] the child gets the full width.
+class MaxWidthBody extends StatelessWidget {
+  final Widget child;
+  final double maxWidth;
+  const MaxWidthBody({super.key, required this.child, this.maxWidth = 720});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
     );
   }
 }

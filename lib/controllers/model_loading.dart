@@ -129,15 +129,15 @@ extension ModelControllerLoading on ModelController {
         const taesdUrl = 'https://huggingface.co/madebyollin/taesd/resolve/main/diffusion_pytorch_model.safetensors';
         final hasTaesd = await _download.isModelDownloaded(taesdFilename);
         if (!hasTaesd) {
-          print('[ModelController] TAESD not found, downloading...');
+          debugPrint('[ModelController] TAESD not found, downloading...');
           await _download.downloadModel(url: taesdUrl, filename: taesdFilename);
-          print('[ModelController] TAESD downloaded successfully');
+          debugPrint('[ModelController] TAESD downloaded successfully');
         } else {
-          print('[ModelController] TAESD already present');
+          debugPrint('[ModelController] TAESD already present');
         }
         taesdPath = await _download.modelPath(taesdFilename);
       } catch (e) {
-        print('[ModelController] TAESD download failed (will use standard VAE): $e');
+        debugPrint('[ModelController] TAESD download failed (will use standard VAE): $e');
       }
 
       // Show loading dialog with live logs

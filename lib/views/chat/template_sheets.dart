@@ -1,13 +1,18 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../controllers/chat_controller.dart';
 import '../../controllers/settings_controller.dart';
 import '../../controllers/vision_live_controller.dart';
 import '../../services/inference_service.dart';
 import '../../services/local_image_service.dart';
 import '../../theme/design_tokens.dart';
+import '../../utils/app_snackbar.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/model_switcher_sheet.dart';
 import '../prompt_library_view.dart';
@@ -125,6 +130,47 @@ void showTemplateSheet(BuildContext context, bool isDark) {
                       onPressed: () {
                         Navigator.pop(sheetCtx);
                         Get.to(() => const PromptLibraryView());
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(LucideIcons.upload, size: 16),
+                      label: const Text('Export mine'),
+                      onPressed: () {
+                        final bundle = _c.exportCustomTemplates();
+                        Share.share(bundle,
+                            subject: 'CubicLM templates');
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(LucideIcons.download, size: 16),
+                      label: const Text('Import'),
+                      onPressed: () async {
+                        final res = await FilePicker.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: ['json', 'txt'],
+                          withData: true,
+                        );
+                        final bytes = res?.files.single.bytes;
+                        if (bytes == null) return;
+                        final outcome = await _c.importTemplateBundle(
+                            utf8.decode(bytes, allowMalformed: true));
+                        if (!context.mounted) return;
+                        AppSnackbar.showTop(
+                          'Templates imported',
+                          '${outcome.$1} added, ${outcome.$2} skipped',
+                          iconName: 'library',
+                          logHistory: false,
+                        );
                       },
                     ),
                   ),
@@ -320,7 +366,7 @@ void showAddToChatSheet(
               Obx(() => AppSheetRowCard(
                     leading:
                         const AppIconCircle(icon: LucideIcons.slidersHorizontal),
-                    title: 'Show Web button',
+                    title: 'sheet_show_web'.tr,
                     subtitle: s.showWebAccess.value
                         ? 'Visible in the composer'
                         : 'Hidden from the composer',
@@ -333,7 +379,7 @@ void showAddToChatSheet(
               Obx(() => AppSheetRowCard(
                     leading:
                         const AppIconCircle(icon: LucideIcons.slidersHorizontal),
-                    title: 'Show Deep Search button',
+                    title: 'sheet_show_search'.tr,
                     subtitle: s.showDeepSearch.value
                         ? 'Visible in the composer'
                         : 'Hidden from the composer',
@@ -346,7 +392,7 @@ void showAddToChatSheet(
               Obx(() => AppSheetRowCard(
                     leading:
                         const AppIconCircle(icon: LucideIcons.slidersHorizontal),
-                    title: 'Show Live Vision button',
+                    title: 'sheet_show_vision'.tr,
                     subtitle: s.showLiveVision.value
                         ? 'Visible in the composer'
                         : 'Hidden from the composer',
@@ -359,7 +405,7 @@ void showAddToChatSheet(
               Obx(() => AppSheetRowCard(
                     leading:
                         const AppIconCircle(icon: LucideIcons.slidersHorizontal),
-                    title: 'Show Polish button',
+                    title: 'sheet_show_polish'.tr,
                     subtitle: s.showPolishPrompt.value
                         ? 'Visible in the composer'
                         : 'Hidden from the composer',

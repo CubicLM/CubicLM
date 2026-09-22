@@ -1,6 +1,8 @@
 import 'package:get/get.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../controllers/settings_controller.dart';
 import '../utils/memory_extract.dart';
+import '../utils/semantic_vectors.dart';
 import 'app_log_service.dart';
 import 'hive_service.dart';
 
@@ -123,6 +125,18 @@ class MemoryService extends GetxService {
     return buffer.toString();
   }
 
+  /// Rescue threshold from the user's recall-strictness setting.
+  /// Never throws — falls back to balanced.
+  double _recallThreshold() {
+    try {
+      if (Get.isRegistered<SettingsController>()) {
+        return thresholdForStrictness(
+            Get.find<SettingsController>().memoryRecallStrictness.value);
+      }
+    } catch (_) {}
+    return semanticRescueThreshold;
+  }
+
   /// Ranked variant: only memories relevant to [query] are injected,
   /// newest-relevant first, within [maxChars]. With many stored facts
   /// this keeps the system prompt lean instead of dumping everything.
@@ -141,6 +155,7 @@ class MemoryService extends GetxService {
       query: query,
       maxChars: maxChars,
       maxItems: maxItems,
+      rescueThreshold: _recallThreshold(),
     );
     if (picked.isEmpty) return basePrompt;
 

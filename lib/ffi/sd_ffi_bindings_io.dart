@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'dart:io';
 import 'dart:isolate';
 
@@ -342,13 +343,13 @@ class SdFfiBindings {
       final libName = backend.libraryName;
       if (_lib != null && _currentBackendLib == libName) return;
 
-      print('[SdFfiBindings] Loading backend library: $libName');
+      debugPrint('[SdFfiBindings] Loading backend library: $libName');
       try {
         _lib = DynamicLibrary.open(libName);
         _currentBackendLib = libName;
-        print('[SdFfiBindings] Loaded: $libName');
+        debugPrint('[SdFfiBindings] Loaded: $libName');
       } catch (e) {
-        print('[SdFfiBindings] Failed to load $libName: $e');
+        debugPrint('[SdFfiBindings] Failed to load $libName: $e');
         rethrow;
       }
     } else {
@@ -377,7 +378,7 @@ class SdFfiBindings {
     if (_currentBackendLib != Backend.cpu.libraryName) {
       final backend =
           Backend.values.firstWhere((b) => b.libraryName == _currentBackendLib);
-      print('[SdFfiBindings] Backend ${backend.displayName} loaded');
+      debugPrint('[SdFfiBindings] Backend ${backend.displayName} loaded');
     }
 
     freeCtx = _lib!.lookupFunction<SdFfiFreeNative, SdFfiFree>('sd_ffi_free');

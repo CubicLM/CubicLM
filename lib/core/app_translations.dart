@@ -1,4 +1,4 @@
-﻿import 'package:get/get.dart';
+import 'package:get/get.dart';
 
 class AppTranslations extends Translations {
   @override
@@ -280,6 +280,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'Image Gen',
     'model_filter_uncensored': 'Uncensored',
     'model_filter_vision': 'Vision',
+    'model_filter_fits': 'Fits device',
     'model_sort_size': 'Size',
     'model_sort_name': 'Name',
     'model_active_intelligence': 'ACTIVE INTELLIGENCE',
@@ -398,6 +399,13 @@ class AppTranslations extends Translations {
     'builder_project_gallery': 'Project Gallery',
     'builder_new_project': 'New Project',
     'builder_edit_instructions': 'System Instructions',
+    'sheet_show_web': 'Show Web button',
+    'sheet_show_search': 'Show Deep Search button',
+    'sheet_show_vision': 'Show Live Vision button',
+    'sheet_show_polish': 'Show Polish button',
+    'mem_recall_strict': 'Strict',
+    'mem_recall_balanced': 'Balanced',
+    'mem_recall_loose': 'Loose',
   };
 
   // ── Bangla (বাংলা) ──
@@ -609,6 +617,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'ছবি তৈরি',
     'model_filter_uncensored': 'আনসেন্সরড',
     'model_filter_vision': 'ভিশন',
+    'model_filter_fits': 'ডিভাইসে ফিট',
     'model_sort_size': 'আকার',
     'model_sort_name': 'নাম',
     'model_active_intelligence': 'সক্রিয় বুদ্ধিমত্তা',
@@ -759,6 +768,13 @@ class AppTranslations extends Translations {
     'prompt_view_rendered': 'View rendered prompt',
     'settings_personalize': 'Personalize',
     'settings_personalize_desc': 'Themes, colors & typography',
+    'sheet_show_web': 'ওয়েব বাটন দেখাও',
+    'sheet_show_search': 'ডিপ সার্চ বাটন দেখাও',
+    'sheet_show_vision': 'লাইভ ভিশন বাটন দেখাও',
+    'sheet_show_polish': 'পলিশ বাটন দেখাও',
+    'mem_recall_strict': 'কঠোর',
+    'mem_recall_balanced': 'ভারসাম্যপূর্ণ',
+    'mem_recall_loose': 'শিথিল',
   };
 
   // ── Hindi (हिन्दी) ──
@@ -933,6 +949,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'Image Gen',
     'model_filter_uncensored': 'Uncensored',
     'model_filter_vision': 'Vision',
+    'model_filter_fits': 'Fits device',
     'model_sort_size': 'Size',
     'model_sort_name': 'Name',
     'model_active_intelligence': 'ACTIVE INTELLIGENCE',
@@ -1075,6 +1092,13 @@ class AppTranslations extends Translations {
     'prompt_view_rendered': 'View rendered prompt',
     'settings_personalize': 'Personalize',
     'settings_personalize_desc': 'Themes, colors & typography',
+    'sheet_show_web': 'Show Web button',
+    'sheet_show_search': 'Show Deep Search button',
+    'sheet_show_vision': 'Show Live Vision button',
+    'sheet_show_polish': 'Show Polish button',
+    'mem_recall_strict': 'Strict',
+    'mem_recall_balanced': 'Balanced',
+    'mem_recall_loose': 'Loose',
   };
 
   // ── Arabic (العربية) ──
@@ -1249,6 +1273,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'Image Gen',
     'model_filter_uncensored': 'Uncensored',
     'model_filter_vision': 'Vision',
+    'model_filter_fits': 'Fits device',
     'model_sort_size': 'Size',
     'model_sort_name': 'Name',
     'model_active_intelligence': 'ACTIVE INTELLIGENCE',
@@ -1391,6 +1416,13 @@ class AppTranslations extends Translations {
     'prompt_view_rendered': 'View rendered prompt',
     'settings_personalize': 'Personalize',
     'settings_personalize_desc': 'Themes, colors & typography',
+    'sheet_show_web': 'Show Web button',
+    'sheet_show_search': 'Show Deep Search button',
+    'sheet_show_vision': 'Show Live Vision button',
+    'sheet_show_polish': 'Show Polish button',
+    'mem_recall_strict': 'Strict',
+    'mem_recall_balanced': 'Balanced',
+    'mem_recall_loose': 'Loose',
   };
 
   // ── Chinese (中文) ──
@@ -1565,6 +1597,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'Image Gen',
     'model_filter_uncensored': 'Uncensored',
     'model_filter_vision': 'Vision',
+    'model_filter_fits': 'Fits device',
     'model_sort_size': 'Size',
     'model_sort_name': 'Name',
     'model_active_intelligence': 'ACTIVE INTELLIGENCE',
@@ -1707,6 +1740,13 @@ class AppTranslations extends Translations {
     'prompt_view_rendered': 'View rendered prompt',
     'settings_personalize': 'Personalize',
     'settings_personalize_desc': 'Themes, colors & typography',
+    'sheet_show_web': 'Show Web button',
+    'sheet_show_search': 'Show Deep Search button',
+    'sheet_show_vision': 'Show Live Vision button',
+    'sheet_show_polish': 'Show Polish button',
+    'mem_recall_strict': 'Strict',
+    'mem_recall_balanced': 'Balanced',
+    'mem_recall_loose': 'Loose',
   };
 
   // ── Spanish (Español) ──
@@ -1881,6 +1921,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'Image Gen',
     'model_filter_uncensored': 'Uncensored',
     'model_filter_vision': 'Vision',
+    'model_filter_fits': 'Fits device',
     'model_sort_size': 'Size',
     'model_sort_name': 'Name',
     'model_active_intelligence': 'ACTIVE INTELLIGENCE',
@@ -2023,6 +2064,13 @@ class AppTranslations extends Translations {
     'prompt_view_rendered': 'View rendered prompt',
     'settings_personalize': 'Personalize',
     'settings_personalize_desc': 'Themes, colors & typography',
+    'sheet_show_web': 'Show Web button',
+    'sheet_show_search': 'Show Deep Search button',
+    'sheet_show_vision': 'Show Live Vision button',
+    'sheet_show_polish': 'Show Polish button',
+    'mem_recall_strict': 'Strict',
+    'mem_recall_balanced': 'Balanced',
+    'mem_recall_loose': 'Loose',
   };
 
   // ── French (Français) ──
@@ -2197,6 +2245,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'Image Gen',
     'model_filter_uncensored': 'Uncensored',
     'model_filter_vision': 'Vision',
+    'model_filter_fits': 'Fits device',
     'model_sort_size': 'Size',
     'model_sort_name': 'Name',
     'model_active_intelligence': 'ACTIVE INTELLIGENCE',
@@ -2339,6 +2388,13 @@ class AppTranslations extends Translations {
     'prompt_view_rendered': 'View rendered prompt',
     'settings_personalize': 'Personalize',
     'settings_personalize_desc': 'Themes, colors & typography',
+    'sheet_show_web': 'Show Web button',
+    'sheet_show_search': 'Show Deep Search button',
+    'sheet_show_vision': 'Show Live Vision button',
+    'sheet_show_polish': 'Show Polish button',
+    'mem_recall_strict': 'Strict',
+    'mem_recall_balanced': 'Balanced',
+    'mem_recall_loose': 'Loose',
   };
 
   // ── Japanese (日本語) ──
@@ -2513,6 +2569,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'Image Gen',
     'model_filter_uncensored': 'Uncensored',
     'model_filter_vision': 'Vision',
+    'model_filter_fits': 'Fits device',
     'model_sort_size': 'Size',
     'model_sort_name': 'Name',
     'model_active_intelligence': 'ACTIVE INTELLIGENCE',
@@ -2655,6 +2712,13 @@ class AppTranslations extends Translations {
     'prompt_view_rendered': 'View rendered prompt',
     'settings_personalize': 'Personalize',
     'settings_personalize_desc': 'Themes, colors & typography',
+    'sheet_show_web': 'Show Web button',
+    'sheet_show_search': 'Show Deep Search button',
+    'sheet_show_vision': 'Show Live Vision button',
+    'sheet_show_polish': 'Show Polish button',
+    'mem_recall_strict': 'Strict',
+    'mem_recall_balanced': 'Balanced',
+    'mem_recall_loose': 'Loose',
   };
 
   // ── Korean (한국어) ──
@@ -2825,6 +2889,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'Image Gen',
     'model_filter_uncensored': 'Uncensored',
     'model_filter_vision': 'Vision',
+    'model_filter_fits': 'Fits device',
     'model_sort_size': 'Size',
     'model_sort_name': 'Name',
     'model_active_intelligence': 'ACTIVE INTELLIGENCE',
@@ -2971,6 +3036,13 @@ class AppTranslations extends Translations {
     'settings_tab_devtools': 'Dev Tools',
     'settings_tab_general': 'General',
     'settings_tab_parameters': 'Parameters',
+    'sheet_show_web': 'Show Web button',
+    'sheet_show_search': 'Show Deep Search button',
+    'sheet_show_vision': 'Show Live Vision button',
+    'sheet_show_polish': 'Show Polish button',
+    'mem_recall_strict': 'Strict',
+    'mem_recall_balanced': 'Balanced',
+    'mem_recall_loose': 'Loose',
   };
 
   // ── Portuguese (Português) ──
@@ -3141,6 +3213,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'Image Gen',
     'model_filter_uncensored': 'Uncensored',
     'model_filter_vision': 'Vision',
+    'model_filter_fits': 'Fits device',
     'model_sort_size': 'Size',
     'model_sort_name': 'Name',
     'model_active_intelligence': 'ACTIVE INTELLIGENCE',
@@ -3287,6 +3360,13 @@ class AppTranslations extends Translations {
     'settings_tab_devtools': 'Dev Tools',
     'settings_tab_general': 'General',
     'settings_tab_parameters': 'Parameters',
+    'sheet_show_web': 'Show Web button',
+    'sheet_show_search': 'Show Deep Search button',
+    'sheet_show_vision': 'Show Live Vision button',
+    'sheet_show_polish': 'Show Polish button',
+    'mem_recall_strict': 'Strict',
+    'mem_recall_balanced': 'Balanced',
+    'mem_recall_loose': 'Loose',
   };
 
   // ── German (Deutsch) ──
@@ -3457,6 +3537,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'Image Gen',
     'model_filter_uncensored': 'Uncensored',
     'model_filter_vision': 'Vision',
+    'model_filter_fits': 'Fits device',
     'model_sort_size': 'Size',
     'model_sort_name': 'Name',
     'model_active_intelligence': 'ACTIVE INTELLIGENCE',
@@ -3603,6 +3684,13 @@ class AppTranslations extends Translations {
     'settings_tab_devtools': 'Dev Tools',
     'settings_tab_general': 'General',
     'settings_tab_parameters': 'Parameters',
+    'sheet_show_web': 'Show Web button',
+    'sheet_show_search': 'Show Deep Search button',
+    'sheet_show_vision': 'Show Live Vision button',
+    'sheet_show_polish': 'Show Polish button',
+    'mem_recall_strict': 'Strict',
+    'mem_recall_balanced': 'Balanced',
+    'mem_recall_loose': 'Loose',
   };
 
   // ── Turkish (Türkçe) ──
@@ -3773,6 +3861,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'Image Gen',
     'model_filter_uncensored': 'Uncensored',
     'model_filter_vision': 'Vision',
+    'model_filter_fits': 'Fits device',
     'model_sort_size': 'Size',
     'model_sort_name': 'Name',
     'model_active_intelligence': 'ACTIVE INTELLIGENCE',
@@ -3919,6 +4008,13 @@ class AppTranslations extends Translations {
     'settings_tab_devtools': 'Dev Tools',
     'settings_tab_general': 'General',
     'settings_tab_parameters': 'Parameters',
+    'sheet_show_web': 'Show Web button',
+    'sheet_show_search': 'Show Deep Search button',
+    'sheet_show_vision': 'Show Live Vision button',
+    'sheet_show_polish': 'Show Polish button',
+    'mem_recall_strict': 'Strict',
+    'mem_recall_balanced': 'Balanced',
+    'mem_recall_loose': 'Loose',
   };
 
   // ── Indonesian (Bahasa Indonesia) ──
@@ -4089,6 +4185,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'Image Gen',
     'model_filter_uncensored': 'Uncensored',
     'model_filter_vision': 'Vision',
+    'model_filter_fits': 'Fits device',
     'model_sort_size': 'Size',
     'model_sort_name': 'Name',
     'model_active_intelligence': 'ACTIVE INTELLIGENCE',
@@ -4235,6 +4332,13 @@ class AppTranslations extends Translations {
     'settings_tab_devtools': 'Dev Tools',
     'settings_tab_general': 'General',
     'settings_tab_parameters': 'Parameters',
+    'sheet_show_web': 'Show Web button',
+    'sheet_show_search': 'Show Deep Search button',
+    'sheet_show_vision': 'Show Live Vision button',
+    'sheet_show_polish': 'Show Polish button',
+    'mem_recall_strict': 'Strict',
+    'mem_recall_balanced': 'Balanced',
+    'mem_recall_loose': 'Loose',
   };
 
   // ── Russian (Русский) ──
@@ -4405,6 +4509,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'Image Gen',
     'model_filter_uncensored': 'Uncensored',
     'model_filter_vision': 'Vision',
+    'model_filter_fits': 'Fits device',
     'model_sort_size': 'Size',
     'model_sort_name': 'Name',
     'model_active_intelligence': 'ACTIVE INTELLIGENCE',
@@ -4551,6 +4656,13 @@ class AppTranslations extends Translations {
     'settings_tab_devtools': 'Dev Tools',
     'settings_tab_general': 'General',
     'settings_tab_parameters': 'Parameters',
+    'sheet_show_web': 'Show Web button',
+    'sheet_show_search': 'Show Deep Search button',
+    'sheet_show_vision': 'Show Live Vision button',
+    'sheet_show_polish': 'Show Polish button',
+    'mem_recall_strict': 'Strict',
+    'mem_recall_balanced': 'Balanced',
+    'mem_recall_loose': 'Loose',
   };
 
   // ── Urdu (اردو) ──
@@ -4721,6 +4833,7 @@ class AppTranslations extends Translations {
     'model_filter_image': 'Image Gen',
     'model_filter_uncensored': 'Uncensored',
     'model_filter_vision': 'Vision',
+    'model_filter_fits': 'Fits device',
     'model_sort_size': 'Size',
     'model_sort_name': 'Name',
     'model_active_intelligence': 'ACTIVE INTELLIGENCE',
@@ -4867,6 +4980,13 @@ class AppTranslations extends Translations {
     'settings_tab_devtools': 'Dev Tools',
     'settings_tab_general': 'General',
     'settings_tab_parameters': 'Parameters',
+    'sheet_show_web': 'Show Web button',
+    'sheet_show_search': 'Show Deep Search button',
+    'sheet_show_vision': 'Show Live Vision button',
+    'sheet_show_polish': 'Show Polish button',
+    'mem_recall_strict': 'Strict',
+    'mem_recall_balanced': 'Balanced',
+    'mem_recall_loose': 'Loose',
   };
 }
 

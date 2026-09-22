@@ -22,6 +22,18 @@ const localServerRelease = 'b6403';
 /// `true` on Windows desktop only (web + mobile use other engines).
 bool get supportsLocalServer => !GetPlatform.isWeb && GetPlatform.isWindows;
 
+/// Best-effort Vulkan driver presence check (vulkan-1.dll ships with
+/// the driver). Presence ≠ working GPU, but absence means the Vulkan
+/// build can never init — so auto mode picks the CPU asset then.
+bool vulkanPresent() {
+  try {
+    final sys32 = Platform.environment['SystemRoot'] ?? r'C:\Windows';
+    return File('$sys32/System32/vulkan-1.dll').existsSync();
+  } catch (_) {
+    return false;
+  }
+}
+
 /// Server zip asset for the [gpu] variant (Vulkan / CPU-only).
 String serverAssetName({required bool gpu}) =>
     gpu ? 'llama-b6403-bin-win-vulkan-x64.zip' : 'llama-b6403-bin-win-cpu-x64.zip';
@@ -105,6 +117,24 @@ class LocalServerService extends GetxService {
   Future<File> _exeFile({required bool gpu}) async =>
       File('${(await serverDir(gpu: gpu)).path}/llama-server.exe');
 
+  /// Deletes server dirs from older pins (each pin is versioned, so a
+  /// release bump orphans the previous download). Best-effort only.
+  Future<void> _pruneStaleVersions() async {
+    try {
+      final support = await getApplicationSupportDirectory();
+      final root = Directory('${support.path}/llama_server');
+      if (!await root.exists()) return;
+      await for (final e in root.list()) {
+        if (e is! Directory) continue;
+        final name = e.path.split(RegExp(r'[/\\]')).last;
+        if (!name.startsWith(localServerRelease)) {
+          try {
+            await e.delete(recursive: true);
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
   /// Downloads + extracts the pinned server the first time it is
   /// needed (14MB CPU / 26MB Vulkan). Returns the exe file.
   Future<File> ensureServer({
@@ -113,6 +143,7 @@ class LocalServerService extends GetxService {
   }) async {
     final exe = await _exeFile(gpu: wantGpu);
     if (await exe.exists()) return exe;
+    unawaited(_pruneStaleVersions());
     final dir = await serverDir(gpu: wantGpu);
     final zipPath = '${dir.path}/${serverAssetName(gpu: wantGpu)}';
     final client = HttpClient();
@@ -156,11 +187,13 @@ class LocalServerService extends GetxService {
     required int threads,
     required int gpuLayers,
     required bool wantGpu,
+    void Function(double)? onBinaryProgress,
   }) async {
     await stop();
     starting = true;
     try {
-      final exe = await ensureServer(wantGpu: wantGpu);
+      final exe = await ensureServer(
+          wantGpu: wantGpu, onProgress: onBinaryProgress);
       port = await _freePort();
       final args = buildServerArgs(
         modelPath: modelPath,

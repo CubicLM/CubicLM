@@ -34,6 +34,12 @@ void main() {
       expect(fusedRelevance(keywordScore: 1, cosine: 0.0),
           greaterThan(fusedRelevance(keywordScore: 0, cosine: 1.0)));
     });
+
+    test('thresholdForStrictness orders strict > balanced > loose', () {
+      expect(thresholdForStrictness('strict'), greaterThan(thresholdForStrictness('balanced')));
+      expect(thresholdForStrictness('balanced'), greaterThan(thresholdForStrictness('loose')));
+      expect(thresholdForStrictness('bogus'), thresholdForStrictness('balanced'));
+    });
   });
 
   group('rankFacts semantic rescue', () {

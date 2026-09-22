@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 import 'package:get/get.dart';
 import 'package:xml/xml.dart';
@@ -57,7 +58,7 @@ class NewsService extends GetxService {
         _summarizeAll();
       }
     } catch (e) {
-      print('[NewsService] Error fetching news: $e');
+      debugPrint('[NewsService] Error fetching news: $e');
     } finally {
       isLoading.value = false;
     }

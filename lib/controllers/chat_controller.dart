@@ -43,6 +43,7 @@ import '../utils/paste_convert.dart';
 import '../utils/app_snackbar.dart';
 import '../utils/history_budget.dart';
 import '../utils/memory_extract.dart';
+import '../utils/semantic_vectors.dart';
 import '../services/stats_service.dart';
 import '../services/device_info_service.dart';
 import '../services/tool_service.dart';

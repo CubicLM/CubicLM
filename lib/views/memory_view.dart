@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../core/colors.dart';
+import '../controllers/settings_controller.dart';
 import '../services/memory_service.dart';
 import '../theme/design_tokens.dart';
 
@@ -202,6 +203,60 @@ class _MemoryViewState extends State<MemoryView> {
                   ),
                 )
               : const SizedBox.shrink()),
+
+          // Recall strictness: how eagerly paraphrase matches count.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Obx(() {
+              final s = Get.find<SettingsController>();
+              final cur = s.memoryRecallStrictness.value;
+              Widget chip(String mode, String label) {
+                final on = cur == mode;
+                return InkWell(
+                  onTap: () => s.setMemoryRecallStrictness(mode),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: on
+                          ? AppColors.primary.withValues(alpha: 0.15)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: on
+                            ? AppColors.primary
+                            : Theme.of(context).dividerColor,
+                      ),
+                    ),
+                    child: Text(label,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: on ? FontWeight.w800 : FontWeight.w600,
+                          color: on
+                              ? AppColors.primary
+                              : Theme.of(context).hintColor,
+                        )),
+                  ),
+                );
+              }
+              return Row(
+                children: [
+                  Text('Recall:',
+                      style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).hintColor)),
+                  const SizedBox(width: 8),
+                  chip('strict', 'mem_recall_strict'.tr),
+                  const SizedBox(width: 8),
+                  chip('balanced', 'mem_recall_balanced'.tr),
+                  const SizedBox(width: 8),
+                  chip('loose', 'mem_recall_loose'.tr),
+                ],
+              );
+            }),
+          ),
 
           // Search bar.
           Padding(

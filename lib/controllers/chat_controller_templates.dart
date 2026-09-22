@@ -5,7 +5,7 @@
 /// and private members. Split out so the controller file stays
 /// navigable; behavior is unchanged.
 /// Contains: ensureTemplatesLoaded(), static _defaultTemplates, insertTemplate(), addPromptTemplate()
-///   deletePromptTemplate()
+///   deletePromptTemplate(), exportCustomTemplates(), importTemplateBundle(), static decodeTemplateBundle()
 part of 'chat_controller.dart';
 
 extension ChatControllerTemplates on ChatController {
@@ -130,5 +130,84 @@ extension ChatControllerTemplates on ChatController {
         .removeWhere((t) => t['id'] == id && (t['builtin'] ?? '').isEmpty);
     await _hive.setSetting(
         ChatController._kTemplatesKey, jsonEncode(promptTemplates.toList()));
+  }
+
+  /// Exports custom (non-built-in) templates as a JSON bundle string.
+  String exportCustomTemplates() {
+    ensureTemplatesLoaded();
+    final customs = promptTemplates
+        .where((t) => (t['builtin'] ?? '').isEmpty)
+        .map((t) => {
+              'name': t['name'] ?? '',
+              'body': t['body'] ?? '',
+              'category': t['category'] ?? '',
+              'description': t['description'] ?? '',
+            })
+        .toList();
+    return jsonEncode({'app': 'cubiclm', 'kind': 'templates', 'items': customs});
+  }
+
+  /// Imports a bundle produced by [exportCustomTemplates]. Returns
+  /// (added, skipped): entries with empty name/body or exact name+body
+  /// duplicates are skipped, never throwing.
+  Future<(int, int)> importTemplateBundle(String raw) async {
+    ensureTemplatesLoaded();
+    final items = decodeTemplateBundle(raw);
+    if (items.isEmpty) return (0, 0);
+    final existing =
+        promptTemplates.map((t) => '${t['name']}\n${t['body']}').toSet();
+    var added = 0;
+    var skipped = 0;
+    for (final it in items) {
+      if (existing.contains('${it['name']}\n${it['body']}')) {
+        skipped++;
+        continue;
+      }
+      promptTemplates.add({
+        'id': _uuid.v4(),
+        'name': it['name'] ?? '',
+        'body': it['body'] ?? '',
+        'builtin': '',
+        'category': it['category'] ?? '',
+        'description': it['description'] ?? '',
+      });
+      existing.add('${it['name']}\n${it['body']}');
+      added++;
+    }
+    await _hive.setSetting(
+        ChatController._kTemplatesKey, jsonEncode(promptTemplates.toList()));
+    return (added, skipped);
+  }
+
+  /// Validates + normalizes an import bundle. Pure — unit tested.
+  /// Accepts the export shape ({items: [...]}) or a bare list.
+  static List<Map<String, String>> decodeTemplateBundle(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      final List<dynamic> list;
+      if (decoded is Map && decoded['items'] is List) {
+        list = decoded['items'] as List;
+      } else if (decoded is List) {
+        list = decoded;
+      } else {
+        return [];
+      }
+      final out = <Map<String, String>>[];
+      for (final e in list) {
+        if (e is! Map) continue;
+        final name = '${e['name'] ?? ''}'.trim();
+        final body = '${e['body'] ?? ''}';
+        if (name.isEmpty || body.trim().isEmpty) continue;
+        out.add({
+          'name': name.length > 80 ? name.substring(0, 80) : name,
+          'body': body.length > 8000 ? body.substring(0, 8000) : body,
+          'category': '${e['category'] ?? ''}',
+          'description': '${e['description'] ?? ''}',
+        });
+      }
+      return out;
+    } catch (_) {
+      return [];
+    }
   }
 }

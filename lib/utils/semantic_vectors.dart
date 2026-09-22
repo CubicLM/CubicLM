@@ -20,6 +20,19 @@ const semanticDims = 256;
 /// unrelated text stays well below.
 const semanticRescueThreshold = 0.25;
 
+/// User-facing recall strictness (Memory page) → rescue threshold.
+/// Strict = fewer, safer recalls; loose = more paraphrase rescues.
+double thresholdForStrictness(String mode) {
+  switch (mode) {
+    case 'strict':
+      return 0.35;
+    case 'loose':
+      return 0.15;
+    default:
+      return semanticRescueThreshold;
+  }
+}
+
 /// L2-normalized trigram-hash vector for [text]. Empty text → zero
 /// vector (cosine 0 against everything).
 List<double> semanticVector(String text, {int dims = semanticDims}) {

@@ -27,6 +27,8 @@ List<Map<String, String>> _recallWorker(Map<String, dynamic> args) {
   final qv = kws.isEmpty ? null : semanticVector(query);
   final maxHits = args['maxHits'] as int? ?? 3;
   final snippetChars = args['snippetChars'] as int? ?? 300;
+  final rescueAt =
+      (args['threshold'] as num?)?.toDouble() ?? semanticRescueThreshold;
   final scored = <Map<String, dynamic>>[];
   var order = 0;
   for (final r in rows) {
@@ -50,7 +52,7 @@ List<Map<String, String>> _recallWorker(Map<String, dynamic> args) {
       sem = cosineSimilarity(qv, semanticVector(content));
     }
     final fused = fusedRelevance(keywordScore: score, cosine: sem);
-    final rescued = score == 0 && sem >= semanticRescueThreshold;
+    final rescued = score == 0 && sem >= rescueAt;
     if (fused <= 0 && !rescued) continue;
     scored.add({
       'score': fused,
@@ -876,6 +878,7 @@ class HiveService extends GetxService {
     required List<String> keywords,
     required String excludeChatId,
     String query = '',
+    double threshold = semanticRescueThreshold,
     int maxSessions = 12,
     int perSession = 8,
     int maxHits = 3,
@@ -916,6 +919,7 @@ class HiveService extends GetxService {
         'rows': rows,
         'keywords': keywords,
         'query': query,
+        'threshold': threshold,
         'maxHits': maxHits,
         'snippetChars': snippetChars,
       });

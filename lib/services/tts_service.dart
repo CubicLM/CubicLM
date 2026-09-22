@@ -224,70 +224,7 @@ class TtsService extends GetxService {
   }
 
   /// Strip thinking tags, markdown, and attachment footers for cleaner speech.
-  String _cleanForSpeech(String raw) {
-    var s = raw.trim();
-    if (s.isEmpty) return '';
-
-    // Remove <think>...</think> blocks (including unclosed thinking).
-    s = s.replaceAll(RegExp(r'<think>.*?</think>', caseSensitive: false, dotAll: true), ' ');
-    s = s.replaceAll(RegExp(r'<think>.*', caseSensitive: false, dotAll: true), ' ');
-
-    // Remove attached file footer.
-    final attachedIdx = s.indexOf('Attached file:');
-    if (attachedIdx != -1) {
-      s = s.substring(0, attachedIdx);
-    }
-
-    // Remove special tokens.
-    s = s.replaceAll('<|endoftext|>', ' ');
-    s = s.replaceAll('<|im_end|>', ' ');
-    s = s.replaceAll('<|end|>', ' ');
-
-    // Code fences ```...``` -> keep inner text but mark as code.
-    s = s.replaceAllMapped(RegExp(r'```[\s\S]*?```'), (m) {
-      final inner = m.group(0)!.replaceAll('```', '').trim();
-      // Take first line or truncated inner for speech.
-      final firstLine = inner.split('\n').first.trim();
-      return firstLine.isEmpty ? ' code block ' : ' $firstLine ';
-    });
-
-    // Inline code `...` -> keep content.
-    s = s.replaceAllMapped(RegExp(r'`([^`]+)`'), (m) => ' ${m.group(1)} ');
-
-    // Images ![alt](url) -> alt
-    s = s.replaceAllMapped(RegExp(r'!\[([^\]]*)\]\([^\)]+\)'), (m) => ' ${m.group(1)} ');
-
-    // Links [text](url) -> text
-    s = s.replaceAllMapped(RegExp(r'\[([^\]]+)\]\([^\)]+\)'), (m) => ' ${m.group(1)} ');
-
-    // Headings: remove leading #'s
-    s = s.replaceAll(RegExp(r'^#{1,6}\s+', multiLine: true), '');
-
-    // Bold/italic markers
-    s = s.replaceAll(RegExp(r'\*\*([^*]+)\*\*'), r'$1');
-    s = s.replaceAll(RegExp(r'__([^_]+)__'), r'$1');
-    // Simple * and _ wrappers (avoid mangling normal underscores)
-    s = s.replaceAll(RegExp(r'\*([^*]+)\*'), r'$1');
-
-    // Blockquote markers
-    s = s.replaceAll(RegExp(r'^>\s?', multiLine: true), '');
-
-    // List bullets at line start
-    s = s.replaceAll(RegExp(r'^\s*[-*]\s+', multiLine: true), '');
-    s = s.replaceAll(RegExp(r'^\s*\d+\.\s+', multiLine: true), '');
-
-    // HTML tags
-    s = s.replaceAll(RegExp(r'<[^>]+>'), ' ');
-
-    // Collapse markdown table pipes and dashes
-    s = s.replaceAll('|', ' ');
-    s = s.replaceAll(RegExp(r'-{2,}'), ' ');
-
-    // Collapse whitespace
-    s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-    return s;
-  }
+  String _cleanForSpeech(String raw) => cleanTextForSpeech(raw);
 
   String _truncate(String s, int max) {
     if (s.length <= max) return s;
@@ -301,4 +238,103 @@ class TtsService extends GetxService {
     } catch (_) {}
     super.onClose();
   }
+}
+
+/// Speech-ready text cleanup (top-level + pure so it is unit-testable).
+/// Strips everything a speech engine would read as gibberish: think
+/// blocks, code (summarized, not read), bare URLs, LaTeX math, HTML,
+/// markdown markup and emoji (engines spell emoji names aloud).
+String cleanTextForSpeech(String raw) {
+  var s = raw.trim();
+  if (s.isEmpty) return '';
+
+  // Remove <think>...</think> blocks (including unclosed thinking).
+  s = s.replaceAll(
+      RegExp(r'<think>.*?</think>', caseSensitive: false, dotAll: true), ' ');
+  s = s.replaceAll(
+      RegExp(r'<think>.*', caseSensitive: false, dotAll: true), ' ');
+
+  // Remove attached file footer.
+  final attachedIdx = s.indexOf('Attached file:');
+  if (attachedIdx != -1) {
+    s = s.substring(0, attachedIdx);
+  }
+
+  // Remove special tokens.
+  s = s.replaceAll('<|endoftext|>', ' ');
+  s = s.replaceAll('<|im_end|>', ' ');
+  s = s.replaceAll('<|end|>', ' ');
+
+  // LaTeX math ($..$, $$..$$, \(..\)) -> placeholder (else the engine
+  // reads dollar/backslash/brace soup).
+  s = s.replaceAll(RegExp(r'\$\$.+?\$\$', dotAll: true), ' math expression ');
+  s = s.replaceAll(RegExp(r'\$[^$\n]+\$'), ' math expression ');
+  s = s.replaceAll(RegExp(r'\\\(.+?\\\)'), ' math expression ');
+
+  // Code fences -> a short marker (reading 50 lines of code aloud is
+  // noise; the user sees the block on screen).
+  s = s.replaceAllMapped(RegExp(r'```[\s\S]*?```'), (m) {
+    final inner = m.group(0)!.replaceAll('```', '').trim();
+    if (inner.isEmpty) return ' code block ';
+    final firstLine = inner.split('\n').first.trim();
+    // Tiny snippets (one-liners) are worth reading; big blocks aren't.
+    if (!inner.contains('\n') && firstLine.length <= 80) {
+      return ' $firstLine ';
+    }
+    return ' code snippet ';
+  });
+
+  // Inline code `...` -> keep short content, summarize long content.
+  s = s.replaceAllMapped(RegExp(r'`([^`]+)`'), (m) {
+    final inner = m.group(1)!.trim();
+    return inner.length <= 40 ? ' $inner ' : ' code ';
+  });
+
+  // Bare URLs -> "link" (else the engine spells h-t-t-p-s aloud).
+  s = s.replaceAllMapped(
+      RegExp(r'https?://[^\s)>\]]+'), (m) => ' link ');
+
+  // Images ![alt](url) -> alt
+  s = s.replaceAllMapped(
+      RegExp(r'!\[([^\]]*)\]\([^\)]+\)'), (m) => ' ${m.group(1)} ');
+
+  // Links [text](url) -> text
+  s = s.replaceAllMapped(
+      RegExp(r'\[([^\]]+)\]\([^\)]+\)'), (m) => ' ${m.group(1)} ');
+
+  // Headings: remove leading #'s
+  s = s.replaceAll(RegExp(r'^#{1,6}\s+', multiLine: true), '');
+
+  // Bold/italic markers (replaceAllMapped: plain replaceAll does NOT
+  // substitute $1 — it would read "dollar-one" aloud).
+  s = s.replaceAllMapped(RegExp(r'\*\*([^*]+)\*\*'), (m) => m.group(1)!);
+  s = s.replaceAllMapped(RegExp(r'__([^_]+)__'), (m) => m.group(1)!);
+  // Simple * wrappers (avoid mangling normal underscores)
+  s = s.replaceAllMapped(RegExp(r'\*([^*]+)\*'), (m) => m.group(1)!);
+
+  // Blockquote markers
+  s = s.replaceAll(RegExp(r'^>\s?', multiLine: true), '');
+
+  // List bullets at line start
+  s = s.replaceAll(RegExp(r'^\s*[-*]\s+', multiLine: true), '');
+  s = s.replaceAll(RegExp(r'^\s*\d+\.\s+', multiLine: true), '');
+
+  // HTML tags
+  s = s.replaceAll(RegExp(r'<[^>]+>'), ' ');
+
+  // Emoji + pictographs (engines spell their names aloud).
+  s = s.replaceAll(
+      RegExp(
+          r'[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]',
+          unicode: true),
+      ' ');
+
+  // Collapse markdown table pipes and dashes
+  s = s.replaceAll('|', ' ');
+  s = s.replaceAll(RegExp(r'-{2,}'), ' ');
+
+  // Collapse whitespace
+  s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  return s;
 }

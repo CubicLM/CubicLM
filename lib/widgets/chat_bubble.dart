@@ -81,6 +81,10 @@ class _ChatBubbleState extends State<ChatBubble> {
   CitationLinkBuilder? _citationBuilder;
   Brightness? _sheetBrightness;
 
+  /// Image precached once per bubble so fast scrolling never shows a
+  /// re-decode flicker (decode at thumbnail width; viewer decodes full).
+  bool _imagePrecached = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -95,6 +99,17 @@ class _ChatBubbleState extends State<ChatBubble> {
         widget.message.citations,
         widget.message.webSources,
       );
+    }
+    // One-shot precache: decode the thumbnail now so list scrolling
+    // never flashes. Guarded — precache throws on dead contexts.
+    final imgBytes = widget.message.decodedImageBytes;
+    if (!_imagePrecached && imgBytes != null && imgBytes.isNotEmpty) {
+      _imagePrecached = true;
+      try {
+        precacheImage(MemoryImage(imgBytes), context);
+      } catch (_) {
+        _imagePrecached = false;
+      }
     }
   }
 

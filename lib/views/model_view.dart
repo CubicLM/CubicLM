@@ -17,6 +17,7 @@ import 'explore/add_model_sheet.dart';
 import 'explore/local_model_card.dart';
 import 'explore/provider_cards.dart';
 import 'gallery_view.dart';
+import '../widgets/app_ui.dart';
 
 class ModelView extends GetView<ModelController> {
   const ModelView({super.key});
@@ -63,27 +64,29 @@ class ModelView extends GetView<ModelController> {
           }),
         ],
       ),
-      body: Column(
-        children: [
-          const SizedBox(height: 10),
-          Expanded(
-            child: Column(children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _buildScopeToggle(context),
-              ),
-              const SizedBox(height: 14),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _buildActiveModelBanner(context),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: _buildHubList(context),
-              ),
-            ]),
-          ),
-        ],
+      body: MaxWidthBody(
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            Expanded(
+              child: Column(children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _buildScopeToggle(context),
+                ),
+                const SizedBox(height: 14),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _buildActiveModelBanner(context),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: _buildHubList(context),
+                ),
+              ]),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -563,6 +566,7 @@ class ModelView extends GetView<ModelController> {
     final labels = {
       'downloaded': 'model_filter_downloaded'.tr,
       'general': 'model_filter_general'.tr,
+      'fits': 'model_filter_fits'.tr,
       'image': 'model_filter_image'.tr,
       'uncensored': 'model_filter_uncensored'.tr,
       'vision': 'model_filter_vision'.tr,

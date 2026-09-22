@@ -102,12 +102,16 @@ class _ThinkingOrbState extends State<ThinkingOrb>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final orb = CustomPaint(
-      size: Size.square(widget.size),
-      painter: _OrbPainter(
-        simTime: _simTime,
-        state: _state,
-        isDark: isDark,
+    // RepaintBoundary: the ticker repaints every frame — without it,
+    // each tick also repaints the parent (chat list during streaming).
+    final orb = RepaintBoundary(
+      child: CustomPaint(
+        size: Size.square(widget.size),
+        painter: _OrbPainter(
+          simTime: _simTime,
+          state: _state,
+          isDark: isDark,
+        ),
       ),
     );
 

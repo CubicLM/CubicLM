@@ -70,10 +70,12 @@ extension InferenceServiceServer on InferenceService {
     final largeMode = settings.largeModelMode.value;
     if (largeMode && threads > 2) threads = 2;
     final accelMode = largeMode ? 'cpu' : settings.ggufAccelMode.value;
-    // Server asset choice mirrors the accel card: explicit GPU asks for
-    // the Vulkan build, everything else takes the CPU build (ngl 0).
-    // Auto stays CPU-build: guaranteed to run, no driver roulette.
-    final wantGpu = accelMode == 'gpu';
+    // Server asset choice mirrors the accel card. Auto probes the Vulkan
+    // driver DLL: present → Vulkan build (ngl 99), absent → CPU build.
+    // Explicit 'gpu' forces Vulkan (may fail without a driver), 'cpu'
+    // always takes the CPU build.
+    final wantGpu =
+        accelMode == 'gpu' || (accelMode == 'auto' && vulkanPresent());
     final gpuLayers = wantGpu ? 99 : 0;
     isLoadingModel.value = true;
     loadingModelName.value = modelName ?? modelPath.split('/').last;
@@ -84,6 +86,7 @@ extension InferenceServiceServer on InferenceService {
         threads: threads,
         gpuLayers: gpuLayers,
         wantGpu: wantGpu,
+        onBinaryProgress: (p) => modelLoadProgress.value = p * 0.3,
       );
       _serverCtx = contextSize;
       Get.find<AppLogService>().info(

@@ -116,7 +116,10 @@ class _BattleArenaViewState extends State<BattleArenaView> {
             children: [
               for (final p in c.picks)
                 Chip(
-                  label: Text(p.label,
+                  label: Text(
+                      c.arenaTpsFor(p.provider, p.model) == null
+                          ? p.label
+                          : '${p.label} · ${c.arenaTpsFor(p.provider, p.model)!.toStringAsFixed(1)}t/s',
                       style: GoogleFonts.plusJakartaSans(
                           fontSize: 12, fontWeight: FontWeight.w700)),
                   deleteIcon: const Icon(Icons.close, size: 14),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:get/get.dart';
 
 import '../services/cloud_service.dart';
+import '../services/hive_service.dart';
 import '../services/inference_service.dart';
 import '../controllers/cloud_model_controller.dart';
 import '../controllers/settings_controller.dart';
@@ -350,6 +351,31 @@ class BattleArenaController extends GetxController {
             ))
         .toList();
     verdict.value = scoreContenders(inputs);
+    // Persist per-model speed so future pickers show "last measured"
+    // pace without re-racing (local Best-on-Device equivalent).
+    try {
+      final hive = Get.find<HiveService>();
+      for (final e in entries) {
+        final tps = e.tokensPerSec;
+        if (e.status.value == 'done' && tps > 0) {
+          unawaited(hive.setSetting(
+              arenaTpsKey(e.pick.id), double.parse(tps.toStringAsFixed(1))));
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// Hive key for a contender's last measured pace. Pure — unit tested.
+  static String arenaTpsKey(String id) => 'arena_tps_$id';
+
+  /// Last measured tok/s for a provider/model pick, null when never raced.
+  double? arenaTpsFor(String provider, String model) {
+    try {
+      return Get.find<HiveService>()
+          .getSetting<double>(arenaTpsKey('$provider::$model'));
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Rank (1-based) of an entry in the final verdict, 0 when unscored.

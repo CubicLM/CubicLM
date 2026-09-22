@@ -312,6 +312,7 @@ List<String> rankFacts(
   required String query,
   int maxChars = 600,
   int maxItems = 5,
+  double rescueThreshold = semanticRescueThreshold,
 }) {
   if (facts.isEmpty) return [];
   final kws = extractKeywords(query);
@@ -335,7 +336,7 @@ List<String> rankFacts(
     return (
       fact: e.value,
       fused: fusedRelevance(keywordScore: kw, cosine: sem),
-      rescued: kw == 0 && sem >= semanticRescueThreshold,
+      rescued: kw == 0 && sem >= rescueThreshold,
       order: e.key
     );
   }).toList();

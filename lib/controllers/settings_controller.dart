@@ -239,6 +239,10 @@ class SettingsController extends GetxController {
   /// offload, caps threads at 2, always evicts other residents before
   /// load. RAM gate still applies — unsafe loads stay blocked.
   final largeModelMode = AppConstants.defaultLargeModelMode.obs;
+  /// Memory recall strictness: 'strict' | 'balanced' | 'loose'.
+  /// Maps to the semantic rescue threshold (Memory page selector).
+  final memoryRecallStrictness =
+      AppConstants.defaultMemoryRecallStrictness.obs;
   final imageSteps = 1.obs;
   final imageGenForceCpu = AppConstants.defaultImageGenForceCpu.obs;
   final imageGenBackend = Backend.cpu.obs;

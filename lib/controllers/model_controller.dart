@@ -102,6 +102,7 @@ class ModelController extends GetxController {
   static const localFilters = [
     'downloaded',
     'general',
+    'fits',
     'image',
     'uncensored',
     'vision'
@@ -141,11 +142,40 @@ class ModelController extends GetxController {
           return isVisionModel(model);
         case 'image':
           return isImageModel(model);
+        case 'fits':
+          return fitsDevice(model);
         case 'general':
         default:
           return isGeneralModel(model);
       }
     }).toList();
+  }
+
+  /// "Fits this device" filter: hides models the RAM guard would hard-
+  /// block (unknown-size models stay visible — never hide what we
+  /// can't measure). Tight fits stay visible; the loader warns anyway.
+  bool fitsDevice(AiModel model) {
+    final bytes = _knownModelBytes(model);
+    if (bytes <= 0) return true;
+    double availGb = 0;
+    var kvBytes = 0;
+    try {
+      if (Get.isRegistered<DeviceInfoService>()) {
+        final dev = Get.find<DeviceInfoService>();
+        availGb = dev.availableRamGB.value;
+        if (Get.isRegistered<SettingsController>()) {
+          kvBytes = dev.estimatedKvBytes(
+              Get.find<SettingsController>().effectiveContextSize);
+        }
+      }
+    } catch (_) {}
+    if (availGb <= 0) return true;
+    return ramFitFor(
+          fileBytes: bytes,
+          kvBytes: kvBytes,
+          availableBytes: (availGb * 1024 * 1024 * 1024).round(),
+        ) !=
+        RamFit.blocked;
   }
 
   String get defaultLocalFilter =>

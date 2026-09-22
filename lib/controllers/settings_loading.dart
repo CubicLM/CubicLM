@@ -341,6 +341,11 @@ extension SettingsControllerLoading on SettingsController {
           defaultValue: AppConstants.defaultLargeModelMode,
         ) ??
         AppConstants.defaultLargeModelMode;
+    memoryRecallStrictness.value = _hive.getSetting(
+          AppConstants.keyMemoryRecallStrictness,
+          defaultValue: AppConstants.defaultMemoryRecallStrictness,
+        ) ??
+        AppConstants.defaultMemoryRecallStrictness;
     imageSteps.value = _hive.getSetting(AppConstants.keyImageSteps,
             defaultValue: AppConstants.defaultImageSteps) ??
         AppConstants.defaultImageSteps;

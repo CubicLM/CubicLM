@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:get/get.dart';
 import '../../controllers/settings_controller.dart';
@@ -30,7 +31,7 @@ class BrowserSoundService extends GetxService {
       await _ambientPlayer.play(UrlSource(lofiUrl));
       await _ambientPlayer.setVolume(0.1); // Keep it very low
     } catch (e) {
-      print('[BrowserSoundService] Could not play ambient music: $e');
+      debugPrint('[BrowserSoundService] Could not play ambient music: $e');
     }
   }
 

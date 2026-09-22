@@ -12,6 +12,7 @@ import '../services/mcp/mcp_registry_service.dart';
 import '../services/mcp/mcp_config.dart';
 import '../services/mcp/mcp_connection.dart';
 import 'settings/apple_widgets.dart';
+import '../widgets/app_ui.dart';
 import 'settings/device_card.dart';
 import 'settings/model_params.dart';
 import 'settings/skills_section.dart';
@@ -47,7 +48,9 @@ class SettingsView extends GetView<SettingsController> {
         toolbarHeight: 70,
         centerTitle: false,
       ),
-      body: _configBody(context),
+      body: MaxWidthBody(
+        child: _configBody(context),
+      ),
     );
   }
 

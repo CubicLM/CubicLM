@@ -1,7 +1,7 @@
 /// Parameters, browser options, bookmarks, defaults, and composer upsell.
 ///
 /// Split from `settings_controller.dart` - behavior is unchanged.
-/// Contains: setTemperature(), setGgufAccelMode(), setLargeModelMode(), setTopP(), setTopK(), setRepeatPenalty(), setMaxTokens(), setContextSize()
+/// Contains: setTemperature(), setGgufAccelMode(), setLargeModelMode(), setMemoryRecallStrictness(), setTopP(), setTopK(), setRepeatPenalty(), setMaxTokens(), setContextSize()
 ///   effectiveContextSize, effectiveMaxTokens, _applyAutoTune(), setAutoTuneParams()
 ///   setWebFetchEnabled(), setAdblockEnabled(), setBrowserSearchEngine(), setBrowserForcedDark()
 ///   setBrowserHttpsOnly(), setBrowserDntEnabled(), setBrowserBlockThirdPartyCookies()
@@ -45,6 +45,18 @@ extension SettingsControllerBrowser on SettingsController {
   Future<void> setLargeModelMode(bool value) async {
     largeModelMode.value = value;
     await _hive.setSetting(AppConstants.keyLargeModelMode, value);
+  }
+
+  /// Memory recall strictness ('strict' | 'balanced' | 'loose').
+  Future<void> setMemoryRecallStrictness(String mode) async {
+    final normalized = switch (mode) {
+      'strict' => 'strict',
+      'loose' => 'loose',
+      _ => AppConstants.defaultMemoryRecallStrictness,
+    };
+    memoryRecallStrictness.value = normalized;
+    await _hive.setSetting(
+        AppConstants.keyMemoryRecallStrictness, normalized);
   }
 
   Future<void> setTopP(double value) async {

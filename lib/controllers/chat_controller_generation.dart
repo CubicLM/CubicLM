@@ -745,9 +745,18 @@ extension ChatControllerGeneration on ChatController {
               historyBudget - histChars > 1500) {
             final kws = extractKeywords(prompt);
             if (kws.length >= 2) {
+              double rescueAt = 0.25;
+              try {
+                if (Get.isRegistered<SettingsController>()) {
+                  rescueAt = thresholdForStrictness(Get.find<SettingsController>()
+                      .memoryRecallStrictness
+                      .value);
+                }
+              } catch (_) {}
               final hits = await Get.find<HiveService>().recallPastTurns(
                 keywords: kws,
                 query: prompt,
+                threshold: rescueAt,
                 excludeChatId: currentSessionId.value,
                 maxHits: 3,
               );
