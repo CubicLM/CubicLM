@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:cubiclm/services/app_log_service.dart';
+import 'package:cubiclm/services/log_route_observer.dart';
 
 void main() {
   group('AppLogService action trail', () {

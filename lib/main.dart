@@ -28,6 +28,7 @@ import 'services/download_service.dart';
 import 'services/device_info_service.dart';
 import 'services/local_image_service.dart';
 import 'services/app_log_service.dart';
+import 'services/log_route_observer.dart';
 import 'services/crash_reporting_service.dart';
 import 'services/image_generation_notification_service.dart';
 import 'services/notification_history_service.dart';

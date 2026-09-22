@@ -43,7 +43,10 @@ import '../../widgets/voice_overlay.dart';
 import 'browser_files_view.dart';
 import 'qr_scanner_view.dart';
 
-part 'browser_sheets.dart';
+part 'browser_sheets_menu.dart';
+part 'browser_sheets_library.dart';
+part 'browser_sheets_ai.dart';
+part 'browser_sheets_engine.dart';
 part 'browser_home.dart';
 
 class BrowserView extends StatefulWidget {
