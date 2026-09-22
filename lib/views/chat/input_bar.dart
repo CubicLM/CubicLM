@@ -568,12 +568,12 @@ Widget inputBar(BuildContext context, bool isDark) {
                     ),
                   ),
                 ),
-                // ── Controls row: + / model pill … mic / send ──
-                // Narrow phones collapse secondary tools into an overflow menu
-                // so the pill + send never crowd or overflow.
-                LayoutBuilder(builder: (ctx, constraints) {
-                  final narrow = constraints.maxWidth < 360;
-                  return Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                // ── Controls row: + / model pill / tools … mic / send ──
+                // Tools stay inline in a horizontal scroll (never a 3-dot
+                // menu): visibility is the user's choice via the + sheet
+                // or Settings › Composer. Scroll prevents overflow on
+                // narrow phones no matter how many tools are enabled.
+                Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                   // "+" opens the Add-to-Chat sheet (attachments, web access)
                   AppCircleButton(
                     icon: LucideIcons.plus,
@@ -594,13 +594,21 @@ Widget inputBar(BuildContext context, bool isDark) {
                           onTap: () => showModelSwitcherSheet(context),
                         )),
                   ),
+                  const SizedBox(width: 4),
+                  // Tool icons: inline scroll, no overflow menu.
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
                   Obx(() {
                     final s = Get.find<SettingsController>();
-                    // Read FIRST: short-circuiting on `narrow` below with
-                    // zero Rx reads trips GetX's empty-scope error on
-                    // narrow phones (3x in logs).
+                    // Read FIRST: returning with zero Rx reads trips
+                    // GetX's empty-scope error.
                     final show = s.showWebAccess.value;
-                    if (narrow || !show) {
+                    if (!show) {
                       return const SizedBox.shrink();
                     }
                     final enabled = s.webFetchEnabled.value;
@@ -621,9 +629,9 @@ Widget inputBar(BuildContext context, bool isDark) {
                   Obx(() {
                     final s = Get.find<SettingsController>();
                     // Read FIRST (see web-access Obx above): avoids the
-                    // empty reactive scope on narrow phones.
+                    // empty reactive scope.
                     final show = s.showDeepSearch.value;
-                    if (narrow || !show) {
+                    if (!show) {
                       return const SizedBox.shrink();
                     }
                     final enabled = _c.isSearchMode.value;
@@ -644,9 +652,9 @@ Widget inputBar(BuildContext context, bool isDark) {
                   Obx(() {
                     final s = Get.find<SettingsController>();
                     // Read FIRST (see web-access Obx above): avoids the
-                    // empty reactive scope on narrow phones.
+                    // empty reactive scope.
                     final show = s.showLiveVision.value;
-                    if (narrow || !show) {
+                    if (!show) {
                       return const SizedBox.shrink();
                     }
                     final vision = Get.find<VisionLiveController>();
@@ -666,8 +674,7 @@ Widget inputBar(BuildContext context, bool isDark) {
                   }),
                   Obx(() {
                     final hasText = _c.inputText.value.trim().isNotEmpty;
-                    if (narrow ||
-                        !hasText ||
+                    if (!hasText ||
                         !Get.find<SettingsController>()
                             .showPolishPrompt
                             .value) {
@@ -682,74 +689,13 @@ Widget inputBar(BuildContext context, bool isDark) {
                       ),
                     );
                   }),
-                  // Overflow: secondary tools when the row is too tight.
-                  Obx(() {
-                    final s = Get.find<SettingsController>();
-                    final hasText = _c.inputText.value.trim().isNotEmpty;
-                    final showOverflow = narrow &&
-                        ((s.showWebAccess.value) ||
-                            (s.showDeepSearch.value) ||
-                            (s.showLiveVision.value) ||
-                            (s.showPolishPrompt.value && hasText));
-                    if (!showOverflow) return const SizedBox.shrink();
-                    return PopupMenuButton<String>(
-                      tooltip: 'chat_more_tools'.tr,
-                      icon: Icon(LucideIcons.moreHorizontal, size: 18,
-                          color: Theme.of(context).iconTheme.color),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      onSelected: (v) {
-                        switch (v) {
-                          case 'web':
-                            s.setWebFetchEnabled(!s.webFetchEnabled.value);
-                            break;
-                          case 'search':
-                            _c.isSearchMode.value = !_c.isSearchMode.value;
-                            break;
-                          case 'vision':
-                            Get.find<VisionLiveController>().toggleLive();
-                            break;
-                          case 'polish':
-                            _c.polishPrompt();
-                            break;
-                        }
-                      },
-                      itemBuilder: (ctx) {
-                        final items = <PopupMenuEntry<String>>[];
-                        if (s.showWebAccess.value) {
-                          items.add(PopupMenuItem(
-                            value: 'web',
-                            child: Text(
-                                '${'chat_web_access'.tr}${s.webFetchEnabled.value ? ' ✓' : ''}'),
-                          ));
-                        }
-                        if (s.showDeepSearch.value) {
-                          items.add(PopupMenuItem(
-                            value: 'search',
-                            child: Text(
-                                '${'chat_deep_search'.tr}${_c.isSearchMode.value ? ' ✓' : ''}'),
-                          ));
-                        }
-                        if (s.showLiveVision.value) {
-                          items.add(PopupMenuItem(
-                            value: 'vision',
-                            child: Text('chat_live_vision'.tr),
-                          ));
-                        }
-                        if (s.showPolishPrompt.value && hasText) {
-                          items.add(PopupMenuItem(
-                            value: 'polish',
-                            child: Text('chat_polish_prompt'.tr),
-                          ));
-                        }
-                        return items;
-                      },
-                    );
-                  }),
-                  const Spacer(),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
                   // Right cluster: mic (muted circle) + primary CTA (solid dark)
-                  // Spacer pushes this cluster to the far right corner,
-                  // and inner Row keeps mic + send at the same vertical level.
+                  // — fixed at the row end; tools scroll to its left.
                   Obx(() {
                     final loading = _c.isLoading.value;
                     final hasContent = _c.inputText.value.isNotEmpty ||
@@ -803,8 +749,7 @@ Widget inputBar(BuildContext context, bool isDark) {
                       ],
                     );
                   }),
-                ]);
-                }),
+                ]),
               ]),
             ),
           ],

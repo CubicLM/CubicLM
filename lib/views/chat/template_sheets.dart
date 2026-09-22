@@ -314,6 +314,60 @@ void showAddToChatSheet(
                       onChanged: (v) => s.setWebFetchEnabled(v),
                     ),
                   )),
+              const SizedBox(height: 10),
+              // ── Composer buttons: show/hide the tool icons in the
+              // chat input row (same flags as Settings › Composer) ──
+              Obx(() => AppSheetRowCard(
+                    leading:
+                        const AppIconCircle(icon: LucideIcons.slidersHorizontal),
+                    title: 'Show Web button',
+                    subtitle: s.showWebAccess.value
+                        ? 'Visible in the composer'
+                        : 'Hidden from the composer',
+                    trailing: Switch(
+                      value: s.showWebAccess.value,
+                      onChanged: (v) => s.setShowWebAccess(v),
+                    ),
+                  )),
+              const SizedBox(height: 10),
+              Obx(() => AppSheetRowCard(
+                    leading:
+                        const AppIconCircle(icon: LucideIcons.slidersHorizontal),
+                    title: 'Show Deep Search button',
+                    subtitle: s.showDeepSearch.value
+                        ? 'Visible in the composer'
+                        : 'Hidden from the composer',
+                    trailing: Switch(
+                      value: s.showDeepSearch.value,
+                      onChanged: (v) => s.setShowDeepSearch(v),
+                    ),
+                  )),
+              const SizedBox(height: 10),
+              Obx(() => AppSheetRowCard(
+                    leading:
+                        const AppIconCircle(icon: LucideIcons.slidersHorizontal),
+                    title: 'Show Live Vision button',
+                    subtitle: s.showLiveVision.value
+                        ? 'Visible in the composer'
+                        : 'Hidden from the composer',
+                    trailing: Switch(
+                      value: s.showLiveVision.value,
+                      onChanged: (v) => s.setShowLiveVision(v),
+                    ),
+                  )),
+              const SizedBox(height: 10),
+              Obx(() => AppSheetRowCard(
+                    leading:
+                        const AppIconCircle(icon: LucideIcons.slidersHorizontal),
+                    title: 'Show Polish button',
+                    subtitle: s.showPolishPrompt.value
+                        ? 'Visible in the composer'
+                        : 'Hidden from the composer',
+                    trailing: Switch(
+                      value: s.showPolishPrompt.value,
+                      onChanged: (v) => s.setShowPolishPrompt(v),
+                    ),
+                  )),
             ],
           ),
         ),
