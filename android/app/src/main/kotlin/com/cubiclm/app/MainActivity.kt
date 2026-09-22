@@ -38,6 +38,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private var importChannel: MethodChannel? = null
+    private var crashHandlerInstalled = false
     private var pendingImportResult: MethodChannel.Result? = null
     private var pendingExportFolderResult: MethodChannel.Result? = null
     private var pendingModelsDir: String? = null
@@ -71,6 +72,7 @@ class MainActivity : FlutterFragmentActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         handleShareIntent(intent)
+        installCrashFileHandler()
         importChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, importChannelName)
         // Process-exit forensics for System Logs: ApplicationExitInfo reports
         // HOW the previous process died (native crash signal, LMK kill, ANR)
@@ -1744,9 +1746,39 @@ class MainActivity : FlutterFragmentActivity() {
         return clean.ifBlank { "CubicLM" }
     }
 
+    /// JVM crash-file handler for System Logs: writes uncaught Java/Kotlin
+    /// stack traces where Dart can read them on next boot (works on every
+    /// API level, unlike the trace stream). Chained: the previous handler
+    /// still runs so crash behavior is unchanged.
+    private fun installCrashFileHandler() {
+        if (crashHandlerInstalled) return
+        crashHandlerInstalled = true
+        val prev = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            try {
+                val appFlutter = java.io.File(filesDir.parentFile, "app_flutter/cubiclm_crashes")
+                appFlutter.mkdirs()
+                val f = java.io.File(appFlutter, "crash_${System.currentTimeMillis()}.txt")
+                f.writeText("${java.util.Date()}\nthread=${t.name}\n${Log.getStackTraceString(e)}")
+                // Keep only the newest few files.
+                appFlutter.listFiles()
+                    ?.sortedBy { it.lastModified() }
+                    ?.dropLast(3)
+                    ?.forEach { try { it.delete() } catch (_: Exception) {} }
+            } catch (_: Exception) {
+            }
+            try {
+                prev?.uncaughtException(t, e)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     /// Recent death records for this package (newest first, max 8).
     /// Each map: reason (int code), timestampMs, importance, status,
-    /// description (signal + fault addr for native crashes), rssKb, pssKb.
+    /// description (signal + fault addr for native crashes), trace (head
+    /// of the system trace stream: Java stack for CRASH, tombstone
+    /// excerpt for CRASH_NATIVE — API 31+, null below), rssKb, pssKb.
     /// Empty below API 30 or on any failure — Dart treats that as "none".
     private fun recentExitReasons(): List<Map<String, Any?>> {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return emptyList()
@@ -1759,12 +1791,29 @@ class MainActivity : FlutterFragmentActivity() {
                     "importance" to info.importance,
                     "status" to info.status,
                     "description" to (info.description ?: ""),
+                    "trace" to readTraceHead(info),
                     "rssKb" to (info.rss / 1024L),
                     "pssKb" to (info.pss / 1024L),
                 )
             }
         } catch (_: Exception) {
             emptyList()
+        }
+    }
+
+    /// First ~8KB of the system trace stream (Java stack / tombstone
+    /// head). Null-safe: stream exists only on API 31+ and only for
+    /// some death kinds. Never throws — forensics must not break boot.
+    private fun readTraceHead(info: android.app.ApplicationExitInfo): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return ""
+        return try {
+            info.traceInputStream?.bufferedReader()?.use { reader ->
+                val buf = CharArray(8192)
+                val n = reader.read(buf, 0, buf.size)
+                if (n > 0) String(buf, 0, n) else ""
+            } ?: ""
+        } catch (_: Exception) {
+            ""
         }
     }
 }

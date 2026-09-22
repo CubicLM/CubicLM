@@ -822,6 +822,44 @@ class AppLogService extends GetxService with WidgetsBindingObserver {
     await _loadPersistedCrashHistory();
     await _reportUnresolvedBreadcrumb();
     await _reportProcessExits();
+    await _reportCrashFiles();
+  }
+
+  /// JVM crash files written by MainActivity's uncaught-exception handler
+  /// (works on every API level — the answer for devices without the
+  /// trace stream). One row per file, then deleted.
+  Future<void> _reportCrashFiles() async {
+    try {
+      if (kIsWeb) return;
+      final dir = await getApplicationDocumentsDirectory();
+      final crashDir = Directory('${dir.path}/cubiclm_crashes');
+      if (!await crashDir.exists()) return;
+      final files = await crashDir
+          .list()
+          .where((e) => e is File && e.path.endsWith('.txt'))
+          .cast<File>()
+          .toList();
+      files.sort((a, b) => b.path.compareTo(a.path));
+      var count = 0;
+      for (final f in files) {
+        String body = '';
+        try {
+          body = await f.readAsString();
+        } catch (_) {}
+        try {
+          await f.delete();
+        } catch (_) {}
+        if (body.trim().isEmpty) continue;
+        count++;
+        if (count > 3) continue;
+        if (body.length > 2800) body = '${body.substring(0, 2800)}…';
+        error(
+          '[Previous run] JAVA CRASH — uncaught exception killed the app',
+          details: '$body\nCopy this row + the rows above it and report.',
+          category: LogCategory.model,
+        );
+      }
+    } catch (_) {}
   }
 
   static const _exitChannel =
@@ -873,14 +911,18 @@ class AppLogService extends GetxService with WidgetsBindingObserver {
         final pssMb = ((m['pssKb'] as num?)?.toDouble() ?? 0) / 1024;
         final rssMb = ((m['rssKb'] as num?)?.toDouble() ?? 0) / 1024;
         var desc = '${m['description'] ?? ''}';
-        if (desc.length > 1200) desc = '${desc.substring(0, 1200)}…';
+        final trace = '${m['trace'] ?? ''}';
+        // Trace head (Java stack / tombstone excerpt, API 31+) is the
+        // actual diagnosis — keep up to ~2.5KB of it after the one-line
+        // description so the row stays copy-paste friendly.
+        final combined = (desc + (trace.isEmpty ? '' : '\n--- trace ---\n$trace')).trim();
+        final details = combined.isEmpty
+            ? _exitHintFor(reason)
+            : '${combined.length > 2800 ? '${combined.substring(0, 2800)}…' : combined}\n${_exitHintFor(reason)}';
         error(
           '[Previous run] $name @ $at'
           '${pssMb > 0 ? ' (pss ${pssMb.toStringAsFixed(0)}MB, rss ${rssMb.toStringAsFixed(0)}MB)' : ''}',
-          details: desc.isEmpty
-              ? 'No system description. '
-                  '${_exitHintFor(reason)}'
-              : '$desc\n${_exitHintFor(reason)}',
+          details: details,
           category: (reason == 4 || reason == 5)
               ? LogCategory.model
               : LogCategory.system,
