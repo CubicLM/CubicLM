@@ -1,6 +1,25 @@
 (function(){
 'use strict';
 
+/* ── Mobile nav ── */
+(function(){
+  var burger=document.getElementById('nav-burger');
+  var menu=document.getElementById('nav-mobile');
+  if(!burger||!menu)return;
+  function setOpen(open){
+    menu.classList.toggle('open',open);
+    menu.hidden=!open;
+    burger.setAttribute('aria-expanded',open?'true':'false');
+    burger.innerHTML=open?'<i class="ri-close-line"></i>':'<i class="ri-menu-line"></i>';
+  }
+  burger.addEventListener('click',function(){
+    setOpen(!menu.classList.contains('open'));
+  });
+  menu.querySelectorAll('a').forEach(function(a){
+    a.addEventListener('click',function(){setOpen(false)});
+  });
+})();
+
 /* ── Grain ── */
 (function(){
   var c=document.getElementById('grain');if(!c)return;

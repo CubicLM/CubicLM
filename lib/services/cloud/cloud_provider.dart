@@ -71,7 +71,9 @@ abstract class CloudProvider {
 
   /// Send a streaming chat completion request.
   ///
-  /// Returns a stream of response chunks.
+  /// Default fallback: run non-streaming [sendMessage] and yield the full
+  /// text once — callers that request streaming never crash with
+  /// [UnimplementedError] when a provider has no native SSE path.
   Stream<String> streamMessage({
     required List<Map<String, String>> messages,
     required String apiKey,
@@ -80,8 +82,20 @@ abstract class CloudProvider {
     double? temperature,
     int? maxTokens,
   }) async* {
+    if (!supportsStreaming) {
+      final out = await sendMessage(
+        messages: messages,
+        apiKey: apiKey,
+        model: model,
+        imageBase64: imageBase64,
+        temperature: temperature,
+        maxTokens: maxTokens,
+      );
+      if (out.isNotEmpty) yield out;
+      return;
+    }
     throw UnimplementedError(
-        'Streaming not supported for ${runtimeType.toString()}');
+        'Streaming not implemented for ${runtimeType.toString()}');
   }
 
   /// Fetch the list of available models from the provider's API.

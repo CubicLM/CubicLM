@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'dart:math';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -11,10 +12,12 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../controllers/chat_controller.dart';
 import '../../controllers/settings_controller.dart';
 import '../../core/colors.dart';
+import '../../core/constants.dart';
 import '../../core/routes.dart';
 import '../../services/chat_backup.dart';
 import '../../services/download_service.dart';
 import '../../services/hive_service.dart';
+import '../../services/secure_key_store.dart';
 import '../../services/stats_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../utils/app_snackbar.dart';
@@ -91,8 +94,54 @@ class DataView extends GetView<SettingsController> {
                       size: 20, color: Dt.accent),
                   title: 'Backup every',
                   subtitle:
-                      'Every ${chat.autoBackupDays.value} days (unencrypted)',
+                      'Every ${chat.autoBackupDays.value} days${(Get.isRegistered<HiveService>() && (Get.find<HiveService>().getSetting<bool>(AppConstants.keyAutoBackupEncrypted, defaultValue: false) ?? false)) ? ' · encrypted when passphrase set' : ' (unencrypted)'}',
                   onTap: () => _pickAutoBackupDays(context, chat),
+                );
+              }),
+              Obx(() {
+                final chat = Get.isRegistered<ChatController>()
+                    ? Get.find<ChatController>()
+                    : Get.put(ChatController());
+                if (!chat.autoBackupEnabled.value) {
+                  return const SizedBox.shrink();
+                }
+                final hive = Get.find<HiveService>();
+                final enc = hive.getSetting<bool>(
+                        AppConstants.keyAutoBackupEncrypted,
+                        defaultValue: false) ??
+                    false;
+                return appleListTile(
+                  context,
+                  isDark,
+                  leading: const Icon(LucideIcons.lock,
+                      size: 20, color: Dt.accent),
+                  title: 'Encrypt auto-backups',
+                  subtitle: enc
+                      ? 'Uses passphrase stored in device secure storage'
+                      : 'Off — auto-backups are plaintext JSON',
+                  trailing: Switch.adaptive(
+                    value: enc,
+                    activeThumbColor: Dt.accent,
+                    onChanged: (v) async {
+                      await hive.setSetting(
+                          AppConstants.keyAutoBackupEncrypted, v);
+                      if (v && Get.isRegistered<SecureKeyStore>()) {
+                        final keys = Get.find<SecureKeyStore>();
+                        if (keys.read(secureKeyBackupPassphrase).isEmpty) {
+                          final rng = Random.secure();
+                          const alphabet =
+                              'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                          final pass =
+                              'cubic-${List.generate(24, (_) => alphabet[rng.nextInt(alphabet.length)]).join()}';
+                          await keys.write(secureKeyBackupPassphrase, pass);
+                        }
+                      }
+                      chat.autoBackupEnabled.value =
+                          !chat.autoBackupEnabled.value;
+                      chat.autoBackupEnabled.value =
+                          !chat.autoBackupEnabled.value;
+                    },
+                  ),
                 );
               }),
               appleListTile(

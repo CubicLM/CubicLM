@@ -194,7 +194,7 @@ Computational Universe for Building Intelligent Learning Machines
 | 📱 Modern Android phone (2020+) | **arm64-v8a** | Best performance, full GPU acceleration, all models run |
 | 📱 Older / budget Android | **armeabi-v7a** | Smaller install, runs smaller quantized models |
 | 🖥️ Android emulator / Chromebook | **x86_64** | Native architecture for Intel/AMD chips |
-| 💻 Windows 10/11 PC | **windows-x64** | Cloud mode + Skills + MCP; local GGUF via llama-server sidecar (auto-downloaded) |
+| 💻 Windows 10/11 PC | **windows-x64** | Cloud mode + Skills + MCP; optional local GGUF via llama-server sidecar when bundled (LiteRT/SD remain Android-first) |
 | 🌐 Any browser | *Coming soon* | Web is `dart:ffi`-blocked; tracked for future release |
 
 > [!NOTE]
@@ -2361,13 +2361,15 @@ There's no donation link — this is a passion project. If you build something c
 **Near-term**
 - [ ] **Windows local inference** — `local_plugins/llama_flutter_windows` (`llama.dll`)
 - [ ] **Web build unblocked** — `dart:ffi` alternative for cloud-only Web
-- [ ] **Auto-update** — Windows `updater_config.json` enablement
+- [x] **Windows update feed** — `windows/updater_config.json` points at GitHub Releases + zip/checksum templates; signed silent install still needs MSIX/Inno cert
 - [ ] **iOS feasibility study** — Metal backend for llama.cpp
 
 **Mid-term**
-- [ ] **Voice mode** — end-to-end speech-to-text + TTS
+- [ ] **Voice mode** — conversational polish beyond existing STT+TTS hands-free loop
 - [ ] **Multi-modal local** — more VLMs (LLaVA, Moondream)
-- [ ] **Local embeddings** — remove the honest 400 on `/v1/embeddings`
+- [x] **Free web search in chat** — Deep Search uses DuckDuckGo when no Perplexity key is set; Perplexity still preferred when keyed
+- [x] **Local embeddings (v1)** — `/v1/embeddings` via on-device trigram-hash vectors (`cubiclm-trigram-hash-v1`); neural model swap planned
+- [x] **Encrypted auto-backups** — optional AES-256 auto-backups with passphrase in device secure storage
 - [ ] **Plugin marketplace** — community Skills + MCP registry
 
 **Long-term**

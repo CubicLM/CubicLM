@@ -253,13 +253,15 @@ class _DiffViewState extends State<DiffView> {
         ),
         Expanded(
           child: Container(
-            color: widget.isDark ? const Color(0xFF0D0D12) : const Color(0xFFFCFCFD),
+            color: widget.isDark
+                ? SyntaxColors.surfaceDark
+                : SyntaxColors.surfaceLight,
             child: LineNumberWrapper(
               content: code,
               isDark: widget.isDark,
               scrollController: scroll,
               child: Text.rich(
-                buildHighlightedSpan(highlight(code, path)),
+                buildHighlightedSpan(highlight(code, path, isDark: widget.isDark)),
                 style: GoogleFonts.firaCode(fontSize: 12, height: 1.5),
                 softWrap: false,
               ),

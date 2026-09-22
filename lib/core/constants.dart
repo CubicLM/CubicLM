@@ -191,6 +191,7 @@ class AppConstants {
   // Auto backup (silent JSON to app documents, keeps last 3)
   static const String keyAutoBackupEnabled = 'auto_backup_enabled';
   static const String keyAutoBackupDays = 'auto_backup_days';
+  static const String keyAutoBackupEncrypted = 'auto_backup_encrypted';
   static const String keyLastAutoBackup = 'last_auto_backup_ms';
 
   // Export destination: subfolder under Downloads (Android) or Documents

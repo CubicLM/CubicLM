@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import '../core/colors.dart';
 import '../services/terminal/terminal_service.dart';
 import '../theme/design_tokens.dart';
+import '../utils/syntax_highlight.dart';
 import '../views/terminal/terminal_view.dart';
 import 'html_preview_page.dart';
 
@@ -199,7 +200,9 @@ class _CodeBlockState extends State<_CodeBlock> {
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF8F9FA),
+        color: isDark
+            ? SyntaxColors.surfaceDark
+            : SyntaxColors.surfaceLight,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isDark

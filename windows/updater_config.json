@@ -1,7 +1,9 @@
 {
-  "_comment": "Auto-update scaffolding per docs/multiplatfrom.md §5.1 — disabled by default, config exists and is documented.",
-  "enabled": false,
-  "feedUrl": "REPLACE_ME_UPDATE_FEED_URL",
+  "enabled": true,
+  "mode": "github-releases",
+  "feedUrl": "https://api.github.com/repos/abir2afridi/CubicLM/releases/latest",
+  "downloadUrlTemplate": "https://github.com/abir2afridi/CubicLM/releases/download/{version}/cubiclm-{version}-windows-x64.zip",
+  "checksumUrlTemplate": "https://github.com/abir2afridi/CubicLM/releases/download/{version}/checksums.sha256",
   "publicKey": "REPLACE_ME_UPDATE_PUBLIC_KEY",
-  "notes": "Generate a real feed (e.g., GitHub Releases + Tauri updater JSON or msix update manifest) and replace placeholders. See docs/BUILD_AND_RUN.md Windows auto-update section."
+  "notes": "UpdateService already polls this GitHub feed. Desktop opens PlatformLinks.desktopDownloadUrl. For silent zip install, ship a signed MSIX or an Inno-built updater that verifies checksums.sha256 then replaces the extract dir. Replace publicKey when you introduce signature verification."
 }

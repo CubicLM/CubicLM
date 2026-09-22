@@ -295,13 +295,12 @@ class ChatView extends GetView<ChatController> {
           } else {
             model = 'chat_no_model'.tr;
           }
-          if (model.length > 20) model = '${model.substring(0, 20)}…';
+          // Layout ellipsis handles truncation — no hard substring cut.
         } else {
           model = settings.selectedCloudModelName;
           if (settings.cloudProvider.value == 'custom' && model.isNotEmpty) {
             model = '${settings.customCloudName.value}: $model';
           }
-          if (model.length > 22) model = '${model.substring(0, 22)}…';
         }
         final statusColor = isLocal
             ? (isLocalReady ? AppColors.success : AppColors.warning)
@@ -717,22 +716,33 @@ class _MessageEntranceState extends State<_MessageEntrance>
   void initState() {
     super.initState();
     _shouldAnimate = !ChatView._animatedMessageIds.contains(widget.messageId);
-    
+
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: Dt.messageEnter,
     );
-    _slide = Tween<double>(begin: 0.15, end: 0.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    // Fixed px offset (not % of viewport height) — desktop slides stay subtle.
+    final height =
+        WidgetsBinding.instance.platformDispatcher.views.first.physicalSize.height /
+            WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
+    final safeHeight = height > 0 ? height : 800.0;
+    _slide = Tween<double>(
+      begin: Dt.messageEnterDy / safeHeight,
+      end: 0.0,
+    ).animate(
+      CurvedAnimation(parent: _controller, curve: Dt.messageEnterCurve),
     );
     _fade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.7, curve: Curves.easeIn)),
     );
 
-    if (_shouldAnimate) {
+    final disableMotion = WidgetsBinding
+            .instance.platformDispatcher.accessibilityFeatures.disableAnimations;
+    if (_shouldAnimate && !disableMotion) {
       ChatView._animatedMessageIds.add(widget.messageId);
       _controller.forward();
     } else {
+      ChatView._animatedMessageIds.add(widget.messageId);
       _controller.value = 1.0;
     }
   }

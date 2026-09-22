@@ -10,6 +10,7 @@
 /// writer.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 
@@ -30,11 +31,16 @@ class SecureStorageBackend implements VaultBackend {
       {FlutterSecureStorage? storage, this.prefix = 'clm_key_'})
       : _storage = storage ?? const FlutterSecureStorage();
 
+  void _log(String op, Object e) {
+    debugPrint('[ApiKeyVault] $op failed: $e');
+  }
+
   @override
   Future<String?> read(String key) async {
     try {
       return await _storage.read(key: '$prefix$key');
-    } catch (_) {
+    } catch (e) {
+      _log('read($key)', e);
       return null;
     }
   }
@@ -47,7 +53,9 @@ class SecureStorageBackend implements VaultBackend {
       } else {
         await _storage.write(key: '$prefix$key', value: value);
       }
-    } catch (_) {}
+    } catch (e) {
+      _log('write($key)', e);
+    }
   }
 
   @override
@@ -64,7 +72,8 @@ class SecureStorageBackend implements VaultBackend {
         }
       }
       return out;
-    } catch (_) {
+    } catch (e) {
+      _log('readAll', e);
       return {};
     }
   }

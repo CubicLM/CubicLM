@@ -69,6 +69,13 @@ class AppSheetHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark
+        ? Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white
+        : Dt.textPrimary;
+    final iconColor = isDark
+        ? Theme.of(context).iconTheme.color ?? Colors.white
+        : Dt.iconDefault;
     // Claude sheet header: title leading-left, close action trailing-right.
     return SizedBox(
       height: 52,
@@ -82,10 +89,10 @@ class AppSheetHeader extends StatelessWidget {
             child: Center(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: Dt.textPrimary,
+                  color: titleColor,
                 ),
               ),
             ),
@@ -94,10 +101,15 @@ class AppSheetHeader extends StatelessWidget {
             right: 8,
             child: IconButton(
               onPressed: onClose,
-              icon: Icon(
-                showBack ? LucideIcons.arrowLeft : LucideIcons.x,
-                size: Dt.iconSize - 2,
-                color: Dt.iconDefault,
+              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+              icon: Semantics(
+                button: true,
+                label: showBack ? 'Back' : 'Close',
+                child: Icon(
+                  showBack ? LucideIcons.arrowLeft : LucideIcons.x,
+                  size: Dt.iconSize - 2,
+                  color: iconColor,
+                ),
               ),
             ),
           ),
@@ -129,22 +141,36 @@ class AppCircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final btn = Container(
       width: diameter,
       height: diameter,
-      decoration: const BoxDecoration(
-        color: Dt.pillMuted,
+      decoration: BoxDecoration(
+        color: isDark
+            ? Theme.of(context).colorScheme.surfaceContainerHighest
+            : Dt.pillMuted,
         shape: BoxShape.circle,
       ),
-      child: Icon(icon, size: 18, color: iconColor ?? Dt.iconDefault),
+      child: Icon(
+        icon,
+        size: 18,
+        color: iconColor ??
+            (isDark
+                ? Theme.of(context).iconTheme.color ?? Colors.white
+                : Dt.iconDefault),
+      ),
     );
-    return Tooltip(
-      message: tooltip ?? '',
-      child: InkWell(
-          onTap: onTap,
-          onLongPress: onLongPress,
-          customBorder: const CircleBorder(),
-          child: btn),
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: Tooltip(
+        message: tooltip ?? '',
+        child: InkWell(
+            onTap: onTap,
+            onLongPress: onLongPress,
+            customBorder: const CircleBorder(),
+            child: btn),
+      ),
     );
   }
 }
@@ -159,19 +185,28 @@ class AppCtaButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Container(
-        width: Dt.circleBtnDiameter,
-        height: Dt.circleBtnDiameter,
-        decoration: BoxDecoration(
-          // Claude: idle = warm sand surface, active = Claude Orange.
-          color: enabled ? Dt.ctaFill : Dt.accentMuted,
-          shape: BoxShape.circle,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final idleBg = isDark
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : Dt.accentMuted;
+    final idleIcon =
+        isDark ? Theme.of(context).hintColor : Dt.textPlaceholder;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: Dt.circleBtnDiameter,
+          height: Dt.circleBtnDiameter,
+          decoration: BoxDecoration(
+            // Claude: idle = warm sand surface, active = Claude Orange.
+            color: enabled ? Dt.ctaFill : idleBg,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 18, color: enabled ? Colors.white : idleIcon),
         ),
-        child: Icon(icon,
-            size: 18, color: enabled ? Colors.white : Dt.textPlaceholder),
       ),
     );
   }
@@ -186,34 +221,51 @@ class AppModelPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(Dt.pillHeight),
-      child: Container(
-        height: Dt.pillHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: Dt.pillMuted,
-          borderRadius: BorderRadius.circular(Dt.pillHeight),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: Dt.textPrimary,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pillBg = isDark
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : Dt.pillMuted;
+    final labelColor = isDark
+        ? Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white
+        : Dt.textPrimary;
+    final chevronColor =
+        isDark ? Theme.of(context).hintColor : Dt.textSecondary;
+    return Semantics(
+      button: true,
+      label: 'Model: $label',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(Dt.pillHeight),
+        child: Container(
+          height: Dt.pillHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          constraints: const BoxConstraints(
+            minWidth: Dt.modelPillMinWidth,
+            maxWidth: Dt.modelPillMaxWidth,
+          ),
+          decoration: BoxDecoration(
+            color: pillBg,
+            borderRadius: BorderRadius.circular(Dt.pillHeight),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: labelColor,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 4),
-            const Icon(LucideIcons.chevronDown, size: 14, color: Dt.textSecondary),
-          ],
+              const SizedBox(width: 4),
+              Icon(LucideIcons.chevronDown, size: 14, color: chevronColor),
+            ],
+          ),
         ),
       ),
     );

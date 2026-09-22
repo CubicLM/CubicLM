@@ -60,11 +60,18 @@ abstract class Dt {
   static const Color textPlaceholder = Color(0xFF8A7E72);
   static const Color textMuted = Color(0xFF8A7E72);
 
-  // Brand accent — Claude Orange.
+  // Brand accent — Claude Orange. Canonical UI accent; prefer this over
+  // AppColors.primary (indigo) except for legacy user-bubble gradients.
   static const Color accent = Color(0xFFD97757);
   static const Color accentGx = Color(0xFFFF4D00); // Neon Orange for Gaming Mode
   static const Color accentMuted = Color(0xFFE8E0D2); // idle send/mic surface
   static const Color link = Color(0xFF6D5FE8); // upsell/indigo links
+
+  /// Warm semantic tints for empty-state / suggestion chips (theme-safe).
+  static const Color chipAccent = Color(0xFFD97757);
+  static const Color chipLink = Color(0xFF6D5FE8);
+  static const Color chipSuccess = Color(0xFF10B981);
+  static const Color chipWarm = Color(0xFFE8A317);
   static const Color selected = Color(0xFF0A3B7B); // selected row (deep navy)
   static const Color badgeBg = Color(0xFFE7F1F9);
   static const Color badgeText = Color(0xFF275890);
@@ -100,6 +107,18 @@ abstract class Dt {
   // ── Motion ──
   static const Duration sheetOpen = Duration(milliseconds: 260);
   static const Duration sheetClose = Duration(milliseconds: 200);
+  static const Duration messageEnter = Duration(milliseconds: 320);
   static const Curve sheetOpenCurve = Curves.easeOutCubic;
   static const Curve sheetCloseCurve = Curves.easeInCubic;
+  static const Curve messageEnterCurve = Curves.easeOutCubic;
+
+  /// Fixed px offset for message entrance — never use % of viewport height.
+  static const double messageEnterDy = 18;
+
+  // ── Layout ──
+  static const double navRailWidth = 84;
+  static const double navBottomHeight = 72;
+  static const double modelPillMinWidth = 88;
+  static const double modelPillMaxWidth = 140;
+  static const double composerToolGap = 6;
 }

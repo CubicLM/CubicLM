@@ -19,22 +19,22 @@ Widget emptyState(BuildContext context, bool isDark) {
     {
       'text': 'Explain quantum computing simply',
       'icon': Icons.auto_awesome_rounded,
-      'color': Colors.blue
+      'color': Dt.chipAccent,
     },
     {
       'text': 'Write a short poem about time',
       'icon': Icons.edit_note_rounded,
-      'color': Colors.purple
+      'color': Dt.chipLink,
     },
     {
       'text': 'What makes the Northern Lights happen?',
       'icon': Icons.light_mode_rounded,
-      'color': Colors.teal
+      'color': Dt.chipSuccess,
     },
     {
       'text': 'Give me a 5-minute healthy breakfast recipe',
       'icon': Icons.restaurant_rounded,
-      'color': Colors.orange
+      'color': Dt.chipWarm,
     },
   ];
   return Center(
@@ -60,7 +60,7 @@ Widget emptyState(BuildContext context, bool isDark) {
       Text('chat_empty_subtitle'.tr,
           style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
-              color: Dt.textSecondary,
+              color: isDark ? AppColors.textSecondary : Dt.textSecondary,
               fontWeight: FontWeight.w500)),
       const SizedBox(height: 28),
       Obx(() {

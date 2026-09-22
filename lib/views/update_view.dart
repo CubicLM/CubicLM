@@ -86,8 +86,10 @@ class UpdateView extends StatelessWidget {
         content: SingleChildScrollView(
           child: Text(
             'CubicLM is private by default.\n\n'
-            '• Chats stay on your device in AES-256 encrypted storage.\n'
-            '• No accounts, no telemetry, no analytics.\n'
+            '• Chats stay on your device. Local boxes use AES when the '
+            'device keystore is available; optional encrypted backups '
+            'use AES-256 with your passphrase.\n'
+            '• No accounts, no telemetry, no analytics by default.\n'
             '• API keys live in your device keystore / keychain — '
             'settings export never includes them.\n'
             '• Cloud mode sends prompts only to the provider you '

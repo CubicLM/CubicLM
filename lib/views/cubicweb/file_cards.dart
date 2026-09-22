@@ -98,7 +98,8 @@ class StreamingFileCardState extends State<StreamingFileCard> {
                   isDark: true,
                   scrollController: _scroll,
                   child: SelectableText.rich(
-                    buildHighlightedSpan(highlight(content, widget.path)),
+                    buildHighlightedSpan(
+                        highlight(content, widget.path, isDark: true)),
                     style: GoogleFonts.firaCode(fontSize: 11.5, height: 1.5),
                   ),
                 ),
@@ -353,7 +354,8 @@ class FileEditorCardState extends State<FileEditorCard> {
             isDark: widget.isDark,
             child: _viewMode
                 ? SelectableText.rich(
-                    buildHighlightedSpan(highlight(_ctrl.text, widget.path)),
+                    buildHighlightedSpan(highlight(_ctrl.text, widget.path,
+                        isDark: widget.isDark)),
                     style: GoogleFonts.firaCode(fontSize: 12, height: 1.5),
                   )
                 : CallbackShortcuts(

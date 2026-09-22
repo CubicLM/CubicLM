@@ -10,25 +10,62 @@ class SyntaxToken {
   const SyntaxToken(this.text, this.color);
 }
 
-/// Color palette (Catppuccin-inspired, works on both dark and light BGs).
+/// Theme-aware color palettes for syntax tokens.
 class SyntaxColors {
-  static const keyword = Color(0xFFCBA6F7); // purple
-  static const string = Color(0xFFA6E3A1); // green
-  static const comment = Color(0xFF6C7086); // gray
-  static const tag = Color(0xFFF38BA8); // red/pink
-  static const attr = Color(0xFFFAB387); // orange
-  static const number = Color(0xFFF9E2AF); // yellow
-  static const punct = Color(0xFF89DCEB); // sky/cyan for brackets
-  static const plain = Color(0xFFCDD6F4); // default text
-  static const ghost = Color(0x66CDD6F4); // faint ghost text
+  // Dark (Catppuccin-inspired on warm dark surfaces)
+  static const keyword = Color(0xFFCBA6F7);
+  static const string = Color(0xFFA6E3A1);
+  static const comment = Color(0xFF6C7086);
+  static const tag = Color(0xFFF38BA8);
+  static const attr = Color(0xFFFAB387);
+  static const number = Color(0xFFF9E2AF);
+  static const punct = Color(0xFF89DCEB);
+  static const plain = Color(0xFFCDD6F4);
+  static const ghost = Color(0x66CDD6F4);
+
+  // Light (parchment/paper)
+  static const keywordLight = Color(0xFF7C3AED);
+  static const stringLight = Color(0xFF15803D);
+  static const commentLight = Color(0xFF6B7280);
+  static const tagLight = Color(0xFFBE123C);
+  static const attrLight = Color(0xFFC2410C);
+  static const numberLight = Color(0xFFA16207);
+  static const punctLight = Color(0xFF0E7490);
+  static const plainLight = Color(0xFF2D2520);
+  static const ghostLight = Color(0x662D2520);
+
+  static const surfaceDark = Color(0xFF1E1E2E);
+  static const surfaceLight = Color(0xFFF8F9FA);
+}
+
+/// Resolve palette for current brightness.
+class SyntaxPalette {
+  final bool isDark;
+  const SyntaxPalette(this.isDark);
+
+  Color get keyword => isDark ? SyntaxColors.keyword : SyntaxColors.keywordLight;
+  Color get string => isDark ? SyntaxColors.string : SyntaxColors.stringLight;
+  Color get comment => isDark ? SyntaxColors.comment : SyntaxColors.commentLight;
+  Color get tag => isDark ? SyntaxColors.tag : SyntaxColors.tagLight;
+  Color get attr => isDark ? SyntaxColors.attr : SyntaxColors.attrLight;
+  Color get number => isDark ? SyntaxColors.number : SyntaxColors.numberLight;
+  Color get punct => isDark ? SyntaxColors.punct : SyntaxColors.punctLight;
+  Color get plain => isDark ? SyntaxColors.plain : SyntaxColors.plainLight;
+  Color get ghost => isDark ? SyntaxColors.ghost : SyntaxColors.ghostLight;
+  Color get surface =>
+      isDark ? SyntaxColors.surfaceDark : SyntaxColors.surfaceLight;
 }
 
 /// Detect file type from path.
-String _detectLang(String path) {
+String detectLangFromPath(String path) {
   final p = path.toLowerCase();
   if (p.endsWith('.html') || p.endsWith('.htm')) return 'html';
   if (p.endsWith('.css')) return 'css';
-  if (p.endsWith('.js') || p.endsWith('.jsx') || p.endsWith('.mjs') || p.endsWith('.ts') || p.endsWith('.tsx')) {
+  if (p.endsWith('.js') ||
+      p.endsWith('.jsx') ||
+      p.endsWith('.mjs') ||
+      p.endsWith('.ts') ||
+      p.endsWith('.tsx')) {
     return 'js';
   }
   if (p.endsWith('.dart')) return 'dart';
@@ -39,117 +76,117 @@ String _detectLang(String path) {
   return 'text';
 }
 
-/// Tokenize source code into colored spans.
-List<SyntaxToken> highlight(String source, String path) {
-  final lang = _detectLang(path);
+/// Tokenize source code into colored spans (theme-aware).
+List<SyntaxToken> highlight(String source, String path, {bool isDark = true}) {
+  final pal = SyntaxPalette(isDark);
+  final lang = detectLangFromPath(path);
   switch (lang) {
     case 'html':
     case 'xml':
-      return _highlightHtml(source);
+      return _highlightHtml(source, pal);
     case 'css':
-      return _highlightCss(source);
+      return _highlightCss(source, pal);
     case 'js':
     case 'dart':
     case 'python':
-      return _highlightCode(source, lang);
+      return _highlightCode(source, lang, pal);
     case 'json':
-      return _highlightJson(source);
+      return _highlightJson(source, pal);
     default:
-      return [SyntaxToken(source, SyntaxColors.plain)];
+      return [SyntaxToken(source, pal.plain)];
   }
 }
 
-List<SyntaxToken> _highlightHtml(String src) {
+List<SyntaxToken> _highlightHtml(String src, SyntaxPalette pal) {
   final tokens = <SyntaxToken>[];
   final re = RegExp(
-    r'(<!--[\s\S]*?-->)' // 1: comment
-    r'|(<[a-zA-Z][\w-]*)' // 2: tag start
-    r'|(<\/?[a-zA-Z][\w-]*>)' // 3: full tag
-    r'|(\s+[a-zA-Z][\w-]*=)' // 4: attr name
-    r'|("([^"\\]|\\.)*")' // 5: double-quoted string
-    r"|('([^'\\]|\\.)*')" // 6: single-quoted string
-    r'|(\s+)', // 7: whitespace
+    r'(<!--[\s\S]*?-->)'
+    r'|(<[a-zA-Z][\w-]*)'
+    r'|(<\/?[a-zA-Z][\w-]*>)'
+    r'|(\s+[a-zA-Z][\w-]*=)'
+    r'|("([^"\\]|\\.)*")'
+    r"|('([^'\\]|\\.)*')"
+    r'|(\s+)',
     caseSensitive: false,
   );
-  
+
   var lastIndex = 0;
   for (final m in re.allMatches(src)) {
     if (m.start > lastIndex) {
-      tokens.add(SyntaxToken(src.substring(lastIndex, m.start), SyntaxColors.plain));
+      tokens.add(SyntaxToken(src.substring(lastIndex, m.start), pal.plain));
     }
-    
     if (m.group(1) != null) {
-      tokens.add(SyntaxToken(m.group(1)!, SyntaxColors.comment));
+      tokens.add(SyntaxToken(m.group(1)!, pal.comment));
     } else if (m.group(2) != null) {
-      tokens.add(SyntaxToken(m.group(2)!, SyntaxColors.tag));
+      tokens.add(SyntaxToken(m.group(2)!, pal.tag));
     } else if (m.group(3) != null) {
-      tokens.add(SyntaxToken(m.group(3)!, SyntaxColors.tag));
+      tokens.add(SyntaxToken(m.group(3)!, pal.tag));
     } else if (m.group(4) != null) {
-      tokens.add(SyntaxToken(m.group(4)!, SyntaxColors.attr));
+      tokens.add(SyntaxToken(m.group(4)!, pal.attr));
     } else if (m.group(5) != null) {
-      tokens.add(SyntaxToken(m.group(5)!, SyntaxColors.string));
+      tokens.add(SyntaxToken(m.group(5)!, pal.string));
     } else if (m.group(6) != null) {
-      tokens.add(SyntaxToken(m.group(6)!, SyntaxColors.string));
+      tokens.add(SyntaxToken(m.group(6)!, pal.string));
     } else if (m.group(7) != null) {
-      tokens.add(SyntaxToken(m.group(7)!, SyntaxColors.plain));
+      tokens.add(SyntaxToken(m.group(7)!, pal.plain));
     }
     lastIndex = m.end;
   }
-  
+
   if (lastIndex < src.length) {
-    tokens.add(SyntaxToken(src.substring(lastIndex), SyntaxColors.plain));
+    tokens.add(SyntaxToken(src.substring(lastIndex), pal.plain));
   }
   return tokens;
 }
 
-List<SyntaxToken> _highlightCss(String src) {
+List<SyntaxToken> _highlightCss(String src, SyntaxPalette pal) {
   final tokens = <SyntaxToken>[];
   final re = RegExp(
-    r'(\/\*[\s\S]*?\*\/)' // 1: comment
-    r'|("(\\.|[^"\\])*")' // 2: double string
-    r"|('(\\.|[^'\\])*')" // 3: single string
-    r'|(\#[0-9a-fA-F]{3,8})' // 4: hex color
-    r'|(\.[a-zA-Z][\w-]*)' // 5: class selector
-    r'|(\#[a-zA-Z][\w-]*)' // 6: id selector
-    r'|(@[a-zA-Z]+)' // 7: at-rule
-    r'|(:{1,2}[a-zA-Z][\w-]*)' // 8: pseudo
-    r'|\b(\d+\.?\d*(px|em|rem|%|vh|vw|s|ms)?)\b' // 9: number
-    r'|([{}();:,])' // 10: punct
-    r'|(\s+)', // 11: ws
+    r'(\/\*[\s\S]*?\*\/)'
+    r'|("(\\.|[^"\\])*")'
+    r"|('(\\.|[^'\\])*')"
+    r'|(\#[0-9a-fA-F]{3,8})'
+    r'|(\.[a-zA-Z][\w-]*)'
+    r'|(\#[a-zA-Z][\w-]*)'
+    r'|(@[a-zA-Z]+)'
+    r'|(:{1,2}[a-zA-Z][\w-]*)'
+    r'|\b(\d+\.?\d*(px|em|rem|%|vh|vw|s|ms)?)\b'
+    r'|([{}();:,])'
+    r'|(\s+)',
     caseSensitive: false,
   );
   for (final m in re.allMatches(src)) {
     if (m.group(1) != null) {
-      tokens.add(SyntaxToken(m.group(1)!, SyntaxColors.comment));
+      tokens.add(SyntaxToken(m.group(1)!, pal.comment));
     } else if (m.group(2) != null) {
-      tokens.add(SyntaxToken(m.group(2)!, SyntaxColors.string));
+      tokens.add(SyntaxToken(m.group(2)!, pal.string));
     } else if (m.group(3) != null) {
-      tokens.add(SyntaxToken(m.group(3)!, SyntaxColors.string));
+      tokens.add(SyntaxToken(m.group(3)!, pal.string));
     } else if (m.group(4) != null) {
-      tokens.add(SyntaxToken(m.group(4)!, SyntaxColors.number));
+      tokens.add(SyntaxToken(m.group(4)!, pal.number));
     } else if (m.group(5) != null) {
-      tokens.add(SyntaxToken(m.group(5)!, SyntaxColors.attr));
+      tokens.add(SyntaxToken(m.group(5)!, pal.attr));
     } else if (m.group(6) != null) {
-      tokens.add(SyntaxToken(m.group(6)!, SyntaxColors.attr));
+      tokens.add(SyntaxToken(m.group(6)!, pal.attr));
     } else if (m.group(7) != null) {
-      tokens.add(SyntaxToken(m.group(7)!, SyntaxColors.keyword));
+      tokens.add(SyntaxToken(m.group(7)!, pal.keyword));
     } else if (m.group(8) != null) {
-      tokens.add(SyntaxToken(m.group(8)!, SyntaxColors.keyword));
+      tokens.add(SyntaxToken(m.group(8)!, pal.keyword));
     } else if (m.group(9) != null) {
-      tokens.add(SyntaxToken(m.group(9)!, SyntaxColors.number));
+      tokens.add(SyntaxToken(m.group(9)!, pal.number));
     } else if (m.group(10) != null) {
-      tokens.add(SyntaxToken(m.group(10)!, SyntaxColors.punct));
+      tokens.add(SyntaxToken(m.group(10)!, pal.punct));
     } else if (m.group(11) != null) {
-      tokens.add(SyntaxToken(m.group(11)!, SyntaxColors.plain));
+      tokens.add(SyntaxToken(m.group(11)!, pal.plain));
     }
   }
   if (tokens.isEmpty) {
-    tokens.add(SyntaxToken(src, SyntaxColors.plain));
+    tokens.add(SyntaxToken(src, pal.plain));
   }
   return tokens;
 }
 
-List<SyntaxToken> _highlightCode(String src, String lang) {
+List<SyntaxToken> _highlightCode(String src, String lang, SyntaxPalette pal) {
   final tokens = <SyntaxToken>[];
   final String kwPattern;
   if (lang == 'js') {
@@ -174,93 +211,94 @@ List<SyntaxToken> _highlightCode(String src, String lang) {
 
   final kw = RegExp(kwPattern);
   final re = RegExp(
-    r'(\/\/[^\n]*)' // 1: line comment
-    r'|(\/\*[\s\S]*?\*\/)' // 2: block comment
-    r'|(\#[^\n]*)' // 3: python line comment
-    r'|("(\\.|[^"\\])*")' // 4: double string
-    r"|('(\\.|[^'\\])*')" // 5: single string
-    r'|(`(\\.|[^`])*`)' // 6: template string
-    r'|(\b\d+\.?\d*([eE][+-]?\d+)?\b)' // 7: number
-    r'|(\s*[a-zA-Z_$][\w$]*\s*:)' // 8: object key
-    r'|([{}();:,.\[\]=+\-<>&|!?])' // 9: punct
-    r'|(\s+)', // 10: ws
+    r'(\/\/[^\n]*)'
+    r'|(\/\*[\s\S]*?\*\/)'
+    r'|(\#[^\n]*)'
+    r'|("(\\.|[^"\\])*")'
+    r"|('(\\.|[^'\\])*')"
+    r'|(`(\\.|[^`])*`)'
+    r'|(\b\d+\.?\d*([eE][+-]?\d+)?\b)'
+    r'|(\s*[a-zA-Z_$][\w$]*\s*:)'
+    r'|([{}();:,.\[\]=+\-<>&|!?])'
+    r'|(\s+)',
     caseSensitive: false,
   );
 
   var lastIndex = 0;
   for (final m in re.allMatches(src)) {
     if (m.start > lastIndex) {
-      tokens.add(SyntaxToken(src.substring(lastIndex, m.start), SyntaxColors.plain));
+      tokens.add(SyntaxToken(src.substring(lastIndex, m.start), pal.plain));
     }
-    
+
     final fullMatch = m.group(0)!;
     if (m.group(1) != null || m.group(2) != null || m.group(3) != null) {
-      tokens.add(SyntaxToken(fullMatch, SyntaxColors.comment));
+      tokens.add(SyntaxToken(fullMatch, pal.comment));
     } else if (m.group(4) != null || m.group(5) != null || m.group(6) != null) {
-      tokens.add(SyntaxToken(fullMatch, SyntaxColors.string));
+      tokens.add(SyntaxToken(fullMatch, pal.string));
     } else if (m.group(7) != null) {
-      tokens.add(SyntaxToken(fullMatch, SyntaxColors.number));
+      tokens.add(SyntaxToken(fullMatch, pal.number));
     } else {
       if (kw.hasMatch(fullMatch.trim())) {
-        tokens.add(SyntaxToken(fullMatch, SyntaxColors.keyword));
+        tokens.add(SyntaxToken(fullMatch, pal.keyword));
       } else if (m.group(8) != null) {
-        tokens.add(SyntaxToken(fullMatch, SyntaxColors.attr));
+        tokens.add(SyntaxToken(fullMatch, pal.attr));
       } else if (m.group(9) != null) {
-        tokens.add(SyntaxToken(fullMatch, SyntaxColors.punct));
+        tokens.add(SyntaxToken(fullMatch, pal.punct));
       } else {
-        tokens.add(SyntaxToken(fullMatch, SyntaxColors.plain));
+        tokens.add(SyntaxToken(fullMatch, pal.plain));
       }
     }
     lastIndex = m.end;
   }
-  
+
   if (lastIndex < src.length) {
-    tokens.add(SyntaxToken(src.substring(lastIndex), SyntaxColors.plain));
+    tokens.add(SyntaxToken(src.substring(lastIndex), pal.plain));
   }
   return tokens;
 }
 
-List<SyntaxToken> _highlightJson(String src) {
+List<SyntaxToken> _highlightJson(String src, SyntaxPalette pal) {
   final tokens = <SyntaxToken>[];
   final re = RegExp(
-    r'("(\\.|[^"\\])*")\s*:' // 1: key
-    r'|("(\\.|[^"\\])*")' // 2: string value
-    r'|\b(true|false|null)\b' // 3: literal
-    r'|(-?\d+\.?\d*([eE][+-]?\d+)?)' // 4: number
-    r'|([{}[\]:,])' // 5: punct
-    r'|(\s+)', // 6: ws
+    r'("(\\.|[^"\\])*")\s*:'
+    r'|("(\\.|[^"\\])*")'
+    r'|\b(true|false|null)\b'
+    r'|(-?\d+\.?\d*([eE][+-]?\d+)?)'
+    r'|([{}[\]:,])'
+    r'|(\s+)',
   );
-  
+
   var lastIndex = 0;
   for (final m in re.allMatches(src)) {
     if (m.start > lastIndex) {
-      tokens.add(SyntaxToken(src.substring(lastIndex, m.start), SyntaxColors.plain));
+      tokens.add(SyntaxToken(src.substring(lastIndex, m.start), pal.plain));
     }
-    
+
     if (m.group(1) != null) {
-      tokens.add(SyntaxToken(m.group(1)!, SyntaxColors.attr));
+      tokens.add(SyntaxToken(m.group(1)!, pal.attr));
     } else if (m.group(2) != null) {
-      tokens.add(SyntaxToken(m.group(2)!, SyntaxColors.string));
+      tokens.add(SyntaxToken(m.group(2)!, pal.string));
     } else if (m.group(3) != null) {
-      tokens.add(SyntaxToken(m.group(3)!, SyntaxColors.keyword));
+      tokens.add(SyntaxToken(m.group(3)!, pal.keyword));
     } else if (m.group(4) != null) {
-      tokens.add(SyntaxToken(m.group(4)!, SyntaxColors.number));
+      tokens.add(SyntaxToken(m.group(4)!, pal.number));
     } else if (m.group(5) != null) {
-      tokens.add(SyntaxToken(m.group(5)!, SyntaxColors.punct));
+      tokens.add(SyntaxToken(m.group(5)!, pal.punct));
     } else if (m.group(6) != null) {
-      tokens.add(SyntaxToken(m.group(6)!, SyntaxColors.plain));
+      tokens.add(SyntaxToken(m.group(6)!, pal.plain));
     }
     lastIndex = m.end;
   }
-  
+
   if (lastIndex < src.length) {
-    tokens.add(SyntaxToken(src.substring(lastIndex), SyntaxColors.plain));
+    tokens.add(SyntaxToken(src.substring(lastIndex), pal.plain));
   }
   return tokens;
 }
 
 /// Build a TextSpan tree from tokens for use with RichText.
-TextSpan buildHighlightedSpan(List<SyntaxToken> tokens, {double fontSize = 12}) {
+TextSpan buildHighlightedSpan(List<SyntaxToken> tokens,
+    {double fontSize = 12}) {
   return TextSpan(
     children: tokens
         .map((t) => TextSpan(
@@ -279,9 +317,14 @@ TextSpan buildHighlightedSpan(List<SyntaxToken> tokens, {double fontSize = 12}) 
 /// A specialized controller that applies syntax highlighting as you type.
 class SyntaxHighlightingController extends TextEditingController {
   final String path;
+  final bool isDark;
   String? ghostText;
 
-  SyntaxHighlightingController({super.text, required this.path});
+  SyntaxHighlightingController({
+    super.text,
+    required this.path,
+    this.isDark = true,
+  });
 
   @override
   TextSpan buildTextSpan({
@@ -289,17 +332,23 @@ class SyntaxHighlightingController extends TextEditingController {
     TextStyle? style,
     required bool withComposing,
   }) {
-    final tokens = highlight(text, path);
-    final baseSpan = buildHighlightedSpan(tokens, fontSize: style?.fontSize ?? 12);
-    
-    if (ghostText != null && selection.isCollapsed && selection.baseOffset == text.length) {
+    final dark =
+        isDark && (Theme.of(context).brightness == Brightness.dark || isDark);
+    final tokens = highlight(text, path, isDark: dark);
+    final baseSpan =
+        buildHighlightedSpan(tokens, fontSize: style?.fontSize ?? 12);
+    final pal = SyntaxPalette(dark);
+
+    if (ghostText != null &&
+        selection.isCollapsed &&
+        selection.baseOffset == text.length) {
       return TextSpan(
         children: [
           baseSpan,
           TextSpan(
             text: ghostText,
             style: TextStyle(
-              color: SyntaxColors.ghost,
+              color: pal.ghost,
               fontFamily: 'FiraCode',
               fontSize: style?.fontSize ?? 12,
               height: 1.5,
@@ -308,7 +357,7 @@ class SyntaxHighlightingController extends TextEditingController {
         ],
       );
     }
-    
+
     return baseSpan;
   }
 }

@@ -18,6 +18,7 @@ import '../utils/text_sanitize.dart';
 import '../utils/thought_parser.dart';
 import '../core/colors.dart';
 import '../theme/design_tokens.dart';
+import '../utils/syntax_highlight.dart';
 import '../services/tts_service.dart';
 import 'attachment_preview.dart';
 import 'citation_link_builder.dart';
@@ -132,20 +133,9 @@ class _ChatBubbleState extends State<ChatBubble> {
     final hasAlternatives = alternatives != null && alternatives.isNotEmpty;
     final preferredIdx = widget.message.preferredIndex;
 
-    return TweenAnimationBuilder<double>(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
-      tween: Tween(begin: 0.0, end: 1.0),
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0, 10 * (1 - value)),
-            child: child,
-          ),
-        );
-      },
-      child: Padding(
+    // Entrance animation lives only in ChatView._MessageEntrance — a second
+    // TweenAnimationBuilder here re-animates on every rebuild (jank + double motion).
+    return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -434,7 +424,7 @@ class _ChatBubbleState extends State<ChatBubble> {
                                       const Icon(LucideIcons.clock, size: 10, color: Colors.orange),
                                       const SizedBox(width: 4),
                                       Text(
-                                        'Queued',
+                                        'chat_queued'.tr,
                                         style: GoogleFonts.plusJakartaSans(
                                           fontSize: 9,
                                           color: Colors.orange,
@@ -501,8 +491,7 @@ class _ChatBubbleState extends State<ChatBubble> {
             _buildActionBar(context, isUser, isDark),
           ],
         ),
-      ),
-    );
+      );
   }
 
   /// Claude-style raw/code view: exact source text in mono, selectable.
@@ -513,7 +502,9 @@ class _ChatBubbleState extends State<ChatBubble> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF8F9FA),
+        color: isDark
+            ? SyntaxColors.surfaceDark
+            : SyntaxColors.surfaceLight,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isDark
@@ -527,7 +518,7 @@ class _ChatBubbleState extends State<ChatBubble> {
         style: GoogleFonts.firaCode(
           fontSize: 12.5,
           height: 1.6,
-          color: isDark ? const Color(0xFFCDD6F4) : Dt.textPrimary,
+          color: isDark ? SyntaxColors.plain : SyntaxColors.plainLight,
         ),
       ),
     );

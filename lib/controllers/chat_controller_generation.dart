@@ -903,7 +903,63 @@ extension ChatControllerGeneration on ChatController {
         } catch (e) {
           fullResponse = 'Search failed: $e';
         }
-      } else if (inferenceMode == 'local') {
+      } else {
+        // Deep Search without a Perplexity key: free DuckDuckGo snippets
+        // are injected into the prompt; local/cloud generation then runs
+        // as usual and Sources chips show the hits.
+        if (isSearchMode.value) {
+          addToolStep(
+              name: 'web_search', args: {'query': prompt, 'engine': 'ddg'},
+              running: true);
+          try {
+            final sr = await WebSearchService.search(prompt, maxResults: 5);
+            if (sr.ok) {
+              prompt = sr.augmentPrompt(prompt);
+              if (history.isNotEmpty && history.last['role'] == 'user') {
+                history[history.length - 1] = {
+                  'role': 'user',
+                  'content': prompt,
+                };
+              }
+              for (final s in sr.sources) {
+                if (!webSources.any((w) => w.url == s.url)) {
+                  webSources.add(s);
+                }
+              }
+              if (currentToolSteps.isNotEmpty &&
+                  currentToolSteps.last['name'] == 'web_search') {
+                currentToolSteps[currentToolSteps.length - 1] = {
+                  ...currentToolSteps.last,
+                  'output': 'DuckDuckGo: ${sr.hits.length} results',
+                  'running': false,
+                  'success': true,
+                };
+              }
+            } else if (currentToolSteps.isNotEmpty &&
+                currentToolSteps.last['name'] == 'web_search') {
+              currentToolSteps[currentToolSteps.length - 1] = {
+                ...currentToolSteps.last,
+                'output': sr.error ?? 'Search failed',
+                'running': false,
+                'success': false,
+              };
+            }
+          } catch (e) {
+            if (currentToolSteps.isNotEmpty &&
+                currentToolSteps.last['name'] == 'web_search') {
+              currentToolSteps[currentToolSteps.length - 1] = {
+                ...currentToolSteps.last,
+                'output': 'Search failed: $e',
+                'running': false,
+                'success': false,
+              };
+            }
+          }
+        }
+      }
+
+      if (!(isSearchMode.value && cloud.isProviderConfigured('perplexity'))) {
+      if (inferenceMode == 'local') {
         final localImage = Get.find<LocalImageService>();
 
         if (localImage.isModelLoaded.value &&
@@ -1023,6 +1079,7 @@ extension ChatControllerGeneration on ChatController {
           onToken: bufferToken,
         );
       }
+      } // end non-perplexity local/cloud generation
 
       generationDone = true;
       return true;

@@ -6,7 +6,7 @@ Per `docs/multiplatfrom.md` §8.3: if a feature is genuinely infeasible on a tar
 
 | Feature | Android (primary, full) | Web (Flutter Web) | Windows Desktop (Flutter Windows) |
 |---------|------------------------|-------------------|-----------------------------------|
-| **Local LLM (llama.cpp GGUF)** | ✅ Full — `llama_flutter_android`, GPU Vulkan/OpenCL, resident pool, instant switch | ❌ Cloud-only — `dart:io` unavailable, `inference_stub` returns `supportsLocalInference=false`; `File`/`mmap` not possible in browser sandbox | ❌ Cloud-only (for now) — `local_plugins` are Android FFI only; Windows runner has no `llama.dll` yet. Stub returns `Cloud mode` banner. **Roadmap:** add `local_plugins/llama_flutter_windows` |
+| **Local LLM (llama.cpp GGUF)** | ✅ Full — `llama_flutter_android`, GPU Vulkan/OpenCL, resident pool, instant switch | ❌ Cloud-only — `dart:io` unavailable, `inference_stub` returns `supportsLocalInference=false`; `File`/`mmap` not possible in browser sandbox | ⚠️ **Partial** — `supportsLocalInference` still false for Dart FFI path; optional **llama-server.exe sidecar** (`lib/services/local_server_service.dart`) can serve GGUF over a local OpenAI-compatible endpoint when the binary is present. LiteRT/SD/vision remain Android-only. Roadmap: `local_plugins/llama_flutter_windows` |
 | **LiteRT-LM (.litertlm)** | ✅ Full — `flutter_litert_lm` | ❌ Cloud-only | ❌ Cloud-only (same reason) |
 | **Stable Diffusion 1.5** | ✅ Full — `sd_flutter_android` (safetensors) | ❌ Cloud Stability fallback | ❌ Cloud Stability fallback |
 | **Image understanding (Qwen2-VL, Gemma vision)** | ✅ Via GGUF vision | ❌ Cloud vision models (Gemini, GPT-4o, Claude) | ❌ Same as Web |

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/colors.dart';
 import '../../services/device_info_service.dart';
+import '../../services/hive_service.dart';
 import '../../services/inference_service.dart';
 import '../../services/local_image_service.dart';
 import '../../services/soc_family.dart';
@@ -73,6 +74,36 @@ Widget buildDeviceCard(BuildContext context, bool isDark) {
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                           color: Theme.of(context).hintColor)),
+                  const SizedBox(height: 4),
+                  Builder(builder: (ctx) {
+                    String storage = 'Storage status unavailable';
+                    Color? storageColor;
+                    try {
+                      final hive = Get.find<HiveService>();
+                      storage = hive.storageStatus;
+                      if (hive.isEncrypted) {
+                        storageColor = AppColors.success;
+                      } else if (hive.isFallback) {
+                        storageColor = AppColors.warning;
+                      } else {
+                        storageColor = AppColors.warning;
+                      }
+                    } catch (_) {}
+                    return Row(children: [
+                      Icon(LucideIcons.database,
+                          size: 12,
+                          color: storageColor ?? Theme.of(ctx).hintColor),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(storage,
+                            style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: storageColor ??
+                                    Theme.of(ctx).hintColor)),
+                      ),
+                    ]);
+                  }),
                 ])),
           ])),
       Divider(

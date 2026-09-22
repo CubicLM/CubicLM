@@ -40,7 +40,7 @@ CubicLM/
 | Validation, core algorithms | `lib/services/skills/skill_injector`, `lib/utils/thought_parser` | **Yes** | Pure Dart, no `dart:io` at import time |
 | Constants, types, theme | `lib/core/constants`, `lib/models`, `lib/theme/design_tokens` | **Yes** | `shared/theme/tokens.dart` will hold spacing/breakpoint tokens per §5.3 |
 | i18n | strings inline + skills | **Yes** (future: `shared/locales/`) | Bangla detection in `skill_injector` |
-| Theme tokens | `lib/theme/design_tokens.dart` + `shared/theme/` | **Yes** | `canvas #F8F4ED`, `accent #D97757`, etc. consumed by all shells |
+| Theme tokens | `lib/theme/design_tokens.dart` + `shared/theme/` | **Yes** | Signature canvas `#F8F4ED`, accent `#D97757` (Claude Orange — prefer over `AppColors.primary` indigo for new UI); chip/warm semantic tints live on `Dt.chip*` |
 | Storage | `lib/services/hive_service.dart` | **Yes** with platform adapter | `hive_flutter` on Android/Windows, `hive` IndexedDB on Web; `_MemoryBox` fallback on corruption |
 | File picker/share | `file_picker`, `share_plus`, `gal`, `image_picker` | **Yes** via plugin abstraction | Plugins internally use native dialogs (Android Storage Access, Windows `GetOpenFileName`, Web `<input>`) — no `dart:io` direct |
 | Window chrome | `windows/runner/*`, `lib/main.dart: window_manager` | **No** — Windows only | `window_manager` gated by `!kIsWeb && defaultTargetPlatform==windows` |
@@ -94,4 +94,4 @@ ModelController.downloadModel → DownloadService.downloadModel → startNativeS
 ## 5. What Was Not Built & Why
 
 - **Linux/macOS shells**: Not requested (§1 lists Web, Windows, Android). `flutter create` could add them in one command when needed — same pattern as Windows.
-- **Windows local inference**: `local_plugins` are Android-only FFI. Windows build is **cloud-only** (local toggle shows “Not available on this platform” via `supportsLocalInference==false` stub) — intentional per §8.3, avoids shipping a broken native lib. Roadmap: port `llama.cpp` Windows build to `local_plugins/llama_flutter_windows` and flip the flag.
+- **Windows local inference**: `local_plugins` are Android-only FFI. In-app Dart FFI on Windows still reports `supportsLocalInference=false`. An optional **llama-server.exe sidecar** (`lib/services/local_server_service.dart`) can expose GGUF models via a local OpenAI-compatible HTTP endpoint when the binary is bundled/downloaded. LiteRT, Stable Diffusion, vision, APK install, and PRoot runtime remain Android-only. Roadmap: port `llama.cpp` Windows build to `local_plugins/llama_flutter_windows` and flip the flag for in-process load.

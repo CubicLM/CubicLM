@@ -102,6 +102,15 @@ class ServerController extends GetxController {
         apiKey: useApiKey.value ? apiKey.value : null,
         onLog: (message) => serverStatus.value = message,
       );
+      // Capture auto-generated key so the UI can show clients how to auth.
+      final generated = _server.activeApiKey;
+      if (!useApiKey.value &&
+          generated != null &&
+          generated.isNotEmpty &&
+          apiKey.value.trim().isEmpty) {
+        apiKey.value = generated;
+        apiKeyCtrl.text = generated;
+      }
       localUrl.value = _server.localUrl;
       isRunning.value = true;
       serverStatus.value = 'Server running';

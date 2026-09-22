@@ -49,22 +49,33 @@ class _ThinkingOrbState extends State<ThinkingOrb>
   void initState() {
     super.initState();
     _state = widget.state ?? OrbState.working;
-    _ticker = createTicker(_onTick)..start();
+    _ticker = createTicker(_onTick);
+    if (!_reducedMotion) _ticker.start();
     if (widget.autoCycle && widget.state == null) {
       _cycleTimer = Timer.periodic(_cyclePeriod, (_) {
-        if (!mounted) return;
+        if (!mounted || _reducedMotion) return;
         setState(() => _state = _randomNext(_state));
       });
     }
   }
 
+  bool get _reducedMotion => WidgetsBinding
+      .instance.platformDispatcher.accessibilityFeatures.disableAnimations;
+
   // Sim time is never reset on state change — hard cut, continuous phase
   // (matches the reference engine's wall-clock behaviour).
   void _onTick(Duration elapsed) {
+    if (!mounted) return;
+    // Skip rebuild when the orb is offstage (TickerMode) or motion is reduced.
+    final tickerEnabled = TickerMode.valuesOf(context).enabled;
+    if (!tickerEnabled || _reducedMotion) {
+      _lastElapsed = elapsed;
+      return;
+    }
     final dt = (elapsed - _lastElapsed).inMicroseconds / 1e6;
     _lastElapsed = elapsed;
     _simTime += dt * _speedFor(_state, widget.size);
-    if (mounted) setState(() {});
+    setState(() {});
   }
 
   @override

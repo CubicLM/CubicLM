@@ -27,6 +27,7 @@ import '../ffi/sd_ffi_bindings.dart';
 import '../services/hive_service.dart';
 import '../services/chat_backup.dart';
 import '../services/web_fetch_service.dart';
+import '../services/web_search_service.dart';
 import '../services/inference_service.dart';
 import '../services/cloud_service.dart';
 import '../services/local_image_service.dart';

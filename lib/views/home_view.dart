@@ -10,6 +10,7 @@ import '../controllers/chat_controller.dart';
 import '../controllers/home_controller.dart';
 import '../core/colors.dart';
 import '../services/hive_service.dart';
+import '../theme/design_tokens.dart';
 import '../utils/app_snackbar.dart';
 import 'chat_view.dart';
 import 'model_view.dart';
@@ -79,7 +80,8 @@ class _HomeViewState extends State<HomeView> {
       ];
 
   bool get _isWide {
-    if (kIsWeb) return true;
+    // Same breakpoint on web and native: narrow browser windows keep
+    // bottom nav instead of forcing the desktop rail.
     return Get.width >= 800;
   }
 
@@ -211,14 +213,17 @@ class _HomeViewState extends State<HomeView> {
     final muted = Theme.of(context).hintColor;
 
     return Container(
-      width: 84,
+      width: Dt.navRailWidth,
       color: Theme.of(context).scaffoldBackgroundColor,
       child: Column(children: [
         const SizedBox(height: 24),
-        Image.asset(
-          'assets/icons/CubicLM.png',
-          width: 40,
-          height: 40,
+        Semantics(
+          label: 'Primary navigation',
+          child: Image.asset(
+            'assets/icons/CubicLM.png',
+            width: 40,
+            height: 40,
+          ),
         ),
         const SizedBox(height: 32),
         Expanded(child: Obx(() {
@@ -231,7 +236,11 @@ class _HomeViewState extends State<HomeView> {
               return Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: InkWell(
+                child: Semantics(
+                  selected: sel,
+                  button: true,
+                  label: tab.label,
+                  child: InkWell(
                   borderRadius: BorderRadius.circular(16),
                   onTap: () => controller.changeTab(i),
                   child: AnimatedContainer(
@@ -268,8 +277,10 @@ class _HomeViewState extends State<HomeView> {
                                     color: sel ? accent : muted, size: 22),
                                 const SizedBox(height: 6),
                                 Text(tab.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 10,
+                                        fontSize: 11,
                                         fontWeight:
                                             sel ? FontWeight.w800 : FontWeight.w600,
                                         color: sel ? accent : muted)),
@@ -278,6 +289,7 @@ class _HomeViewState extends State<HomeView> {
                       ],
                     ),
                   ),
+                ),
                 ),
               );
             },

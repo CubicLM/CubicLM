@@ -9,6 +9,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../core/constants.dart';
 import '../utils/memory_extract.dart';
 import '../utils/semantic_vectors.dart';
+import 'app_log_service.dart';
 import 'secure_key_store.dart';
 
 /// Worker for [HiveService.recallPastTurns] — must stay top-level for
@@ -267,6 +268,16 @@ class HiveService extends GetxService {
 
   HiveAesCipher? _encryptionCipher;
 
+  /// True when AES cipher is active for on-disk boxes.
+  bool get isEncrypted => _encryptionCipher != null;
+
+  /// Human-readable storage mode for Settings/diagnostics.
+  String get storageStatus {
+    if (_isFallback) return 'Memory only (disk unavailable)';
+    if (_encryptionCipher != null) return 'Encrypted on disk (AES)';
+    return 'On disk (not encrypted)';
+  }
+
   Box get sessionsBox => _sessionsBox;
   Box get messagesBox => _messagesBox;
   Box get tasksBox => _tasksBox;
@@ -361,8 +372,17 @@ class HiveService extends GetxService {
       try {
         final key = await secureKeyStore.hiveEncryptionKey();
         _encryptionCipher = HiveAesCipher(key);
-      } catch (_) {
-        // Encryption setup failed — proceed without encryption.
+      } catch (e) {
+        // Encryption setup failed — proceed without encryption, but surface
+        // the reason so Settings can show "not encrypted" honestly.
+        _encryptionCipher = null;
+        if (Get.isRegistered<AppLogService>()) {
+          Get.find<AppLogService>().error(
+            'Hive encryption unavailable — storage will be plaintext on disk',
+            details: e,
+            category: LogCategory.system,
+          );
+        }
       }
     }
 

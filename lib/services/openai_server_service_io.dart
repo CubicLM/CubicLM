@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../controllers/settings_controller.dart';
 import '../core/constants.dart';
+import '../utils/semantic_vectors.dart';
 import 'inference_service.dart';
 
 class OpenAiServerService {
@@ -49,13 +50,29 @@ class OpenAiServerService {
     void Function(String)? onLog,
   }) async {
     if (_server != null) return;
-    _apiKey = apiKey?.trim();
+    final provided = apiKey?.trim() ?? '';
+    // Default: require a bearer token on LAN. Empty key previously left
+    // the API open to every device on the network.
+    _apiKey = provided.isNotEmpty ? provided : _generateDefaultToken();
     _onLog = onLog;
     _lastReachableAddress = await _reachableIpv4Address();
     _server = await HttpServer.bind(InternetAddress.anyIPv4, port);
     _onLog?.call('Server listening on ${localUrl ?? 'http://localhost:$port'}');
+    if (provided.isEmpty) {
+      _onLog?.call(
+          'Generated default API key — clients must send Authorization: Bearer $_apiKey');
+    }
     unawaited(_serve(_server!));
   }
+
+  static String _generateDefaultToken() {
+    final rng = Random.secure();
+    const chars =
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    return List.generate(32, (_) => chars[rng.nextInt(chars.length)]).join();
+  }
+
+  String? get activeApiKey => _apiKey;
 
   Future<void> stop() async {
     final server = _server;
@@ -121,11 +138,7 @@ class OpenAiServerService {
         return;
       }
       if (request.method == 'POST' && path == '/v1/embeddings') {
-        // Honest 400: the on-device engine has no embedding mode.
-        await _json(request, {
-          'error': 'Embeddings are not supported by the on-device engine',
-          'hint': 'Use /v1/chat/completions or /v1/completions instead',
-        }, status: HttpStatus.badRequest);
+        await _handleEmbeddings(request);
         return;
       }
 
@@ -146,9 +159,51 @@ class OpenAiServerService {
 
   bool _isAuthorized(HttpRequest request) {
     final key = _apiKey;
-    if (key == null || key.isEmpty) return true;
+    if (key == null || key.isEmpty) return false; // never open by default
     final header = request.headers.value(HttpHeaders.authorizationHeader) ?? '';
     return header.trim() == 'Bearer $key';
+  }
+
+  Future<void> _handleEmbeddings(HttpRequest request) async {
+    final body = utf8.decode(await request.fold<List<int>>(
+        <int>[], (b, chunk) => b..addAll(chunk)));
+    Map<String, dynamic> parsed;
+    try {
+      parsed = jsonDecode(body.isEmpty ? '{}' : body) as Map<String, dynamic>;
+    } catch (_) {
+      await _json(request, {'error': 'Invalid JSON body'},
+          status: HttpStatus.badRequest);
+      return;
+    }
+    final input = parsed['input'];
+    final List<String> texts;
+    if (input is String) {
+      texts = [input];
+    } else if (input is List) {
+      texts = input.map((e) => '$e').toList();
+    } else {
+      await _json(request, {
+        'error': 'input must be a string or array of strings',
+      }, status: HttpStatus.badRequest);
+      return;
+    }
+    final data = <Map<String, dynamic>>[];
+    for (var i = 0; i < texts.length; i++) {
+      data.add({
+        'object': 'embedding',
+        'index': i,
+        'embedding': semanticVector(texts[i]),
+      });
+    }
+    await _json(request, {
+      'object': 'list',
+      'model': parsed['model'] ?? 'cubiclm-trigram-hash-v1',
+      'data': data,
+      'usage': {
+        'prompt_tokens': texts.fold<int>(0, (s, t) => s + t.length),
+        'total_tokens': texts.fold<int>(0, (s, t) => s + t.length),
+      },
+    });
   }
 
   Future<void> _handleModels(HttpRequest request) async {
@@ -184,7 +239,9 @@ class OpenAiServerService {
         'audio': isLiteRt,
         'streaming': hasModel,
         'gguf': hasModel && !isLiteRt,
-        'embeddings': false,
+        'embeddings': true,
+        'embeddings_model': 'cubiclm-trigram-hash-v1',
+        'embeddings_dims': 256,
       },
       'limits': {
         'post_per_min_per_ip': _kRateMax,

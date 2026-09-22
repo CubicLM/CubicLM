@@ -10,6 +10,7 @@ import '../core/constants.dart';
 import '../models/chat_session.dart';
 import 'app_log_service.dart';
 import 'hive_service.dart';
+import 'secure_key_store.dart';
 import '../utils/export_file.dart';
 
 /// Chat backup + settings transfer (export/import JSON).
@@ -140,11 +141,12 @@ Future<String?> _exportChatsDesktop(String jsonStr) async {
   }
 }
 
-/// Silent scheduled backup: writes unencrypted JSON (no images) to the
-/// app documents dir when enabled and due, keeping the last 3 files.
+/// Silent scheduled backup: writes JSON (no images) to the app documents
+/// dir when enabled and due, keeping the last 3 files.
 /// Runs once per process from onInit. Never throws, never prompts.
-/// NOTE: auto-backups are unencrypted (no unattended passphrase) —
-/// use manual export with a passphrase for sensitive chats.
+/// When [AppConstants.keyAutoBackupEncrypted] is on and a backup passphrase
+/// is stored in [SecureKeyStore] (`clm_backup_pass`), auto-backups are
+/// AES-256 encrypted like manual exports; otherwise plaintext JSON.
 Future<void> maybeAutoBackup(HiveService hive) async {
   try {
     final enabled = hive.getSetting<bool>(AppConstants.keyAutoBackupEnabled,
@@ -160,18 +162,29 @@ Future<void> maybeAutoBackup(HiveService hive) async {
             0;
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     if (nowMs - last < days * 24 * 60 * 60 * 1000) return;
-    final jsonStr = await buildBackupJson(hive);
+
+    String? passphrase;
+    final wantEnc = hive.getSetting<bool>(AppConstants.keyAutoBackupEncrypted,
+            defaultValue: false) ??
+        false;
+    if (wantEnc && Get.isRegistered<SecureKeyStore>()) {
+      passphrase = Get.find<SecureKeyStore>().read(secureKeyBackupPassphrase);
+      if (passphrase.isEmpty) passphrase = null;
+    }
+
+    final jsonStr = await buildBackupJson(hive, passphrase: passphrase);
     if (jsonStr == null) return;
     final dir = await getApplicationDocumentsDirectory();
     final stamp =
         DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-    final file = File('${dir.path}/cubiclm_auto_backup_$stamp.json');
+    final encTag = passphrase != null ? '_enc' : '';
+    final file = File('${dir.path}/cubiclm_auto_backup${encTag}_$stamp.json');
     await file.writeAsString(jsonStr, flush: true);
     // Prune to the last 3 auto-backups.
     final autos = Directory(dir.path)
         .listSync()
         .whereType<File>()
-        .where((f) => f.path.contains('cubiclm_auto_backup_'))
+        .where((f) => f.path.contains('cubiclm_auto_backup'))
         .toList()
       ..sort((a, b) => b.path.compareTo(a.path));
     for (final old in autos.skip(3)) {
@@ -180,10 +193,15 @@ Future<void> maybeAutoBackup(HiveService hive) async {
       } catch (_) {}
     }
     await hive.setSetting(AppConstants.keyLastAutoBackup, nowMs);
-    Get.find<AppLogService>().info('Auto backup saved',
-        details: file.path, category: LogCategory.chat);
+    Get.find<AppLogService>().info(
+        'Auto backup saved${passphrase != null ? ' (encrypted)' : ''}',
+        details: file.path,
+        category: LogCategory.chat);
   } catch (_) {}
 }
+
+/// Secure-storage key for the unattended auto-backup passphrase.
+const String secureKeyBackupPassphrase = 'clm_backup_pass';
 
 /// Export app settings WITHOUT secrets (API keys live in secure
 /// storage and custom-profile inline keys are excluded too).

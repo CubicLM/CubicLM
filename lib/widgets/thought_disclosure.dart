@@ -163,7 +163,7 @@ class _ThoughtDisclosureState extends State<ThoughtDisclosure>
         // Content
         SizeTransition(
           sizeFactor: _expandAnimation,
-          axisAlignment: -1.0,
+          alignment: Alignment.topCenter,
           child: Container(
             margin: const EdgeInsets.only(top: 4, bottom: 12),
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),

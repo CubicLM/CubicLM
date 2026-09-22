@@ -1,13 +1,13 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CubicLM — Private, Local AI for Everyone</title>
-<meta name="description" content="CubicLM is private offline-first AI for Android & Windows — llama.cpp GGUF + LiteRT-LM + Stable Diffusion on-device, 20+ cloud providers, MIT open source. Your data never leaves the device.">
+<meta name="description" content="CubicLM is private offline-first AI — full on-device LLMs on Android (llama.cpp GGUF + LiteRT-LM + Stable Diffusion); Windows ships cloud chat + optional local GGUF sidecar. 23+ cloud providers, MIT open source.">
 <link rel="canonical" href="https://cubiclm.vercel.app/">
 <meta property="og:title" content="CubicLM — Private, Local AI for Everyone">
-<meta property="og:description" content="Run LLMs and Stable Diffusion entirely offline on Android & Windows. Local GGUF + LiteRT + 23 cloud providers. MIT open source.">
+<meta property="og:description" content="Run LLMs and Stable Diffusion offline on Android. Windows: cloud chat + optional local GGUF. 23 cloud providers. MIT open source.">
 <meta property="og:image" content="https://cubiclm.vercel.app/logo.png">
 <meta property="og:url" content="https://cubiclm.vercel.app/">
 <meta property="og:type" content="website">
@@ -77,13 +77,25 @@
     </div>
   </div>
   <div class="nav-social">
+    <button class="nav-burger" id="nav-burger" aria-label="Open menu" aria-expanded="false"><i class="ri-menu-line"></i></button>
     <a href="https://github.com/abir2afridi/CubicLM" target="_blank"><i class="ri-github-line"></i></a>
   </div>
 </nav>
+<div class="nav-mobile" id="nav-mobile" hidden>
+  <a href="#services">Services</a>
+  <a href="#download">Download</a>
+  <a href="#about">About</a>
+  <a href="#features">Features</a>
+  <a href="#models">Models</a>
+  <a href="#providers">Providers</a>
+  <a href="#tech">Tech</a>
+  <a href="#faq">FAQ</a>
+  <a href="https://github.com/abir2afridi/CubicLM" target="_blank">GitHub</a>
+</div>
 
 <!-- ════ HERO ════ -->
 <section class="hero">
-  <h1 style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden">CubicLM — Private, Local AI for Android & Windows</h1>
+  <h1 style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden">CubicLM — Private, Local AI for Android &amp; Windows</h1>
   <div class="hero-bg" id="hero-bg">
     <img src="https://raw.githubusercontent.com/abir2afridi/CubicLM/main/assets/icons/CubicLM.png" alt="CubicLM — Private Local AI">
   </div>
@@ -224,7 +236,7 @@ href="https://github.com/abir2afridi/CubicLM/releases/download/v1.16.0/cubiclm-v
   </div>
   <div class="download-req">
     <div><span>Android</span>9+ · 4 GB+ RAM recommended · free GBs for models (GGUF 0.5–8 GB each)</div>
-    <div><span>Windows</span>10+ · WebView2 · cloud models (on-device GGUF needs the Android app)</div>
+    <div><span>Windows</span>10+ · WebView2 · cloud models + optional local GGUF sidecar (LiteRT/SD Android-first)</div>
   </div>
 </section>
 
@@ -235,7 +247,7 @@ href="https://github.com/abir2afridi/CubicLM/releases/download/v1.16.0/cubiclm-v
     <div class="about-card">
       <div class="about-card-icon"><i class="ri-shield-check-line"></i></div>
       <div class="about-card-title">Private by Default</div>
-      <div class="about-card-text">No telemetry, no accounts, no cloud. Your conversations stay on your device with AES-256 encryption. Your data never leaves.</div>
+      <div class="about-card-text">No telemetry, no accounts by default. Conversations stay on your device; app-lock and optional encrypted backups available. Cloud mode only sends prompts to the provider you choose.</div>
     </div>
     <div class="about-card">
       <div class="about-card-icon"><i class="ri-plug-line"></i></div>
@@ -1026,7 +1038,7 @@ href="https://github.com/abir2afridi/CubicLM/releases/download/v1.16.0/cubiclm-v
     </div>
     <div class="faq-item">
       <button class="faq-q">Can Windows run local GGUF models?<i class="ri-add-line"></i></button>
-      <div class="faq-a">Not yet — on-device llama.cpp / LiteRT / Stable Diffusion are Android-only. Windows gets full chat, 20+ cloud providers, backup, shortcuts and App Lock. A native Windows engine is on the roadmap.</div>
+      <div class="faq-a">Windows ships cloud chat with 23+ providers, Skills, MCP, and optional local GGUF via a llama-server sidecar (when bundled). LiteRT-LM and Stable Diffusion remain Android-first. A fuller native Windows engine is on the roadmap.</div>
     </div>
     <div class="faq-item">
       <button class="faq-q">How much RAM and storage do I need?<i class="ri-add-line"></i></button>
@@ -1034,7 +1046,7 @@ href="https://github.com/abir2afridi/CubicLM/releases/download/v1.16.0/cubiclm-v
     </div>
     <div class="faq-item">
       <button class="faq-q">Is my data private?<i class="ri-add-line"></i></button>
-      <div class="faq-a">Chats live on your device in AES-256 encrypted storage with an optional biometric lock. Cloud mode sends prompts only to the provider you explicitly chose — nothing else leaves the device.</div>
+      <div class="faq-a">Chats live on your device. Optional app-lock (Android biometrics / Windows Hello) and encrypted backups are available. Cloud mode sends prompts only to the provider you explicitly chose — nothing else leaves the device.</div>
     </div>
     <div class="faq-item">
       <button class="faq-q">How do updates work?<i class="ri-add-line"></i></button>
