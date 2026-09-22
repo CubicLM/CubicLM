@@ -75,6 +75,10 @@ class _SettingSearchEntry {
 class AppSettingsView extends GetView<SettingsController> {
   AppSettingsView({super.key});
 
+  /// Inline expand state for the Composer-buttons section (no drawer —
+  /// the four visibility switches live right under the header row).
+  final _composerOpen = false.obs;
+
   void _showCodeEditorInfo(BuildContext context) {
     showDialog(
       context: context,
@@ -297,7 +301,6 @@ class AppSettingsView extends GetView<SettingsController> {
                         ? '${mem.memoryCount} fact${mem.memoryCount == 1 ? '' : 's'} stored'
                         : 'Disabled — CubicLM won\'t remember facts',
                     trailing: const Icon(LucideIcons.chevronRight, size: 20),
-                    showDivider: false,
                     onTap: () => Get.to(() => const MemoryView()),
                   );
                 }),
@@ -327,7 +330,6 @@ class AppSettingsView extends GetView<SettingsController> {
                       trailing: controller.codeEditorType.value == 'split'
                           ? Icon(LucideIcons.check, size: 20, color: Theme.of(context).primaryColor)
                           : null,
-                      showDivider: true,
                       onTap: () => controller.setCodeEditorType('split'),
                     )),
                 Obx(() => _appleListTile(
@@ -340,7 +342,6 @@ class AppSettingsView extends GetView<SettingsController> {
                       trailing: controller.codeEditorType.value == 'plain'
                           ? Icon(LucideIcons.check, size: 20, color: Theme.of(context).primaryColor)
                           : null,
-                      showDivider: true,
                       onTap: () => controller.setCodeEditorType('plain'),
                     )),
                 Obx(() => _appleSwitchTile(
@@ -355,16 +356,80 @@ class AppSettingsView extends GetView<SettingsController> {
                       value: controller.longPasteToFile.value,
                       onChanged: (v) => controller.setLongPasteToFile(v),
                     )),
-                _appleListTile(
-                  context,
-                  isDark,
-                  leading: Icon(LucideIcons.slidersHorizontal,
-                      size: 20, color: Theme.of(context).primaryColor),
-                  title: 'Composer buttons',
-                  subtitle: 'Show or hide chat input icons',
-                  trailing: const Icon(LucideIcons.chevronRight, size: 20),
-                  onTap: () => _showComposerButtonsSheet(context, isDark),
-                ),
+                Obx(() => _appleSwitchTile(
+                      context,
+                      isDark,
+                      leading: Icon(LucideIcons.slidersHorizontal,
+                          size: 20, color: Theme.of(context).primaryColor),
+                      title: 'Composer buttons',
+                      subtitle: _composerOpen.value
+                          ? 'Tap to collapse'
+                          : 'Show or hide chat input icons',
+                      value: _composerOpen.value,
+                      onChanged: (v) => _composerOpen.value = v,
+                    )),
+                Obx(() => _composerOpen.value
+                    ? Column(
+                        children: [
+                          _appleSwitchTile(
+                            context,
+                            isDark,
+                            leading: Icon(LucideIcons.globe,
+                                size: 20,
+                                color: Theme.of(context).primaryColor),
+                            title: 'Web access',
+                            subtitle: controller.showWebAccess.value
+                                ? 'Visible in the composer'
+                                : 'Hidden from the composer',
+                            value: controller.showWebAccess.value,
+                            onChanged: (v) =>
+                                controller.setShowWebAccess(v),
+                          ),
+                          _appleSwitchTile(
+                            context,
+                            isDark,
+                            leading: Icon(LucideIcons.search,
+                                size: 20,
+                                color: Theme.of(context).primaryColor),
+                            title: 'Deep Search',
+                            subtitle: controller.showDeepSearch.value
+                                ? 'Visible in the composer'
+                                : 'Hidden from the composer',
+                            value: controller.showDeepSearch.value,
+                            onChanged: (v) =>
+                                controller.setShowDeepSearch(v),
+                          ),
+                          _appleSwitchTile(
+                            context,
+                            isDark,
+                            leading: Icon(LucideIcons.video,
+                                size: 20,
+                                color: Theme.of(context).primaryColor),
+                            title: 'Live Vision',
+                            subtitle: controller.showLiveVision.value
+                                ? 'Visible in the composer'
+                                : 'Hidden from the composer',
+                            value: controller.showLiveVision.value,
+                            onChanged: (v) =>
+                                controller.setShowLiveVision(v),
+                          ),
+                          _appleSwitchTile(
+                            context,
+                            isDark,
+                            leading: Icon(LucideIcons.sparkles,
+                                size: 20,
+                                color: Theme.of(context).primaryColor),
+                            title: 'Polish Prompt',
+                            subtitle: controller.showPolishPrompt.value
+                                ? 'Visible in the composer'
+                                : 'Hidden from the composer',
+                            value: controller.showPolishPrompt.value,
+                            onChanged: (v) =>
+                                controller.setShowPolishPrompt(v),
+                          ),
+                        ],
+                      )
+                    : const SizedBox.shrink()),
                 Obx(() {
                   final style = controller.contextWindowStyle.value;
                   return _appleListTile(
@@ -381,7 +446,6 @@ class AppSettingsView extends GetView<SettingsController> {
                             : 'Bar below the chat header',
                     trailing:
                         const Icon(LucideIcons.chevronRight, size: 20),
-                    showDivider: false,
                     onTap: () =>
                         _showContextWindowSheet(context, isDark),
                   );
@@ -415,7 +479,6 @@ class AppSettingsView extends GetView<SettingsController> {
                   subtitle:
                       'Notifications, battery, runtime, keys — all optional',
                   trailing: const Icon(LucideIcons.chevronRight, size: 20),
-                  showDivider: false,
                   onTap: () => Get.to(() => const SetupRecommendationsView()),
                 ),
               ]),
@@ -489,7 +552,6 @@ class AppSettingsView extends GetView<SettingsController> {
                       '${controller.locale.value.flag}  ${controller.locale.value.nativeName}',
                   trailing: Icon(LucideIcons.chevronRight,
                       size: 18, color: Theme.of(context).hintColor),
-                  showDivider: false,
                   onTap: () => Get.to(() => const LanguagePickerView()),
                 ),
               ]),
@@ -1180,76 +1242,6 @@ class AppSettingsView extends GetView<SettingsController> {
           onChanged: onChanged,
         ),
       ]),
-    );
-  }
-
-  /// Composer toolbar visibility: hidden icons stay reachable from
-  /// the + menu. Mirrors the browser toolbar config pattern.
-  void _showComposerButtonsSheet(BuildContext context, bool isDark) {
-    Widget chip(
-        String label, bool selected, ValueChanged<bool> onSelected) {
-      return FilterChip(
-        label: Text(label),
-        selected: selected,
-        onSelected: onSelected,
-      );
-    }
-
-    Get.bottomSheet(
-      Container(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        decoration: BoxDecoration(
-          color: isDark ? Dt.cardDark : Dt.card,
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Text('Composer buttons',
-                style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text('Hidden icons stay in the + menu',
-                style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    color: Theme.of(context).hintColor)),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Obx(() => chip(
-                    'Deep Search',
-                    controller.showDeepSearch.value,
-                    (v) => controller.setShowDeepSearch(v))),
-                Obx(() => chip(
-                    'Web access',
-                    controller.showWebAccess.value,
-                    (v) => controller.setShowWebAccess(v))),
-                Obx(() => chip(
-                    'Live Vision',
-                    controller.showLiveVision.value,
-                    (v) => controller.setShowLiveVision(v))),
-                Obx(() => chip(
-                    'Polish Prompt',
-                    controller.showPolishPrompt.value,
-                    (v) => controller.setShowPolishPrompt(v))),
-              ],
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
     );
   }
 
