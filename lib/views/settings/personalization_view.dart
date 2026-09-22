@@ -8,6 +8,10 @@ import '../../controllers/settings_controller.dart';
 import '../../theme/design_tokens.dart';
 import '../../core/colors.dart';
 
+
+part 'personalize_signature.dart';
+part 'personalize_minimal.dart';
+part 'personalize_bold.dart';
 class PersonalizationView extends GetView<SettingsController> {
   const PersonalizationView({super.key});
 
@@ -249,36 +253,9 @@ class PersonalizationView extends GetView<SettingsController> {
               _sectionLabel(context, 'pers_signature_theme'.tr),
               _buildSignatureThemeCard(context, isDark),
               const SizedBox(height: 24),
-              _sectionLabel(context, 'pers_more_themes'.tr),
-              _appleGroupedCard(context, isDark, children: [
-                _HorizontalThemeGrid(
-                  themes: themes,
-                  isDark: isDark,
-                  swatchBuilder: _colorSwatch,
-                ),
-                _appleListTile(
-                  context,
-                  isDark,
-                  leading: Obx(() {
-                    final custom = controller.customAccentColor.value;
-                    return Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: custom?.withValues(alpha: 0.1) ?? Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(LucideIcons.pipette, size: 16, color: custom ?? Theme.of(context).primaryColor),
-                    );
-                  }),
-                  title: 'pers_custom_color'.tr,
-                  subtitle: controller.customAccentColor.value != null
-                      ? 'Currently using a custom hex color'
-                      : 'pers_custom_color_desc'.tr,
-                  onTap: () => _showColorPickerDialog(context),
-                  showDivider: false,
-                ),
-              ]),
+              _buildMinimalThemeSection(context, isDark, themes),
+              const SizedBox(height: 24),
+              _buildBoldThemeSection(context, isDark, themes),
               const SizedBox(height: 24),
               _sectionLabel(context, 'pers_glass_effects'.tr),
               _appleGroupedCard(context, isDark, children: [
@@ -353,97 +330,6 @@ class PersonalizationView extends GetView<SettingsController> {
     );
   }
 
-  /// The original CubicLM theme, prioritized in its own section above
-  /// every other swatch. Tapping reselects the default accent.
-  Widget _buildSignatureThemeCard(BuildContext context, bool isDark) {
-    final palette = [
-      Theme.of(context).primaryColor,
-      Theme.of(context).primaryColor.withValues(alpha: 0.7),
-      Theme.of(context).primaryColor.withValues(alpha: 0.4),
-      Theme.of(context).primaryColor.withValues(alpha: 0.2),
-    ];
-    return Obx(() {
-      final selected = controller.selectedThemeName.value == 'CubicLM' &&
-          !controller.dynamicColorEnabled.value;
-      return GestureDetector(
-        onTap: () => controller.setTheme('CubicLM', null),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.02)
-                : Dt.pillMuted.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: selected ? Theme.of(context).primaryColor : Colors.transparent,
-              width: 2,
-            ),
-            boxShadow: [
-              if (selected)
-                BoxShadow(
-                  color: Theme.of(context).primaryColor.withValues(alpha: 0.25),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-            ],
-          ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 100,
-                height: 40,
-                child: Stack(
-                  children: [
-                    for (int i = 0; i < palette.length; i++)
-                      Positioned(
-                        left: i * 20.0,
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: palette[i],
-                            border: Border.all(
-                              color: isDark
-                                  ? const Color(0xFF1E1E1E)
-                                  : Colors.white,
-                              width: 2,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('CubicLM',
-                        style: _font(
-                            controller.selectedFontFamily.value,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            color: isDark
-                                ? AppColors.textPrimary
-                                : Dt.textPrimary)),
-                    const SizedBox(height: 6),
-                    _pill(context, 'typography_default'.tr.toUpperCase(),
-                        accent: true),
-                  ],
-                ),
-              ),
-              if (selected)
-                Icon(LucideIcons.checkCircle2,
-                    size: 24, color: Theme.of(context).primaryColor),
-            ],
-          ),
-        ),
-      );
-    });
-  }
 
   /// Typography in one framed, scrollable box. The APK's main font
   /// (Plus Jakarta Sans) stays pinned at the top as the CubicLM font
@@ -468,22 +354,24 @@ class PersonalizationView extends GetView<SettingsController> {
     );
   }
 
-  Widget _colorSwatch(BuildContext context, bool isDark, _ThemeOption theme) {
+  Widget _colorSwatch(BuildContext context, bool isDark, _ThemeOption theme, {required bool isBold}) {
     return Obx(() {
       final isSelected =
           controller.selectedThemeName.value == theme.name &&
-          !controller.dynamicColorEnabled.value;
+          !controller.dynamicColorEnabled.value &&
+          controller.isBoldTheme.value == isBold;
       
       final primaryColor = theme.palette[0];
       
       return GestureDetector(
-        onTap: () => controller.setTheme(theme.name, theme.name == 'CubicLM' ? null : primaryColor),
+        onTap: () => controller.setTheme(
+          theme.name,
+          theme.name == 'CubicLM' ? null : primaryColor,
+          isBold: isBold,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Stock-Android minimalist swatch: one flat solid circle.
-            // Selected state is a thin ring + check — no gradients,
-            // no shadows, no scaling.
             Container(
               width: 52,
               height: 52,
@@ -491,12 +379,21 @@ class PersonalizationView extends GetView<SettingsController> {
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isSelected
-                      ? primaryColor
+                      ? (isBold ? Colors.white : primaryColor)
                       : (isDark
                           ? Colors.white.withValues(alpha: 0.14)
                           : Colors.black.withValues(alpha: 0.1)),
                   width: isSelected ? 2.5 : 1,
                 ),
+                boxShadow: isBold && isSelected
+                    ? [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.4),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                        )
+                      ]
+                    : null,
               ),
               child: Center(
                 child: Container(
@@ -505,6 +402,9 @@ class PersonalizationView extends GetView<SettingsController> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: primaryColor,
+                    border: isBold
+                        ? Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5)
+                        : null,
                   ),
                   child: isSelected
                       ? const Icon(LucideIcons.check,
@@ -532,184 +432,6 @@ class PersonalizationView extends GetView<SettingsController> {
     });
   }
 
-  /// Real custom-color picker: hue / saturation / value sliders plus
-  /// hex input and a live preview. No presets here — those live in
-  /// the More-themes grid.
-  void _showColorPickerDialog(BuildContext context) {
-    var hsv = HSVColor.fromColor(
-        controller.customAccentColor.value ?? Theme.of(context).primaryColor);
-    final hexCtrl = TextEditingController(
-        text: '#${hsv.toColor().toARGB32().toRadixString(16).substring(2).toUpperCase()}');
-
-    String hexOf(HSVColor c) =>
-        '#${c.toColor().toARGB32().toRadixString(16).substring(2).toUpperCase()}';
-
-    Widget sliderRow({
-      required String label,
-      required double value,
-      required double max,
-      required Gradient gradient,
-      required ValueChanged<double> onChanged,
-    }) {
-      return Row(
-        children: [
-          SizedBox(
-            width: 72,
-            child: Text(label,
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w700)),
-          ),
-          Expanded(
-            child: Container(
-              height: 28,
-              decoration: BoxDecoration(
-                gradient: gradient,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackShape: const RoundedRectSliderTrackShape(),
-                  trackHeight: 28,
-                  thumbShape:
-                      const RoundSliderThumbShape(enabledThumbRadius: 12),
-                  thumbColor: Colors.white,
-                  overlayShape:
-                      const RoundSliderOverlayShape(overlayRadius: 20),
-                  activeTrackColor: Colors.transparent,
-                  inactiveTrackColor: Colors.transparent,
-                ),
-                child: Slider(
-                  value: value,
-                  min: 0,
-                  max: max,
-                  onChanged: onChanged,
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    Get.dialog(
-      AlertDialog(
-        backgroundColor: Theme.of(context).cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: Text('pers_custom_color'.tr,
-            style: const TextStyle(fontWeight: FontWeight.w800)),
-        content: StatefulBuilder(
-          builder: (ctx, setState) {
-            final preview = hsv.toColor();
-            void update(HSVColor next) {
-              setState(() {
-                hsv = next;
-                hexCtrl.text = hexOf(next);
-              });
-            }
-
-            return SizedBox(
-              width: double.maxFinite,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: preview,
-                        border: Border.all(
-                          color: Theme.of(context)
-                              .hintColor
-                              .withValues(alpha: 0.3),
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    sliderRow(
-                      label: 'Hue',
-                      value: hsv.hue,
-                      max: 360,
-                      gradient: LinearGradient(
-                        colors: [
-                          for (var h = 0; h <= 360; h += 60)
-                            HSVColor.fromAHSV(1, h.toDouble(), 1, 1).toColor(),
-                        ],
-                      ),
-                      onChanged: (v) =>
-                          update(hsv.withHue(v.clamp(0, 360).toDouble())),
-                    ),
-                    const SizedBox(height: 10),
-                    sliderRow(
-                      label: 'Saturation',
-                      value: hsv.saturation,
-                      max: 1,
-                      gradient: LinearGradient(
-                        colors: [
-                          hsv.withSaturation(0).toColor(),
-                          hsv.withSaturation(1).toColor(),
-                        ],
-                      ),
-                      onChanged: (v) => update(
-                          hsv.withSaturation(v.clamp(0.0, 1.0).toDouble())),
-                    ),
-                    const SizedBox(height: 10),
-                    sliderRow(
-                      label: 'Brightness',
-                      value: hsv.value,
-                      max: 1,
-                      gradient: LinearGradient(
-                        colors: [
-                          hsv.withValue(0).toColor(),
-                          hsv.withValue(1).toColor(),
-                        ],
-                      ),
-                      onChanged: (v) => update(
-                          hsv.withValue(v.clamp(0.0, 1.0).toDouble())),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: hexCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'HEX',
-                        hintText: '#FF4D00',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      onSubmitted: (v) {
-                        final hex = v.trim().replaceFirst('#', '');
-                        final rgb = int.tryParse(hex, radix: 16);
-                        if (rgb == null) return;
-                        final full =
-                            hex.length <= 6 ? 0xFF000000 | rgb : rgb;
-                        update(HSVColor.fromColor(Color(full)));
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              controller.setTheme(
-                  'Custom', hsv.toColor());
-              Get.back();
-            },
-            child: const Text('Use color'),
-          ),
-        ],
-      ),
-    ).whenComplete(hexCtrl.dispose);
-  }
 
   Widget _buildPreviewCard(BuildContext context, bool isDark) {
     final accent = controller.customAccentColor.value ?? Theme.of(context).primaryColor;
@@ -1196,11 +918,13 @@ class _DynamicPalettePainter extends CustomPainter {
 class _HorizontalThemeGrid extends StatefulWidget {
   final List<_ThemeOption> themes;
   final bool isDark;
-  final Widget Function(BuildContext, bool, _ThemeOption) swatchBuilder;
+  final bool isBold;
+  final Widget Function(BuildContext, bool, _ThemeOption, {required bool isBold}) swatchBuilder;
 
   const _HorizontalThemeGrid({
     required this.themes,
     required this.isDark,
+    required this.isBold,
     required this.swatchBuilder,
   });
 
@@ -1263,7 +987,7 @@ class _HorizontalThemeGridState extends State<_HorizontalThemeGrid> {
                   ),
                   itemCount: pageThemes.length,
                   itemBuilder: (ctx, i) =>
-                      widget.swatchBuilder(context, widget.isDark, pageThemes[i]),
+                      widget.swatchBuilder(context, widget.isDark, pageThemes[i], isBold: widget.isBold),
                 );
               },
             ),
