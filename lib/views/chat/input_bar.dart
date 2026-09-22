@@ -569,7 +569,11 @@ Widget inputBar(BuildContext context, bool isDark) {
                   ),
                 ),
                 // ── Controls row: + / model pill … mic / send ──
-                Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                // Narrow phones collapse secondary tools into an overflow menu
+                // so the pill + send never crowd or overflow.
+                LayoutBuilder(builder: (ctx, constraints) {
+                  final narrow = constraints.maxWidth < 360;
+                  return Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                   // "+" opens the Add-to-Chat sheet (attachments, web access)
                   AppCircleButton(
                     icon: LucideIcons.plus,
@@ -583,11 +587,8 @@ Widget inputBar(BuildContext context, bool isDark) {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Model selector pill — fixed width so label change
-                  // (Local → loaded model name) doesn't shift the
-                  // right cluster. 125dp fits 14 chars at 12.5sp + chevron.
-                  SizedBox(
-                    width: 125,
+                  // Model selector pill — flexible width, ellipsized by AppModelPill.
+                  Flexible(
                     child: Obx(() => AppModelPill(
                           label: composerModelLabel(),
                           onTap: () => showModelSwitcherSheet(context),
@@ -595,14 +596,18 @@ Widget inputBar(BuildContext context, bool isDark) {
                   ),
                   Obx(() {
                     final s = Get.find<SettingsController>();
-                    if (!s.showWebAccess.value) {
+                    // Read FIRST: short-circuiting on `narrow` below with
+                    // zero Rx reads trips GetX's empty-scope error on
+                    // narrow phones (3x in logs).
+                    final show = s.showWebAccess.value;
+                    if (narrow || !show) {
                       return const SizedBox.shrink();
                     }
                     final enabled = s.webFetchEnabled.value;
                     return Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const SizedBox(width: 6),
+                        const SizedBox(width: Dt.composerToolGap),
                         AppCircleButton(
                           icon: LucideIcons.globe,
                           tooltip: 'chat_web_access'.tr,
@@ -615,17 +620,20 @@ Widget inputBar(BuildContext context, bool isDark) {
                   }),
                   Obx(() {
                     final s = Get.find<SettingsController>();
-                    if (!s.showDeepSearch.value) {
+                    // Read FIRST (see web-access Obx above): avoids the
+                    // empty reactive scope on narrow phones.
+                    final show = s.showDeepSearch.value;
+                    if (narrow || !show) {
                       return const SizedBox.shrink();
                     }
                     final enabled = _c.isSearchMode.value;
                     return Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const SizedBox(width: 6),
+                        const SizedBox(width: Dt.composerToolGap),
                         AppCircleButton(
                           icon: LucideIcons.search,
-                          tooltip: 'Deep Search (Perplexity-style)',
+                          tooltip: 'chat_deep_search'.tr,
                           iconColor:
                               enabled ? Theme.of(context).primaryColor : null,
                           onTap: () => _c.isSearchMode.value = !enabled,
@@ -635,7 +643,10 @@ Widget inputBar(BuildContext context, bool isDark) {
                   }),
                   Obx(() {
                     final s = Get.find<SettingsController>();
-                    if (!s.showLiveVision.value) {
+                    // Read FIRST (see web-access Obx above): avoids the
+                    // empty reactive scope on narrow phones.
+                    final show = s.showLiveVision.value;
+                    if (narrow || !show) {
                       return const SizedBox.shrink();
                     }
                     final vision = Get.find<VisionLiveController>();
@@ -643,10 +654,10 @@ Widget inputBar(BuildContext context, bool isDark) {
                     return Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const SizedBox(width: 6),
+                        const SizedBox(width: Dt.composerToolGap),
                         AppCircleButton(
                           icon: LucideIcons.video,
-                          tooltip: 'Live Vision (Snapshot Loop)',
+                          tooltip: 'chat_live_vision'.tr,
                           iconColor: enabled ? AppColors.error : null,
                           onTap: vision.toggleLive,
                         ),
@@ -655,19 +666,84 @@ Widget inputBar(BuildContext context, bool isDark) {
                   }),
                   Obx(() {
                     final hasText = _c.inputText.value.trim().isNotEmpty;
-                    if (!hasText ||
+                    if (narrow ||
+                        !hasText ||
                         !Get.find<SettingsController>()
                             .showPolishPrompt
                             .value) {
                       return const SizedBox.shrink();
                     }
                     return Padding(
-                      padding: const EdgeInsets.only(left: 6),
+                      padding: const EdgeInsets.only(left: Dt.composerToolGap),
                       child: AppCircleButton(
                         icon: LucideIcons.sparkles,
-                        tooltip: 'Polish Prompt (AI Rewrite)',
+                        tooltip: 'chat_polish_prompt'.tr,
                         onTap: _c.polishPrompt,
                       ),
+                    );
+                  }),
+                  // Overflow: secondary tools when the row is too tight.
+                  Obx(() {
+                    final s = Get.find<SettingsController>();
+                    final hasText = _c.inputText.value.trim().isNotEmpty;
+                    final showOverflow = narrow &&
+                        ((s.showWebAccess.value) ||
+                            (s.showDeepSearch.value) ||
+                            (s.showLiveVision.value) ||
+                            (s.showPolishPrompt.value && hasText));
+                    if (!showOverflow) return const SizedBox.shrink();
+                    return PopupMenuButton<String>(
+                      tooltip: 'chat_more_tools'.tr,
+                      icon: Icon(LucideIcons.moreHorizontal, size: 18,
+                          color: Theme.of(context).iconTheme.color),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      onSelected: (v) {
+                        switch (v) {
+                          case 'web':
+                            s.setWebFetchEnabled(!s.webFetchEnabled.value);
+                            break;
+                          case 'search':
+                            _c.isSearchMode.value = !_c.isSearchMode.value;
+                            break;
+                          case 'vision':
+                            Get.find<VisionLiveController>().toggleLive();
+                            break;
+                          case 'polish':
+                            _c.polishPrompt();
+                            break;
+                        }
+                      },
+                      itemBuilder: (ctx) {
+                        final items = <PopupMenuEntry<String>>[];
+                        if (s.showWebAccess.value) {
+                          items.add(PopupMenuItem(
+                            value: 'web',
+                            child: Text(
+                                '${'chat_web_access'.tr}${s.webFetchEnabled.value ? ' ✓' : ''}'),
+                          ));
+                        }
+                        if (s.showDeepSearch.value) {
+                          items.add(PopupMenuItem(
+                            value: 'search',
+                            child: Text(
+                                '${'chat_deep_search'.tr}${_c.isSearchMode.value ? ' ✓' : ''}'),
+                          ));
+                        }
+                        if (s.showLiveVision.value) {
+                          items.add(PopupMenuItem(
+                            value: 'vision',
+                            child: Text('chat_live_vision'.tr),
+                          ));
+                        }
+                        if (s.showPolishPrompt.value && hasText) {
+                          items.add(PopupMenuItem(
+                            value: 'polish',
+                            child: Text('chat_polish_prompt'.tr),
+                          ));
+                        }
+                        return items;
+                      },
                     );
                   }),
                   const Spacer(),
@@ -691,7 +767,7 @@ Widget inputBar(BuildContext context, bool isDark) {
                             padding: const EdgeInsets.only(right: 8),
                             child: AppCircleButton(
                               icon: LucideIcons.square,
-                              tooltip: 'Stop generation',
+                              tooltip: 'chat_stop_generation'.tr,
                               onTap: _c.stopGenerating,
                               iconColor: AppColors.error,
                             ),
@@ -700,8 +776,8 @@ Widget inputBar(BuildContext context, bool isDark) {
                           AppCircleButton(
                             icon: LucideIcons.mic,
                             tooltip: voiceMode
-                                ? 'Hands-free ON — tap to stop'
-                                : 'Voice input (hold for hands-free)',
+                                ? 'chat_hands_free_on'.tr
+                                : 'chat_voice_input'.tr,
                             iconColor: voiceMode
                                 ? Theme.of(context).primaryColor
                                 : (_c.isListening.value ? AppColors.error : null),
@@ -727,7 +803,8 @@ Widget inputBar(BuildContext context, bool isDark) {
                       ],
                     );
                   }),
-                ]),
+                ]);
+                }),
               ]),
             ),
           ],
