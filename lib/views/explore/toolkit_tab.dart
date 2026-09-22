@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../controllers/settings_controller.dart';
 import '../../core/colors.dart';
 import '../../theme/design_tokens.dart';
 import '../agent/agent_workspace_view.dart';
@@ -159,16 +160,24 @@ Widget _toolkitCard(
   required VoidCallback onTap,
   bool experimental = false,
 }) {
+  final isBold = Get.isRegistered<SettingsController>() &&
+      Get.find<SettingsController>().isBoldTheme.value;
+  final cardBg = Theme.of(context).cardColor;
+  final accent = Theme.of(context).primaryColor;
+  final textColor = Theme.of(context).colorScheme.onSurface;
+
   return InkWell(
     onTap: onTap,
     borderRadius: BorderRadius.circular(18),
     child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surface : Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.07) : Dt.hairline,
+          color: isBold
+              ? Colors.white.withValues(alpha: 0.15)
+              : (isDark ? Colors.white.withValues(alpha: 0.07) : Dt.hairline),
         ),
       ),
       child: Row(
@@ -178,10 +187,16 @@ Widget _toolkitCard(
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: Dt.accent.withValues(alpha: 0.12),
+              color: isBold
+                  ? Colors.white.withValues(alpha: 0.15)
+                  : accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(13),
             ),
-            child: Icon(icon, size: 22, color: Dt.accent),
+            child: Icon(
+              icon,
+              size: 22,
+              color: isBold ? Colors.white : accent,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -191,9 +206,14 @@ Widget _toolkitCard(
                 Row(
                   children: [
                     Flexible(
-                      child: Text(title,
-                          style: GoogleFonts.plusJakartaSans(
-                              fontSize: 15, fontWeight: FontWeight.w800)),
+                      child: Text(
+                        title,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: textColor,
+                        ),
+                      ),
                     ),
                     if (experimental) ...[
                       const SizedBox(width: 8),
@@ -201,7 +221,9 @@ Widget _toolkitCard(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.warning.withValues(alpha: 0.15),
+                          color: isBold
+                              ? Colors.white.withValues(alpha: 0.2)
+                              : AppColors.warning.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -210,7 +232,7 @@ Widget _toolkitCard(
                             fontSize: 8,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.5,
-                            color: AppColors.warning,
+                            color: isBold ? Colors.white : AppColors.warning,
                           ),
                         ),
                       ),
@@ -218,17 +240,27 @@ Widget _toolkitCard(
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(description,
-                    style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12.5,
-                        height: 1.45,
-                        color: Theme.of(context).hintColor)),
+                Text(
+                  description,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12.5,
+                    height: 1.45,
+                    color: isBold
+                        ? Colors.white.withValues(alpha: 0.8)
+                        : Theme.of(context).hintColor,
+                  ),
+                ),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          Icon(LucideIcons.chevronRight,
-              size: 18, color: Theme.of(context).hintColor),
+          Icon(
+            LucideIcons.chevronRight,
+            size: 18,
+            color: isBold
+                ? Colors.white.withValues(alpha: 0.7)
+                : Theme.of(context).hintColor,
+          ),
         ],
       ),
     ),

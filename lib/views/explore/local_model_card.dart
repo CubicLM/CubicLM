@@ -403,18 +403,18 @@ Widget buildModelCard(BuildContext context, AiModel model) {
         isThisTextModelLoading || isThisImageModelLoading;
     final disableActions =
         _c.isImporting.value || isAnyModelLoading || isCurrentlyDownloading;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.03)
-            : Colors.black.withValues(alpha: 0.02),
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color:
-              isActive ? Dt.accent.withValues(alpha: 0.2) : Colors.transparent,
+          color: isActive
+              ? (Get.isRegistered<SettingsController>() && Get.find<SettingsController>().isBoldTheme.value
+                  ? Colors.white
+                  : Dt.accent.withValues(alpha: 0.2))
+              : Colors.transparent,
           width: 1,
         ),
       ),
@@ -424,7 +424,7 @@ Widget buildModelCard(BuildContext context, AiModel model) {
             ? null
             : () => _guardedLoad(model.filename),
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -443,7 +443,7 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
-                                  color: isDark ? Colors.white : Colors.black,
+                                  color: Theme.of(context).colorScheme.onSurface,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -490,7 +490,7 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                           model.description,
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 13,
-                            color: Theme.of(context).hintColor,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                             height: 1.4,
                           ),
                           maxLines: 2,

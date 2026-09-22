@@ -115,7 +115,9 @@ Widget _stackRow(BuildContext context, bool isDark,
             children: [
               Text(s.title,
                   style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14, fontWeight: FontWeight.w700)),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.onSurface)),
               Text(s.subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -362,7 +364,9 @@ class _LinuxRuntimeSectionState extends State<LinuxRuntimeSection> {
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.right,
                 style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface)),
           ),
         ]),
       ),

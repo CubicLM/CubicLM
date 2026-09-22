@@ -24,15 +24,19 @@ Widget buildProviderCard(BuildContext context, CloudProviderInfo provider) {
   final cloudModels = Get.find<CloudModelController>();
   final isSelected = settings.cloudProvider.value == provider.id;
   final isDark = Theme.of(context).brightness == Brightness.dark;
+  final isBold = settings.isBoldTheme.value;
+  final cardBg = Theme.of(context).cardColor;
+  final accent = Theme.of(context).primaryColor;
+  final textColor = Theme.of(context).colorScheme.onSurface;
 
   return Container(
     margin: const EdgeInsets.only(bottom: 12),
     decoration: BoxDecoration(
-      color: isDark ? AppColors.surface : Colors.white,
+      color: cardBg,
       borderRadius: BorderRadius.circular(16),
       border: Border.all(
         color: isSelected
-            ? Dt.accent.withValues(alpha: 0.5)
+            ? (isBold ? Colors.white : accent.withValues(alpha: 0.5))
             : (isDark ? AppColors.border : AppColors.borderLightMode),
       ),
     ),
@@ -46,13 +50,13 @@ Widget buildProviderCard(BuildContext context, CloudProviderInfo provider) {
         height: 40,
         decoration: BoxDecoration(
           color: isSelected
-              ? Dt.accent.withValues(alpha: 0.15)
+              ? (isBold ? Colors.white.withValues(alpha: 0.2) : accent.withValues(alpha: 0.15))
               : (isDark ? Colors.white.withValues(alpha: 0.05) : Dt.pillMuted),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
           provider.icon,
-          color: isSelected ? Dt.accent : Theme.of(context).hintColor,
+          color: isSelected ? (isBold ? Colors.white : accent) : Theme.of(context).hintColor,
           size: 20,
         ),
       ),
@@ -61,7 +65,7 @@ Widget buildProviderCard(BuildContext context, CloudProviderInfo provider) {
         style: GoogleFonts.plusJakartaSans(
           fontSize: 15,
           fontWeight: FontWeight.w700,
-          color: isDark ? Colors.white : Colors.black,
+          color: textColor,
         ),
       ),
       subtitle: Text(
@@ -500,7 +504,7 @@ Widget buildAddKeyCard(BuildContext context, CloudProviderInfo provider,
     margin: const EdgeInsets.only(bottom: 8),
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
     decoration: BoxDecoration(
-      color: isDark ? AppColors.surface : Colors.white,
+      color: Theme.of(context).cardColor,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
           color: isDark ? AppColors.border : AppColors.borderLightMode),
@@ -526,14 +530,14 @@ Widget buildAddKeyCard(BuildContext context, CloudProviderInfo provider,
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white : Colors.black,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               Text(
                 provider.description,
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 11,
-                  color: Theme.of(context).hintColor,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

@@ -316,14 +316,12 @@ class _SetupChecklistCardState extends State<SetupChecklistCard>
       margin: const EdgeInsets.only(bottom: 10),
       padding: EdgeInsets.all(pad),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surface : Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: done
               ? AppColors.success.withValues(alpha: 0.35)
-              : isDark
-                  ? Colors.white.withValues(alpha: 0.07)
-                  : Dt.hairline,
+              : (isDark ? Colors.white.withValues(alpha: 0.07) : Dt.hairline),
         ),
       ),
       child: Column(
@@ -352,6 +350,7 @@ class _SetupChecklistCardState extends State<SetupChecklistCard>
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),

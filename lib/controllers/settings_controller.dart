@@ -258,6 +258,7 @@ class SettingsController extends GetxController {
 
   // Personalization
   final selectedThemeName = 'CubicLM'.obs;
+  final isBoldTheme = false.obs;
   final customAccentColor = Rxn<Color>();
   final dynamicColorEnabled = true.obs;
   final glassIntensity = 0.7.obs;

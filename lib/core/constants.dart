@@ -174,6 +174,7 @@ class AppConstants {
 
   // Personalization
   static const String keySelectedTheme = 'selected_theme';
+  static const String keyIsBoldTheme = 'is_bold_theme';
   static const String keyCustomAccentColor = 'custom_accent_color';
   static const String keyDynamicColorEnabled = 'dynamic_color_enabled';
   static const String keyGlassIntensity = 'glass_intensity';

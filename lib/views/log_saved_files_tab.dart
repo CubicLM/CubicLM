@@ -128,7 +128,7 @@ class LogSavedFilesTabState extends State<LogSavedFilesTab> {
             child: Container(
               margin: const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
-                color: widget.isDark ? AppColors.surface : Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
@@ -165,7 +165,8 @@ class LogSavedFilesTabState extends State<LogSavedFilesTab> {
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.firaCode(
                                     fontSize: 11,
-                                    fontWeight: FontWeight.w600)),
+                                    fontWeight: FontWeight.w600,
+                                    color: Theme.of(context).colorScheme.onSurface)),
                             const SizedBox(height: 4),
                             Text('${f.sizeLabel}  ·  ${f.dateLabel}',
                                 style: GoogleFonts.plusJakartaSans(

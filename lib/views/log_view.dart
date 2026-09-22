@@ -75,13 +75,15 @@ class _LogViewState extends State<LogView> {
     final logs = Get.find<AppLogService>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final bg = Theme.of(context).scaffoldBackgroundColor;
+    final isBold = Get.isRegistered<SettingsController>() && Get.find<SettingsController>().isBoldTheme.value;
+
     return Scaffold(
-      backgroundColor: isDark ? AppColors.bg : AppColors.bgLight,
+      backgroundColor: bg,
       appBar: AppBar(
         scrolledUnderElevation: 0,
-        backgroundColor:
-            (isDark ? AppColors.bg : AppColors.bgLight).withValues(alpha: 0.8),
-        flexibleSpace: ClipRRect(
+        backgroundColor: isBold ? bg : bg.withValues(alpha: 0.85),
+        flexibleSpace: isBold ? null : ClipRRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
             child: Container(color: Colors.transparent),
@@ -92,13 +94,16 @@ class _LogViewState extends State<LogView> {
           children: [
             Text('System Logs',
                 style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w800, fontSize: 18)),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 22,
+                    letterSpacing: -0.5,
+                    color: Theme.of(context).colorScheme.onSurface)),
             Obx(() => Text(
                 '${logs.filteredEntries.length} entries matching filters',
                 style: GoogleFonts.plusJakartaSans(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(context).hintColor))),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant))),
           ],
         ),
         bottom: PreferredSize(
@@ -131,9 +136,7 @@ class _LogViewState extends State<LogView> {
                           )
                         : const SizedBox.shrink()),
                     filled: true,
-                    fillColor: isDark
-                        ? Colors.white.withValues(alpha: 0.04)
-                        : Colors.black.withValues(alpha: 0.03),
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                     isDense: true,
                     contentPadding:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -215,11 +218,11 @@ class _LogViewState extends State<LogView> {
         child: Column(
           children: [
             Container(
-              color: isDark ? AppColors.bg : AppColors.bgLight,
+              color: Theme.of(context).scaffoldBackgroundColor,
               child: TabBar(
-                labelColor: Dt.accent,
-                unselectedLabelColor: Theme.of(context).hintColor,
-                indicatorColor: Dt.accent,
+                labelColor: Theme.of(context).colorScheme.primary,
+                unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                indicatorColor: Theme.of(context).colorScheme.primary,
                 indicatorSize: TabBarIndicatorSize.tab,
                 dividerColor: Colors.transparent,
                 labelStyle:
@@ -267,7 +270,7 @@ class _LogViewState extends State<LogView> {
                                     Text('No patterns detected in current stream.',
                                         style: GoogleFonts.plusJakartaSans(
                                             fontSize: 11,
-                                            color: Theme.of(context).hintColor)),
+                                            color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                   ],
                                 ),
                               ),
@@ -290,7 +293,7 @@ class _LogViewState extends State<LogView> {
                                   Text('$errCount errors · $warnCount warnings',
                                       style: GoogleFonts.plusJakartaSans(
                                           fontSize: 11,
-                                          color: Theme.of(context).hintColor)),
+                                          color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                 ],
                               ),
                               if (patterns.isNotEmpty) ...[
@@ -321,7 +324,7 @@ class _LogViewState extends State<LogView> {
                                                 Text(p.fix,
                                                     style: GoogleFonts.plusJakartaSans(
                                                         fontSize: 11,
-                                                        color: Theme.of(context).hintColor)),
+                                                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                               ],
                                             ),
                                           ),
@@ -387,7 +390,7 @@ class _LogViewState extends State<LogView> {
                           margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: isDark ? AppColors.surface : Colors.white,
+                            color: Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
@@ -396,7 +399,7 @@ class _LogViewState extends State<LogView> {
                                 offset: const Offset(0, 4),
                               )
                             ],
-                            border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05)),
+                            border: Border.all(color: (isDark || isBold) ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05)),
                           ),
                           child: SingleChildScrollView(
                             physics: const BouncingScrollPhysics(),
@@ -460,7 +463,10 @@ class _LogViewState extends State<LogView> {
                                       decoration: BoxDecoration(
                                         color: isSelected
                                             ? color.withValues(alpha: 0.15)
-                                            : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.02)),
+                                            : (Theme.of(context).brightness == Brightness.dark || 
+                                               (Get.isRegistered<SettingsController>() && Get.find<SettingsController>().isBoldTheme.value)
+                                               ? Colors.white.withValues(alpha: 0.06)
+                                               : Colors.black.withValues(alpha: 0.03)),
                                         borderRadius: BorderRadius.circular(10),
                                         border: Border.all(
                                           color: isSelected ? color.withValues(alpha: 0.4) : Colors.transparent,
@@ -532,7 +538,7 @@ class _LogViewState extends State<LogView> {
                                       overflow: TextOverflow.ellipsis,
                                       style: GoogleFonts.plusJakartaSans(
                                           fontSize: 11,
-                                          color: Theme.of(context).hintColor),
+                                          color: Theme.of(context).colorScheme.onSurfaceVariant),
                                     ),
                                   ],
                                 ),
@@ -571,7 +577,7 @@ class _LogViewState extends State<LogView> {
                                         style: GoogleFonts.plusJakartaSans(
                                             fontSize: 20,
                                             fontWeight: FontWeight.w800,
-                                            color: isDark ? Colors.white : Colors.black)),
+                                            color: Theme.of(context).colorScheme.onSurface)),
                                     const SizedBox(height: 8),
                                     Text('No ${logs.selectedLevel.value == 'ALL' ? '' : '${logs.selectedLevel.value.toLowerCase()} '}logs recorded.',
                                         style: GoogleFonts.plusJakartaSans(
@@ -592,7 +598,7 @@ class _LogViewState extends State<LogView> {
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 10),
                                 decoration: BoxDecoration(
-                                  color: isDark ? AppColors.surface : Colors.white,
+                                  color: Theme.of(context).cardColor,
                                   borderRadius: BorderRadius.circular(14),
                                   boxShadow: [
                                     BoxShadow(
@@ -602,7 +608,7 @@ class _LogViewState extends State<LogView> {
                                     )
                                   ],
                                   border: Border.all(
-                                      color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04)),
+                                      color: (isDark || isBold) ? Colors.white.withValues(alpha: 0.06) : Theme.of(context).dividerColor.withValues(alpha: 0.1)),
                                 ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(14),
@@ -674,7 +680,7 @@ class _LogViewState extends State<LogView> {
                                                     Text(_formatTime(entry.timestamp),
                                                         style: GoogleFonts.plusJakartaSans(
                                                             fontSize: 11,
-                                                            color: Theme.of(context).hintColor,
+                                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                             fontWeight: FontWeight.w500)),
                                                   ]),
                                                   const SizedBox(height: 10),
@@ -682,7 +688,7 @@ class _LogViewState extends State<LogView> {
                                                       style: GoogleFonts.plusJakartaSans(
                                                           fontSize: 13,
                                                           fontWeight: FontWeight.w600,
-                                                          color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                                          color: Theme.of(context).colorScheme.onSurface,
                                                           height: 1.4)),
                                                   if (entry.count > 1)
                                                     Padding(

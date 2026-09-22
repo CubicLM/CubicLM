@@ -150,7 +150,7 @@ class _BattleArenaViewState extends State<BattleArenaView> {
         expand: false,
         builder: (_, scrollCtrl) => Container(
           decoration: BoxDecoration(
-            color: isDark ? AppColors.surface : Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius:
                 const BorderRadius.vertical(top: Radius.circular(20)),
           ),

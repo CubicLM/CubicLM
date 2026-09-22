@@ -79,7 +79,9 @@ class _SystemLogsViewState extends State<SystemLogsView> {
           children: [
             Text('CubicWeb System Logs',
                 style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w800, fontSize: 18)),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                    color: Theme.of(context).colorScheme.onSurface)),
             Obx(() {
               final n = logger.events.length;
               return Text(
@@ -89,7 +91,7 @@ class _SystemLogsViewState extends State<SystemLogsView> {
                   style: GoogleFonts.plusJakartaSans(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Theme.of(context).hintColor));
+                      color: Theme.of(context).colorScheme.onSurfaceVariant));
             }),
           ],
         ),
@@ -276,7 +278,7 @@ class _SystemLogsViewState extends State<SystemLogsView> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surface : Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -335,7 +337,7 @@ class _SystemLogsViewState extends State<SystemLogsView> {
                                     style: GoogleFonts.plusJakartaSans(
                                         fontSize: 13.5,
                                         fontWeight: FontWeight.w700,
-                                        color: isDark ? Colors.white : const Color(0xFF1E293B))),
+                                        color: Theme.of(context).colorScheme.onSurface)),
                               ),
                               if (e.occurrenceCount > 1)
                                 Container(

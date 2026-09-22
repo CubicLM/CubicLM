@@ -84,7 +84,7 @@ Widget emptyState(BuildContext context, bool isDark) {
                   style: GoogleFonts.plusJakartaSans(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : Colors.black)),
+                      color: Theme.of(context).colorScheme.onSurface)),
               const SizedBox(height: 10),
               Text('chat_no_local_models_desc'.tr,
                   textAlign: TextAlign.center,
@@ -149,7 +149,7 @@ Widget suggestionCard(BuildContext context, String text, IconData icon,
     child: Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surface : Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDark
@@ -179,7 +179,7 @@ Widget suggestionCard(BuildContext context, String text, IconData icon,
           Text(text,
               style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
-                  color: isDark ? AppColors.textPrimary : Dt.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w700,
                   height: 1.3),
               maxLines: 2,

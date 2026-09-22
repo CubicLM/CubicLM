@@ -10,11 +10,11 @@ class AppTheme {
   static ThemeData get darkTheme => _buildTheme(Brightness.dark);
   static ThemeData get lightTheme => _buildTheme(Brightness.light);
 
-  static ThemeData buildTheme(Brightness brightness, {Color? accentColor, String? fontFamily, ColorScheme? colorScheme}) {
-    return _buildTheme(brightness, accentColor: accentColor, fontFamily: fontFamily, colorScheme: colorScheme);
+  static ThemeData buildTheme(Brightness brightness, {Color? accentColor, String? fontFamily, ColorScheme? colorScheme, bool isBold = false}) {
+    return _buildTheme(brightness, accentColor: accentColor, fontFamily: fontFamily, colorScheme: colorScheme, isBold: isBold);
   }
 
-  static ThemeData _buildTheme(Brightness brightness, {Color? accentColor, String? fontFamily, ColorScheme? colorScheme}) {
+  static ThemeData _buildTheme(Brightness brightness, {Color? accentColor, String? fontFamily, ColorScheme? colorScheme, bool isBold = false}) {
     final isDark = brightness == Brightness.dark;
 
     // Two paths, by design:
@@ -44,16 +44,46 @@ class AppTheme {
       textSecondary = scheme.onSurfaceVariant;
     } else if (accentColor != null) {
       accent = accentColor;
-      scheme = ColorScheme.fromSeed(
-        seedColor: accent,
-        brightness: brightness,
-        primary: accent,
-      );
-      bg = scheme.surface;
-      surface = scheme.surfaceContainerLow;
-      surfaceHigh = scheme.surfaceContainerHigh;
-      textPrimary = scheme.onSurface;
-      textSecondary = scheme.onSurfaceVariant;
+      if (isBold) {
+        // Full Bold Theme (matching user screenshot): rich saturated theme color for background, cards & UI
+        final hsl = HSLColor.fromColor(accentColor);
+        if (isDark) {
+          bg = hsl.withLightness(0.16).withSaturation((hsl.saturation * 1.25).clamp(0.4, 0.9)).toColor();
+          surface = hsl.withLightness(0.23).withSaturation((hsl.saturation * 1.15).clamp(0.35, 0.85)).toColor();
+          surfaceHigh = hsl.withLightness(0.29).withSaturation((hsl.saturation * 1.05).clamp(0.3, 0.8)).toColor();
+          textPrimary = Colors.white;
+          textSecondary = const Color(0xE6FFFFFF);
+        } else {
+          bg = hsl.withLightness(0.38).withSaturation((hsl.saturation * 1.25).clamp(0.55, 0.95)).toColor();
+          surface = hsl.withLightness(0.31).withSaturation((hsl.saturation * 1.20).clamp(0.50, 0.90)).toColor();
+          surfaceHigh = hsl.withLightness(0.26).withSaturation((hsl.saturation * 1.15).clamp(0.45, 0.85)).toColor();
+          textPrimary = Colors.white;
+          textSecondary = const Color(0xEEFFFFFF);
+        }
+        scheme = ColorScheme(
+          brightness: brightness,
+          primary: Colors.white,
+          onPrimary: bg,
+          secondary: hsl.withLightness(isDark ? 0.45 : 0.65).toColor(),
+          onSecondary: Colors.white,
+          surface: surface,
+          onSurface: textPrimary,
+          error: const Color(0xFFFF5252),
+          onError: Colors.white,
+          surfaceContainerHighest: surfaceHigh,
+        );
+      } else {
+        scheme = ColorScheme.fromSeed(
+          seedColor: accent,
+          brightness: brightness,
+          primary: accent,
+        );
+        bg = scheme.surface;
+        surface = scheme.surfaceContainerLow;
+        surfaceHigh = scheme.surfaceContainerHigh;
+        textPrimary = scheme.onSurface;
+        textSecondary = scheme.onSurfaceVariant;
+      }
     } else {
       accent = Dt.accent;
       bg = isDark ? AppColors.bg : AppColors.bgLight;
@@ -74,8 +104,10 @@ class AppTheme {
         surfaceContainerHighest: surfaceHigh,
       );
     }
-    final textMuted = isDark ? AppColors.textMuted : Dt.textMuted;
-    final separator = isDark ? AppColors.border : AppColors.borderLightMode;
+    final textMuted = isBold ? Colors.white70 : (isDark ? AppColors.textMuted : Dt.textMuted);
+    final separator = isBold
+        ? Colors.white.withValues(alpha: 0.15)
+        : (isDark ? AppColors.border : AppColors.borderLightMode);
 
     return ThemeData(
       brightness: brightness,
@@ -95,7 +127,7 @@ class AppTheme {
 
       // ── AppBar ──
       appBarTheme: AppBarTheme(
-        backgroundColor: bg.withValues(alpha: 0.8),
+        backgroundColor: bg.withValues(alpha: 0.85),
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
@@ -107,21 +139,23 @@ class AppTheme {
           color: textPrimary,
           letterSpacing: -0.5,
         ),
-        iconTheme: IconThemeData(color: isDark ? Colors.white : Dt.iconDefault),
-        systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+        iconTheme: IconThemeData(color: (isBold || isDark) ? Colors.white : Dt.iconDefault),
+        systemOverlayStyle: (isBold || isDark) ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       ),
 
       // ── Card ──
       cardTheme: CardThemeData(
-        color: isDark ? Dt.cardDark : Dt.card,
+        color: surface,
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.07)
-                : Dt.hairline,
+            color: isBold
+                ? Colors.white.withValues(alpha: 0.15)
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.07)
+                    : Dt.hairline),
             width: 1,
           ),
         ),
@@ -130,8 +164,8 @@ class AppTheme {
       // ── Bottom Nav ──
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: Colors.transparent,
-        selectedItemColor: isDark ? Colors.white : Dt.textPrimary,
-        unselectedItemColor: textMuted,
+        selectedItemColor: (isBold || isDark) ? Colors.white : Dt.textPrimary,
+        unselectedItemColor: isBold ? Colors.white.withValues(alpha: 0.7) : textMuted,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
         selectedLabelStyle: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w800),

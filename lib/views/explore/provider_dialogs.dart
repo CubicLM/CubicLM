@@ -28,7 +28,7 @@ void showCustomProviderDialog(
   final verifiedCount = (-1).obs; // -1 = not verified yet
 
   Get.dialog(AlertDialog(
-    backgroundColor: isDark ? AppColors.surface : Colors.white,
+    backgroundColor: Theme.of(context).cardColor,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
     titlePadding: const EdgeInsets.fromLTRB(26, 26, 22, 0),
     contentPadding: const EdgeInsets.fromLTRB(26, 20, 26, 10),

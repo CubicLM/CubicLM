@@ -124,13 +124,15 @@ class AppSettingsView extends GetView<SettingsController> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isBold = controller.isBoldTheme.value;
+    final bg = Theme.of(context).scaffoldBackgroundColor;
+
     return DefaultTabController(
       length: 6,
       child: Scaffold(
       appBar: AppBar(
-        backgroundColor:
-            Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.8),
-        flexibleSpace: ClipRRect(
+        backgroundColor: isBold ? bg : bg.withValues(alpha: 0.8),
+        flexibleSpace: isBold ? null : ClipRRect(
           child: Obx(() => BackdropFilter(
             filter: ImageFilter.blur(sigmaX: AppColors.blurSigma, sigmaY: AppColors.blurSigma),
             child: Container(color: Colors.transparent),
@@ -142,7 +144,10 @@ class AppSettingsView extends GetView<SettingsController> {
         ),
         title: Text('settings_title'.tr,
             style: GoogleFonts.plusJakartaSans(
-                fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -1)),
+                fontWeight: FontWeight.w800, 
+                fontSize: 24, 
+                color: Theme.of(context).colorScheme.onSurface,
+                letterSpacing: -1)),
         toolbarHeight: 70,
         centerTitle: false,
         actions: [

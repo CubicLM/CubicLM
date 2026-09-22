@@ -352,7 +352,7 @@ String _fmtTokens(int v) =>
 void showAutoTuneInfoDialog(BuildContext context, bool isDark) {
   Get.dialog(
     AlertDialog(
-      backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+      backgroundColor: Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       title: Row(children: [
         const Icon(LucideIcons.sparkles, color: Dt.accent),

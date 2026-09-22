@@ -9,11 +9,10 @@ import '../core/colors.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../theme/design_tokens.dart';
 import '../services/usage_tracker_service.dart';
-import '../services/device_info_service.dart';
 import '../services/inference_service.dart';
-import '../services/local_image_service.dart';
 import 'explore_skills_mcp_tabs.dart';
 import 'explore/add_model_sheet.dart';
+import 'explore/device_intelligence_card.dart';
 import 'explore/local_model_card.dart';
 import 'explore/provider_cards.dart';
 import 'gallery_view.dart';
@@ -24,13 +23,14 @@ class ModelView extends GetView<ModelController> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = Theme.of(context).scaffoldBackgroundColor;
+    final isBold = Get.isRegistered<SettingsController>() && Get.find<SettingsController>().isBoldTheme.value;
+    
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: bg,
       appBar: AppBar(
-        backgroundColor:
-            (isDark ? Dt.canvasDark : Dt.canvas).withValues(alpha: 0.8),
-        flexibleSpace: ClipRRect(
+        backgroundColor: isBold ? bg : bg.withValues(alpha: 0.85),
+        flexibleSpace: isBold ? null : ClipRRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
             child: Container(color: Colors.transparent),
@@ -38,9 +38,10 @@ class ModelView extends GetView<ModelController> {
         ),
         title: Text('model_hub_title'.tr,
             style: GoogleFonts.plusJakartaSans(
-                fontWeight: FontWeight.w800,
-                fontSize: 24,
-                letterSpacing: -0.5)),
+                fontWeight: FontWeight.w900,
+                fontSize: 28,
+                color: Theme.of(context).colorScheme.onSurface,
+                letterSpacing: -1.0)),
         actions: [
           Obx(() {
             if (controller.modelScope.value != 'local') {
@@ -75,9 +76,9 @@ class ModelView extends GetView<ModelController> {
                   child: _buildScopeToggle(context),
                 ),
                 const SizedBox(height: 14),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _buildActiveModelBanner(context),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: DeviceIntelligenceCard(),
                 ),
                 const SizedBox(height: 12),
                 Expanded(
@@ -92,15 +93,7 @@ class ModelView extends GetView<ModelController> {
   }
 
   Widget _buildHubList(BuildContext context) {
-    // RAM bar stays pinned above the list — it is NOT inside the
-    // scrollable ListView, so scrolling models never moves it.
     return Column(children: [
-      Obx(() => controller.modelScope.value == 'local'
-          ? Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: _buildRamStatusBar(context),
-            )
-          : const SizedBox.shrink()),
       Expanded(
         child: RefreshIndicator(
           onRefresh: () async {
@@ -115,9 +108,6 @@ class ModelView extends GetView<ModelController> {
               if (controller.modelScope.value == 'local') ...[
                 _buildImportingProgress(context),
                 _buildLocalFilterChips(context),
-                const SizedBox(height: 12),
-                _buildDeviceAdvice(context),
-                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -243,217 +233,8 @@ class ModelView extends GetView<ModelController> {
     });
   }
 
-  /// RAM status card for the Local tab: total RAM, a used-space bar,
-  /// free-space text, device tier, live refresh, and a rough "fits"
-  /// estimate so users can tell at a glance whether a model will load.
-  Widget _buildRamStatusBar(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    DeviceInfoService dev;
-    try {
-      dev = Get.find<DeviceInfoService>();
-    } catch (_) {
-      return const SizedBox.shrink();
-    }
-    return Obx(() {
-      final total = dev.totalRamGB.value;
-      final avail = dev.availableRamGB.value;
-      if (total <= 0) return const SizedBox.shrink();
-      final used = (total - avail).clamp(0.0, total);
-      final pct = (used / total).clamp(0.0, 1.0);
-      final low = avail < 1.5;
-      final barColor = low
-          ? AppColors.warning
-          : avail < 3.0
-              ? AppColors.primary
-              : Theme.of(context).primaryColor;
-      final tier = dev.deviceTier.value;
-      final tierLabel =
-          tier.isEmpty ? '' : '${tier[0].toUpperCase()}${tier.substring(1)}';
-      // Rough headroom math mirrors the load gate (file x1.25 plus a
-      // 256MB–1GB reserve scaled by file size). Smallest reserve here
-      // so the estimate stays optimistic for tiny models.
-      final roomMb = ((avail - 0.25) / 1.25 * 1024).round();
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.surface : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.black.withValues(alpha: 0.06),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              const Icon(LucideIcons.memoryStick, size: 15),
-              const SizedBox(width: 8),
-              Text('RAM Status',
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12.5, fontWeight: FontWeight.w800)),
-              const Spacer(),
-              if (tierLabel.isNotEmpty)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(tierLabel,
-                      style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: Theme.of(context).primaryColor)),
-                ),
-              const SizedBox(width: 4),
-              InkWell(
-                onTap: () {
-                  try {
-                    dev.refreshMemoryInfo();
-                  } catch (_) {}
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Icon(LucideIcons.refreshCw, size: 14),
-                ),
-              ),
-              InkWell(
-                onTap: () => _showRamInfoDialog(context,
-                    totalGb: total,
-                    availGb: avail,
-                    usedGb: used,
-                    roomMb: roomMb,
-                    tierLabel: tierLabel),
-                borderRadius: BorderRadius.circular(20),
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Icon(LucideIcons.info, size: 14),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Container(
-                height: 8,
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.black.withValues(alpha: 0.07),
-                child: FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: pct,
-                  child: Container(color: barColor),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(children: [
-              Text('${used.toStringAsFixed(1)} GB used',
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).hintColor)),
-              const Spacer(),
-              Text(
-                  '${avail.toStringAsFixed(1)} GB free of ${total.toStringAsFixed(1)} GB',
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: low ? AppColors.warning : null)),
-            ]),
-            if (roomMb > 0) ...[
-              const SizedBox(height: 4),
-              Text('Room for a model up to ≈$roomMb MB',
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
-                      color: Theme.of(context).hintColor)),
-            ] else ...[
-              const SizedBox(height: 4),
-              Text('Memory critically low — close other apps before loading',
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.warning)),
-            ],
-          ],
-        ),
-      );
-    });
-  }
 
-  /// Explains every RAM Status row in plain language, using the user's
-  /// live numbers — including what "Room for ≈N MB" actually means.
-  void _showRamInfoDialog(
-    BuildContext context, {
-    required double totalGb,
-    required double availGb,
-    required double usedGb,
-    required int roomMb,
-    required String tierLabel,
-  }) {
-    final needForRoom =
-        roomMb > 0 ? (roomMb * 1.25 / 1024 + 0.25) : availGb;
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('RAM Status'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ramInfoRow('Total RAM',
-                  '${totalGb.toStringAsFixed(1)} GB — your phone\'s full memory.'),
-              _ramInfoRow('Used',
-                  '${usedGb.toStringAsFixed(1)} GB — Android system plus all running apps.'),
-              _ramInfoRow('Free',
-                  '${availGb.toStringAsFixed(1)} GB — free right now and available for loading a model.'),
-              _ramInfoRow(
-                  roomMb > 0 ? 'Room for ≈$roomMb MB' : 'No room right now',
-                  roomMb > 0
-                      ? 'With your current free space, a model file up to ≈$roomMb MB should load. A model needs its file size × 1.25 as working space, plus a 256 MB–1 GB safety reserve (small models need less) — so ≈$roomMb MB needs about ${needForRoom.toStringAsFixed(1)} GB free.'
-                      : 'Free space is below the safety reserve, so no model can load safely yet. Close other apps, then tap refresh.'),
-              if (tierLabel.isNotEmpty)
-                _ramInfoRow('Tier: $tierLabel',
-                    'Your device class. Higher tiers can run bigger models with longer context windows.'),
-              _ramInfoRow('Tips',
-                  '• Close heavy apps before loading\n• Prefer smaller (Q4) models on low RAM\n• If a load is blocked, free space or pick a smaller file\n• Power users: Settings → Strict RAM guard can downgrade blocks to confirmed risky loads'),
-              _ramInfoRow('Strict RAM guard',
-                  'ON blocks loads that would crash the app; OFF asks to proceed anyway instead. Change it in Settings → Strict RAM guard.'),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Got it'),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _ramInfoRow(String title, String body) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 2),
-          Text(body,
-              style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12.5, height: 1.45)),
-        ],
-      ),
-    );
-  }
 
   Widget _buildLocalActions(BuildContext context) {
     final inference = Get.find<InferenceService>();
@@ -484,83 +265,6 @@ class ModelView extends GetView<ModelController> {
     );
   }
 
-  /// Device advice row: recommended quantization for this phone's RAM
-  /// tier + the fastest benchmarked download (if any).
-  Widget _buildDeviceAdvice(BuildContext context) {
-    final hint = Theme.of(context).hintColor;
-    // Platforms with no local runtime at all (Web): benchmark +
-    // quantization advice would be noise — set cloud expectations
-    // instead. Checked OUTSIDE Obx on purpose: canLoadLocal is static
-    // per launch, and returning before any Rx read trips GetX's
-    // improper-use (empty reactive scope) error.
-    if (!controller.canLoadLocal) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: hint.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.cloud,
-                size: 14, color: hint.withValues(alpha: 0.7)),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                'On-device models need the Android app — chat via Cloud mode',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: hint,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    return Obx(() {
-      final settings = Get.find<SettingsController>();
-      // Guarded: recommendedQuantization does an unguarded
-      // Get.find<DeviceInfoService>() — must never red-screen the Hub
-      // on platforms where that service isn't registered.
-      var quant = 'Q4_K_M';
-      try {
-        quant = settings.recommendedQuantization;
-      } catch (_) {}
-      final best = controller.bestBenchmarkedFilename();
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: hint.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.memory,
-                size: 14, color: hint.withValues(alpha: 0.7)),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                best == null
-                    ? 'This device: $quant recommended — Benchmark a model to crown the fastest'
-                    : 'This device: $quant recommended · ⚡ $best is fastest here',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: hint,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      );
-    });
-  }
 
   Widget _buildLocalFilterChips(BuildContext context) {
     final labels = {
@@ -679,166 +383,7 @@ class ModelView extends GetView<ModelController> {
     );
   }
 
-  Widget _buildActiveModelBanner(BuildContext context) {
-    return Obx(() {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      if (controller.modelScope.value == 'online') {
-        return _buildActiveCloudBanner(context);
-      }
 
-      final inference = Get.find<InferenceService>();
-      final localImage = Get.find<LocalImageService>();
-
-      final bool isImage = localImage.isModelLoaded.value;
-      final bool isText = inference.isModelLoaded.value;
-
-      if (!isImage && !isText) return const SizedBox.shrink();
-
-      final String name = isImage
-          ? localImage.loadedModelName.value
-          : inference.loadedModelName.value;
-      final bool useGpu = isImage
-          ? localImage.isUsingGpu.value
-          : inference.isGpuAccelerated.value;
-      final String subtitle = isImage
-          ? (useGpu ? '⚡ GPU Accelerated Rendering' : '🖥 CPU Image Synthesis')
-          : (useGpu
-              ? '⚡ GPU: ${inference.gpuName.value}'
-              : '🖥 CPU Neural Engine');
-
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        decoration: BoxDecoration(
-          color:
-              isDark ? AppColors.surface.withValues(alpha: 0.5) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                useGpu ? LucideIcons.zap : LucideIcons.cpu,
-                color: Theme.of(context).primaryColor,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isImage
-                        ? 'model_active_image'.tr
-                        : 'model_active_intelligence'.tr,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10,
-                      color: Theme.of(context).primaryColor,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    name,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : Colors.black,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.firaCode(
-                      fontSize: 11,
-                      color: Theme.of(context).hintColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(LucideIcons.checkCircle,
-                color: AppColors.success, size: 22),
-          ],
-        ),
-      );
-    });
-  }
-
-  Widget _buildActiveCloudBanner(BuildContext context) {
-    final settings = Get.find<SettingsController>();
-    final cloudModels = Get.find<CloudModelController>();
-    final providerId = settings.cloudProvider.value;
-    final provider = cloudModels.providers.firstWhereOrNull(
-      (p) => p.id == providerId,
-    );
-    final providerName = providerId == 'custom'
-        ? settings.customCloudName.value
-        : provider?.name ?? providerId;
-    final model = cloudModels.activeModelFor(providerId);
-    final hasSelectedModel =
-        cloudModels.canSelectModel(providerId) && model.isNotEmpty;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).primaryColor.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(Icons.cloud_done, color: Theme.of(context).primaryColor, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Cloud Provider: $providerName',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
-                    color: Theme.of(context).hintColor,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  hasSelectedModel ? model : 'No cloud model selected',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.check_circle, color: AppColors.success, size: 20),
-        ],
-      ),
-    );
-  }
 
   Widget _buildImportingProgress(BuildContext context) {
     return Obx(() {
@@ -902,7 +447,7 @@ class ModelView extends GetView<ModelController> {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isDark ? AppColors.surface : Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
               color:
@@ -963,7 +508,7 @@ class ModelView extends GetView<ModelController> {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: Theme.of(context).hintColor,
+                  color: Theme.of(context).colorScheme.primary,
                   letterSpacing: 1.2,
                 ),
               ),
@@ -997,7 +542,7 @@ class ModelView extends GetView<ModelController> {
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Theme.of(context).hintColor,
+                    color: Theme.of(context).colorScheme.primary,
                     letterSpacing: 1.2,
                   ),
                 ),
@@ -1006,7 +551,7 @@ class ModelView extends GetView<ModelController> {
                   'Set a key to unlock these providers',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
-                    color: Theme.of(context).hintColor,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1028,7 +573,7 @@ class ModelView extends GetView<ModelController> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isDark ? AppColors.surface : Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
               color: isDark ? AppColors.border : AppColors.borderLightMode),
@@ -1041,7 +586,7 @@ class ModelView extends GetView<ModelController> {
               cloudModels.autoSyncLabel(),
               style: GoogleFonts.plusJakartaSans(
                   fontSize: 11.5,
-                  color: Theme.of(context).hintColor,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w600),
             ),
           ),

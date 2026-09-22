@@ -122,7 +122,9 @@ Widget skillTile(BuildContext context, bool isDark, SkillModel skill) {
                 Expanded(
                   child: Text(skill.name,
                       style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14, fontWeight: FontWeight.w700)),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).colorScheme.onSurface)),
                 ),
                 if (skill.isBuiltIn)
                   Container(

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../core/colors.dart';
 import '../../theme/design_tokens.dart';
 
 /// Apple-style grouped cards, tiles, icon boxes, section labels.
@@ -10,7 +9,7 @@ Widget appleGroupedCard(BuildContext context, bool isDark,
   return Container(
     clipBehavior: Clip.antiAlias,
     decoration: BoxDecoration(
-      color: isDark ? Dt.cardDark : Dt.card,
+      color: Theme.of(context).cardColor,
       border: Border.all(
           color: isDark ? Colors.white.withValues(alpha: 0.07) : Dt.hairline),
       borderRadius: BorderRadius.circular(16),
@@ -46,8 +45,7 @@ Widget appleListTile(
                     style: GoogleFonts.plusJakartaSans(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color:
-                            isDark ? AppColors.textPrimary : Dt.textPrimary)),
+                        color: Theme.of(context).colorScheme.onSurface)),
                 if (subtitle != null) ...[
                   const SizedBox(height: 3),
                   Text(subtitle,

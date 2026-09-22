@@ -704,18 +704,21 @@ class CubicLMApp extends StatelessWidget {
           final accent = settings.customAccentColor.value;
           final family = settings.selectedFontFamily.value;
           final dynamicColor = settings.dynamicColorEnabled.value;
+          final isBold = settings.isBoldTheme.value;
 
           final lightTheme = AppTheme.buildTheme(
             Brightness.light,
             accentColor: accent,
             fontFamily: family,
             colorScheme: dynamicColor ? lightDynamic?.harmonized() : null,
+            isBold: isBold,
           );
           final darkTheme = AppTheme.buildTheme(
             Brightness.dark,
             accentColor: accent,
             fontFamily: family,
             colorScheme: dynamicColor ? dark?.harmonized() : null,
+            isBold: isBold,
           );
 
           return GetMaterialApp(

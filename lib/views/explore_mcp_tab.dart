@@ -116,7 +116,7 @@ class _ExploreMcpTabState extends State<ExploreMcpTab> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-              color: isDark ? AppColors.surface : Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.06) : Dt.hairline)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -216,7 +216,7 @@ class _ExploreMcpTabState extends State<ExploreMcpTab> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-          color: isDark ? AppColors.surface : Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
               color: isDark

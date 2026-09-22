@@ -51,7 +51,7 @@ class TaskView extends GetView<TaskController> {
           ),
           child: const Icon(Icons.auto_awesome_rounded, size: 36, color: AppColors.primary)),
         const SizedBox(height: 24),
-        Text('Agent Idle', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
+        Text('Agent Idle', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.onSurface)),
         const SizedBox(height: 10),
         Text('Instruct the AI to plan complex multi-step operations, then export them as an ADB script to run from your PC.', textAlign: TextAlign.center,
           style: GoogleFonts.plusJakartaSans(fontSize: 15, color: Theme.of(context).hintColor, fontWeight: FontWeight.w500)),
@@ -70,7 +70,7 @@ class TaskView extends GetView<TaskController> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.03) : Dt.pillMuted.withValues(alpha: 0.6),
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
       ),
       child: InkWell(
@@ -82,7 +82,7 @@ class TaskView extends GetView<TaskController> {
             child: Icon(_statusIcon(task.status), color: statusColor, size: 22)),
           const SizedBox(width: 16),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(task.goal, style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black), maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(task.goal, style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface), maxLines: 2, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
             Text('${task.steps.length} operational steps · ${task.status.toUpperCase()}', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: statusColor, fontWeight: FontWeight.w800, letterSpacing: 0.3)),
           ])),
@@ -99,11 +99,11 @@ class TaskView extends GetView<TaskController> {
         GestureDetector(
           onTap: () => controller.currentTask.value = null,
           child: Container(width: 40, height: 40,
-            decoration: BoxDecoration(color: isDark ? AppColors.surface : Dt.pillMuted, borderRadius: BorderRadius.circular(12), border: Border.all(color: isDark ? AppColors.border : AppColors.borderLightMode)),
-            child: Icon(Icons.chevron_left_rounded, size: 24, color: isDark ? Colors.white : Colors.black)),
+            decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: isDark ? AppColors.border : AppColors.borderLightMode)),
+            child: Icon(Icons.chevron_left_rounded, size: 24, color: Theme.of(context).colorScheme.onSurface)),
         ),
         const SizedBox(width: 16),
-        Expanded(child: Text(task.goal, style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black), maxLines: 2, overflow: TextOverflow.ellipsis)),
+        Expanded(child: Text(task.goal, style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.onSurface), maxLines: 2, overflow: TextOverflow.ellipsis)),
       ])),
       Divider(height: 1, color: isDark ? AppColors.border : AppColors.borderLightMode),
 

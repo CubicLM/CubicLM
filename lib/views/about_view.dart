@@ -81,7 +81,7 @@ class AboutView extends StatelessWidget {
             style: GoogleFonts.plusJakartaSans(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: isDark ? AppColors.textPrimary : Dt.textPrimary)),
+                color: Theme.of(context).colorScheme.onSurface)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -115,8 +115,7 @@ class AboutView extends StatelessWidget {
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.5,
-                        color:
-                            isDark ? AppColors.textPrimary : Dt.textPrimary)),
+                        color: Theme.of(context).colorScheme.onSurface)),
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -159,8 +158,7 @@ class AboutView extends StatelessWidget {
                       fontSize: 13.5,
                       height: 1.55,
                       fontWeight: FontWeight.w500,
-                      color:
-                          isDark ? AppColors.textSecondary : Dt.textSecondary),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ]),
             ),
@@ -245,7 +243,7 @@ class AboutView extends StatelessWidget {
 
             // ── Highlights ──
             _sectionLabel('about_highlights'.tr, isDark),
-            _groupedCard(isDark: isDark, children: [
+            _groupedCard(context, isDark: isDark, children: [
               for (final f in [
                 (_Icons.brain, 'about_feat_local'.tr,
                     'about_feat_local_desc'.tr),
@@ -264,13 +262,13 @@ class AboutView extends StatelessWidget {
                 (_Icons.activity, 'about_feat_diagnostics'.tr,
                     'about_feat_diagnostics_desc'.tr),
               ])
-                _featureRow(f.$1, f.$2, f.$3, isDark),
+                _featureRow(context, f.$1, f.$2, f.$3, isDark),
             ]),
             const SizedBox(height: 24),
 
             // ── Cross-platform discoverability (per §5.4) ──
             _sectionLabel('about_available_on'.tr, isDark),
-            _groupedCard(isDark: isDark, children: [
+            _groupedCard(context, isDark: isDark, children: [
               if (kIsWeb) ...[
                 // Web: link to Desktop + Android + changelog (no self)
                 _platformLinkRow(
@@ -383,9 +381,7 @@ class AboutView extends StatelessWidget {
                         style: GoogleFonts.plusJakartaSans(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: isDark
-                                ? AppColors.textSecondary
-                                : Dt.textSecondary)),
+                            color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   ),
               ],
             ),
@@ -393,7 +389,7 @@ class AboutView extends StatelessWidget {
 
             // ── Links ──
             _sectionLabel('about_links'.tr, isDark),
-            _groupedCard(isDark: isDark, children: [
+            _groupedCard(context, isDark: isDark, children: [
               _linkRow(
                 context,
                 isDark,
@@ -433,7 +429,7 @@ class AboutView extends StatelessWidget {
 
             // ── Developer ──
             _sectionLabel('about_developer'.tr, isDark),
-            _groupedCard(isDark: isDark, children: [
+            _groupedCard(context, isDark: isDark, children: [
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(children: [
@@ -513,12 +509,12 @@ class AboutView extends StatelessWidget {
                 color: isDark ? AppColors.textMuted : Dt.textMuted)),
       );
 
-  Widget _groupedCard(
+  Widget _groupedCard(BuildContext context,
           {required bool isDark, required List<Widget> children}) =>
       Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: isDark ? Dt.cardDark : Dt.card,
+          color: Theme.of(context).cardColor,
           border: Border.all(color: Dt.borderColor(isDark)),
           borderRadius: BorderRadius.circular(16),
         ),
@@ -530,7 +526,7 @@ class AboutView extends StatelessWidget {
         child: Divider(height: 1, color: Dt.borderColor(isDark)),
       );
 
-  Widget _featureRow(IconData icon, String title, String subtitle,
+  Widget _featureRow(BuildContext context, IconData icon, String title, String subtitle,
       bool isDark) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -553,18 +549,14 @@ class AboutView extends StatelessWidget {
                     style: GoogleFonts.plusJakartaSans(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: isDark
-                            ? AppColors.textPrimary
-                            : Dt.textPrimary)),
+                        color: Theme.of(context).colorScheme.onSurface)),
                 const SizedBox(height: 2),
                 Text(subtitle,
                     style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         height: 1.4,
                         fontWeight: FontWeight.w500,
-                        color: isDark
-                            ? AppColors.textSecondary
-                            : Dt.textSecondary)),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ]),
         ),
       ]),
@@ -613,9 +605,7 @@ class AboutView extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                           color: highlight
                               ? Dt.accent
-                              : isDark
-                                  ? AppColors.textPrimary
-                                  : Dt.textPrimary)),
+                              : Theme.of(context).colorScheme.onSurface)),
                   const SizedBox(height: 2),
                   Text(
                       isPlaceholder ? 'Configure in platform_links.dart' : subtitle,
@@ -661,9 +651,7 @@ class AboutView extends StatelessWidget {
                       style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: isDark
-                              ? AppColors.textPrimary
-                              : Dt.textPrimary)),
+                          color: Theme.of(context).colorScheme.onSurface)),
                   const SizedBox(height: 2),
                   Text(subtitle,
                       maxLines: 1,

@@ -22,10 +22,12 @@ extension SettingsControllerAppearance on SettingsController {
 
   // ── Personalization ──
 
-  Future<void> setTheme(String name, Color? color) async {
+  Future<void> setTheme(String name, Color? color, {bool isBold = false}) async {
     selectedThemeName.value = name;
     customAccentColor.value = color;
+    isBoldTheme.value = isBold;
     await _hive.setSetting(AppConstants.keySelectedTheme, name);
+    await _hive.setSetting(AppConstants.keyIsBoldTheme, isBold);
     if (color != null) {
       await _hive.setSetting(AppConstants.keyCustomAccentColor, color.toARGB32());
     } else {

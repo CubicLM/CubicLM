@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../theme/design_tokens.dart';
 import 'explore/toolkit_tab.dart';
 
 /// Standalone Toolkit page (Battle Arena, Slide Maker, …).
@@ -38,12 +37,11 @@ class _ToolkitViewState extends State<ToolkitView> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = Theme.of(context).scaffoldBackgroundColor;
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: bg,
       appBar: AppBar(
-        backgroundColor:
-            (isDark ? Dt.canvasDark : Dt.canvas).withValues(alpha: 0.8),
+        backgroundColor: bg.withValues(alpha: 0.85),
         flexibleSpace: ClipRRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),

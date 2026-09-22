@@ -392,6 +392,9 @@ extension SettingsControllerLoading on SettingsController {
     selectedThemeName.value = _hive.getSetting<String>(AppConstants.keySelectedTheme,
             defaultValue: 'CubicLM') ??
         'CubicLM';
+    isBoldTheme.value = _hive.getSetting<bool>(AppConstants.keyIsBoldTheme,
+            defaultValue: false) ??
+        false;
     final savedColor = _hive.getSetting<int>(AppConstants.keyCustomAccentColor);
     if (savedColor != null) {
       customAccentColor.value = Color(savedColor);

@@ -230,7 +230,7 @@ class _McpSectionState extends State<_McpSection> {
       return Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: isDark ? Dt.cardDark : Dt.card,
+          color: Theme.of(context).cardColor,
           border: Border.all(
               color:
                   isDark ? Colors.white.withValues(alpha: 0.07) : Dt.hairline),
@@ -261,7 +261,9 @@ class _McpSectionState extends State<_McpSection> {
                         children: [
                           Text('MCP Servers',
                               style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 15, fontWeight: FontWeight.w700)),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Theme.of(context).colorScheme.onSurface)),
                           const SizedBox(height: 2),
                           Text(
                             servers.isEmpty
