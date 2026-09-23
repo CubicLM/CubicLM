@@ -143,7 +143,14 @@ class GgufEngine {
     return 512;
   }
 
-  /// Halved context for the one-shot load retry (never below 512).
+  /// Batch thread count by free RAM (pure logic, unit tested).
+  /// Prompt-parallel work scales with threads; on <2.5GB phones a
+  /// single batch thread halves the transient spike (slower prefill,
+  /// but alive). -1 keeps the native default (= generation threads).
+  static int resolveBatchThreads(double availGb) {
+    if (availGb > 0 && availGb < 2.5) return 1;
+    return -1;
+  }
   /// Returns [contextSize] unchanged when already minimal.
   static int reducedContextForRetry(int contextSize) {
     if (contextSize <= 512) return contextSize;
@@ -542,11 +549,13 @@ class GgufEngine {
     // biggest transient spike, and small batches keep 4-6GB phones
     // alive through it. No-op where the native side is absent.
     final batchSize = GgufEngine.resolveBatchSize(availGb);
+    final batchThreads = GgufEngine.resolveBatchThreads(availGb);
     try {
-      await _controller!.setBatchSize(batchSize);
+      await _controller!
+          .setBatchSize(batchSize, nBatchThreads: batchThreads);
     } catch (_) {}
-    print('[Inference] Batch size → $batchSize '
-        '(free RAM ${availGb.toStringAsFixed(1)}GB)');
+    print('[Inference] Batch size → $batchSize (threads $batchThreads, '
+        'free RAM ${availGb.toStringAsFixed(1)}GB)');
 
     // ── Load Progress ──
     await _loadProgressSub?.cancel();
@@ -586,7 +595,8 @@ class GgufEngine {
       await _evictOtherResidents(modelPath);
       try {
         await _controller!.setBatchSize(
-            batchSize ~/ 2 < 64 ? 64 : batchSize ~/ 2);
+            batchSize ~/ 2 < 64 ? 64 : batchSize ~/ 2,
+            nBatchThreads: 1);
       } catch (_) {}
       try {
         final log = Get.find<AppLogService>();

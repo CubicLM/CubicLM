@@ -113,6 +113,16 @@ void main() {
     });
   });
 
+  group('resolveBatchThreads', () {
+    test('single batch thread below 2.5GB free', () {
+      expect(GgufEngine.resolveBatchThreads(1.5), 1);
+      expect(GgufEngine.resolveBatchThreads(2.1), 1);
+      expect(GgufEngine.resolveBatchThreads(2.5), -1);
+      expect(GgufEngine.resolveBatchThreads(8.0), -1);
+      expect(GgufEngine.resolveBatchThreads(0), -1);
+    });
+  });
+
   group('resolveBatchSize', () {
     test('scales the prompt-parallel batch to free RAM', () {
       expect(GgufEngine.resolveBatchSize(1.5), 128);

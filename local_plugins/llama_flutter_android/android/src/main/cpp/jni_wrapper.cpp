@@ -34,6 +34,9 @@ static bool g_capture_load_error = false;
 // Prompt-processing batch for the next nativeLoadModel (set from Dart
 // via nativeSetBatchSize; default preserves the historic 512).
 static int g_batch_size = 512;
+// Batch thread count for the parallel prompt pass (same setter channel).
+// 1 thread = slowest but smallest transient spike; used on <2.5GB phones.
+static int g_batch_threads = -1;
 
 static ModelSlot* activeSlot() {
     const int i = g_active_slot.load(std::memory_order_acquire);
@@ -319,7 +322,7 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeLoadMo
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = ctx_size;
     ctx_params.n_threads = n_threads;
-    ctx_params.n_threads_batch = n_threads;
+    ctx_params.n_threads_batch = (g_batch_threads > 0) ? g_batch_threads : n_threads;
 
     // Memory optimization: prompt-processing batch comes from
     // nativeSetBatchSize (default 512). Small batches keep the parallel
@@ -666,11 +669,12 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenera
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeSetBatchSize(
-    JNIEnv* env, jobject thiz, jint n_batch) {
+    JNIEnv* env, jobject thiz, jint n_batch, jint n_batch_threads) {
     if (n_batch < 32) n_batch = 32;
     if (n_batch > 2048) n_batch = 2048;
     g_batch_size = n_batch;
-    LOGI("Batch size set to %d", g_batch_size);
+    g_batch_threads = (n_batch_threads > 0) ? n_batch_threads : -1;
+    LOGI("Batch size set to %d (batch threads %d)", g_batch_size, g_batch_threads);
 }
 
 extern "C" JNIEXPORT void JNICALL

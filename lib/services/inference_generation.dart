@@ -189,6 +189,16 @@ extension InferenceServiceGeneration on InferenceService {
         } catch (_) {}
       }
 
+      // Last-resort pre-generate gate (native GGUF path only): below
+      // ~350MB free even the smallest prefill spike is a proven killer
+      // (turn-2 deaths on 2GB phones). Refuse with a clear, chat-visible
+      // message instead of letting the OS kill the process mid-prefill —
+      // the chat stays alive and the user can free RAM and retry.
+      if (!useServer && loadedModelRuntime.value != 'litert') {
+        final refusal = _refuseWhenStarved();
+        if (refusal != null) return refusal;
+      }
+
       final result = useServer
           ? await _generateViaServer(
               prompt: prompt,
@@ -273,6 +283,19 @@ extension InferenceServiceGeneration on InferenceService {
       Get.find<AppLogService>().error('Local generation failed', details: e, category: LogCategory.model);
       return 'ERROR: $e';
     }
+  }
+
+  /// Near-certain-death line for prefill (~350MB free): returns a
+  /// chat-visible refusal, else null. Never throws — a broken reading
+  /// must not block generation.
+  String? _refuseWhenStarved() {
+    try {
+      final availGb = Get.find<DeviceInfoService>().availableRamGB.value;
+      if (availGb > 0 && availGb * 1024 < 350) {
+        return 'ERROR: Only ${(availGb * 1024).round()}MB RAM free — too low to run even a small prompt safely. Close background apps (or restart the app to free memory), then send again.';
+      }
+    } catch (_) {}
+    return null;
   }
 
 }
