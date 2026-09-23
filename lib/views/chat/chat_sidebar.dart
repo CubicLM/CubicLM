@@ -536,7 +536,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
         return await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            backgroundColor: isDark ? AppColors.surface : Colors.white,
+            backgroundColor: Theme.of(context).cardColor,
             title: Text('chat_delete_chat_title'.tr,
                 style:
                     GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
@@ -803,7 +803,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: isDark ? AppColors.surface : Colors.white,
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => DraggableScrollableSheet(
@@ -940,7 +940,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? AppColors.surface : Colors.white,
+        backgroundColor: Theme.of(context).cardColor,
         title: const Text('New Project'),
         content: TextField(
           controller: ctrl,

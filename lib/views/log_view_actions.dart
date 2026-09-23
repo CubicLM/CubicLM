@@ -60,33 +60,40 @@ extension _LogViewActions on _LogViewState {
   }
 
   Future<void> _showExportSheet(
-      BuildContext context, AppLogService logs, bool isDark) async {    final action = await Get.dialog<String>(
+      BuildContext context, AppLogService logs, bool isDark) async {
+    final bg = Theme.of(context).cardColor;
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    final action = await Get.dialog<String>(
       AlertDialog(
-        backgroundColor: isDark ? AppColors.surface : Colors.white,
+        backgroundColor: bg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Export logs',
-            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18)),
+            style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w800, fontSize: 18, color: textColor)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(LucideIcons.copy, size: 20),
+              leading: Icon(LucideIcons.copy, size: 20, color: textColor),
               title: Text('Copy to clipboard',
-                  style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600)),
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14, fontWeight: FontWeight.w600, color: textColor)),
               contentPadding: EdgeInsets.zero,
               onTap: () => Get.back(result: 'copy'),
             ),
             ListTile(
-              leading: const Icon(LucideIcons.fileText, size: 20),
+              leading: Icon(LucideIcons.fileText, size: 20, color: textColor),
               title: Text('Save as .txt file',
-                  style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600)),
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14, fontWeight: FontWeight.w600, color: textColor)),
               contentPadding: EdgeInsets.zero,
               onTap: () => Get.back(result: 'file'),
             ),
             ListTile(
-              leading: const Icon(LucideIcons.share2, size: 20),
+              leading: Icon(LucideIcons.share2, size: 20, color: textColor),
               title: Text('Share .txt file',
-                  style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600)),
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14, fontWeight: FontWeight.w600, color: textColor)),
               contentPadding: EdgeInsets.zero,
               onTap: () => Get.back(result: 'share'),
             ),

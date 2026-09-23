@@ -61,7 +61,6 @@ void showEditDialog(BuildContext context, ChatMessage msg) {
   _c.inputText.value = '';
 
   final editController = TextEditingController(text: msg.content);
-  final isDark = Theme.of(context).brightness == Brightness.dark;
 
   void submit() {
     final newContent = editController.text.trim();
@@ -74,7 +73,7 @@ void showEditDialog(BuildContext context, ChatMessage msg) {
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      backgroundColor: isDark ? AppColors.surface : Colors.white,
+      backgroundColor: Theme.of(context).cardColor,
       title: Text('chat_edit_title'.tr,
           style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
       content: TextField(
@@ -314,7 +313,7 @@ void showChatActionsSheet(
     BuildContext context, ChatSession session, bool isDark) {
   showModalBottomSheet(
     context: context,
-    backgroundColor: isDark ? AppColors.surface : Colors.white,
+    backgroundColor: Theme.of(context).cardColor,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -461,7 +460,7 @@ void showLabelDialog(BuildContext context, ChatSession session, bool isDark) {
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
-      backgroundColor: isDark ? AppColors.surface : Colors.white,
+      backgroundColor: Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Text('Chat label',
           style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
@@ -529,7 +528,7 @@ void showPersonaDialog(BuildContext context, ChatSession session, bool isDark) {
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
-      backgroundColor: isDark ? AppColors.surface : Colors.white,
+      backgroundColor: Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Text('Chat persona',
           style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
