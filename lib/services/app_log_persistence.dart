@@ -227,6 +227,19 @@ extension AppLogServicePersistence on AppLogService {
   Future<void> _reportProcessExits() async {
     try {
       if (kIsWeb) return;
+      bool forensics = false;
+      try {
+        forensics = await AppLogService._exitChannel
+                .invokeMethod<bool>('forensicsReady') ??
+            false;
+      } catch (_) {}
+      if (!forensics) {
+        // One-shot per boot, debug-level: tells the user (and us, via
+        // their log export) that this APK predates stack capture, so a
+        // bare "crash" row means "update the app", not "unknown".
+        debug('Crash forensics unavailable in this build — update the '
+            'app to capture Java stacks for native-death diagnosis.');
+      }
       List<dynamic>? raw;
       try {
         raw = await AppLogService._exitChannel.invokeListMethod<dynamic>(

@@ -81,6 +81,10 @@ class MainActivity : FlutterFragmentActivity() {
             .setMethodCallHandler { call, result ->
                 if (call.method == "getRecentExitReasons") {
                     result.success(recentExitReasons())
+                } else if (call.method == "forensicsReady") {
+                    // True when this APK contains the JVM crash-file handler
+                    // (lets System Logs prove the build can capture stacks).
+                    result.success(crashHandlerInstalled)
                 } else {
                     result.notImplemented()
                 }
