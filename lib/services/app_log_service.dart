@@ -34,8 +34,35 @@ enum LogCategory {
   const LogCategory(this.label);
 }
 
-/// Android ApplicationExitInfo reason codes → short names. Pure —
-/// unit tested. Mirrors android.app.ApplicationExitInfo (API 30+).
+/// Android RunningAppProcessInfo importance → short name. Pure —
+/// unit tested. Tells foreground kills apart from background reaps.
+String processImportanceName(int importance) {
+  switch (importance) {
+    case 100:
+      return 'FOREGROUND';
+    case 125:
+      return 'FG_SERVICE';
+    case 150:
+      return 'TOP_SLEEPING';
+    case 170:
+      return 'CANT_SAVE_STATE';
+    case 200:
+      return 'VISIBLE';
+    case 300:
+      return 'SERVICE';
+    case 400:
+      return 'CACHED';
+    case 500:
+      return 'EMPTY';
+    case 1000:
+      return 'GONE';
+    default:
+      return 'IMP_$importance';
+  }
+}
+
+/// ApplicationExitInfo reason codes → short names. Pure — unit tested.
+/// Mirrors android.app.ApplicationExitInfo (API 30+).
 String processExitReasonName(int reason) {
   switch (reason) {
     case 0:

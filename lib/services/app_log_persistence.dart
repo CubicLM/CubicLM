@@ -271,6 +271,9 @@ extension AppLogServicePersistence on AppLogService {
         fresh++;
         if (fresh > 4) continue; // Cap rows; still advance maxMs above.
         final name = processExitReasonName(reason);
+        final imp = processImportanceName(
+            (m['importance'] as num?)?.toInt() ?? 0);
+        final status = (m['status'] as num?)?.toInt() ?? 0;
         final at = tsMs > 0
             ? DateTime.fromMillisecondsSinceEpoch(tsMs).toIso8601String()
             : 'unknown time';
@@ -286,7 +289,7 @@ extension AppLogServicePersistence on AppLogService {
             ? AppLogService._exitHintFor(reason)
             : '${combined.length > 2800 ? '${combined.substring(0, 2800)}…' : combined}\n${AppLogService._exitHintFor(reason)}';
         error(
-          '[Previous run] $name @ $at'
+          '[Previous run] $name @ $at [$imp${status != 0 ? ' status=$status' : ''}]'
           '${pssMb > 0 ? ' (pss ${pssMb.toStringAsFixed(0)}MB, rss ${rssMb.toStringAsFixed(0)}MB)' : ''}',
           details: details,
           category: (reason == 4 || reason == 5)
