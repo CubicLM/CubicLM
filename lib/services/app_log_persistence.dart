@@ -209,8 +209,11 @@ extension AppLogServicePersistence on AppLogService {
         count++;
         if (count > 3) continue;
         if (body.length > 2800) body = '${body.substring(0, 2800)}…';
+        final isNative = f.path.contains('native_crash_');
         error(
-          '[Previous run] JAVA CRASH — uncaught exception killed the app',
+          isNative
+              ? '[Previous run] NATIVE CRASH — fatal signal inside the engine'
+              : '[Previous run] JAVA CRASH — uncaught exception killed the app',
           details: '$body\nCopy this row + the rows above it and report.',
           category: LogCategory.model,
         );

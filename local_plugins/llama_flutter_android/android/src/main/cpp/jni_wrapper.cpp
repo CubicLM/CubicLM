@@ -6,6 +6,11 @@
 #include <cstring>
 #include <fstream>
 #include <mutex>
+#include <csignal>
+#include <unistd.h>
+#include <fcntl.h>
+#include <unwind.h>
+#include <dlfcn.h>
 #include <android/log.h>
 #include "llama.cpp/include/llama.h"
 #define LOG_TAG "LlamaJNI"
@@ -37,6 +42,152 @@ static int g_batch_size = 512;
 // Batch thread count for the parallel prompt pass (same setter channel).
 // 1 thread = slowest but smallest transient spike; used on <2.5GB phones.
 static int g_batch_threads = -1;
+
+// ── Native crash tombstone (for in-app System Logs, no adb) ─────────
+// A segfault/abort inside the engine kills the process with zero Dart
+// evidence. This handler writes signal + fault address + raw PCs to a
+// file the Dart layer picks up on next boot; PCs are symbolized offline
+// against the unstripped libllama_jni.so from the same build.
+// SAFETY: only fires for crashes whose PC is inside our own library
+// (ART uses SIGSEGV internally for null checks — those chain straight
+// through). After writing, chains to the previous handler so the system
+// still records the death normally.
+static char g_crash_dir[1024] = {0};
+static struct sigaction g_old_crash_handlers[5];
+static const int g_crash_signals[5] = {SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS};
+
+static void crash_write_str(int fd, const char* s) {
+    size_t n = 0;
+    while (s[n] != '\0') n++;
+    if (n > 0) (void) write(fd, s, n);
+}
+
+static void crash_write_hex(int fd, uintptr_t v) {
+    char buf[19];
+    buf[0] = '0'; buf[1] = 'x';
+    for (int i = 15; i >= 0; i--) {
+        int nib = (v >> (i * 4)) & 0xF;
+        buf[16 - i] = (char)(nib < 10 ? '0' + nib : 'a' + nib - 10);
+    }
+    buf[18] = '\n';
+    (void) write(fd, buf, 19);
+}
+
+static void crash_write_dec(int fd, long long v) {
+    char buf[24];
+    int len = 0;
+    bool neg = false;
+    if (v < 0) { neg = true; v = -v; }
+    char rev[22];
+    int rlen = 0;
+    do { rev[rlen++] = (char)('0' + (v % 10)); v /= 10; } while (v > 0 && rlen < 22);
+    if (neg && len < 23) buf[len++] = '-';
+    while (rlen > 0 && len < 23) buf[len++] = rev[--rlen];
+    buf[len++] = '\n';
+    (void) write(fd, buf, (size_t) len);
+}
+
+struct CrashUnwindState {
+    void** pcs;
+    int max;
+    int count;
+};
+
+static _Unwind_Reason_Code crash_unwind_cb(
+    struct _Unwind_Context* ctx, void* arg) {
+    CrashUnwindState* s = static_cast<CrashUnwindState*>(arg);
+    if (s->count >= s->max) return _URC_END_OF_STACK;
+    s->pcs[s->count++] = (void*) _Unwind_GetIP(ctx);
+    return _URC_NO_REASON;
+}
+
+static void crash_handler(int sig, siginfo_t* info, void* /*ctx*/) {
+    // Faulting PC tells whether this is OUR crash: ART and other libs
+    // must chain through untouched.
+    void* pcs[32];
+    CrashUnwindState state{pcs, 32, 0};
+    _Unwind_Backtrace(crash_unwind_cb, &state);
+    int n = state.count;
+    bool ours = false;
+    // pcs[0..1] are unwind machinery + this handler; the crashing
+    // frame is pcs[2] (best effort — symbolization trims as needed).
+    for (int f = 2; f < n && !ours; f++) {
+        Dl_info dli;
+        if (dladdr(pcs[f], &dli) && dli.dli_fname) {
+            const char* fn = dli.dli_fname;
+            for (size_t k = 0; fn[k] != '\0' && fn[k+1] != '\0' &&
+                 fn[k+2] != '\0' && fn[k+3] != '\0' && fn[k+4] != '\0'; k++) {
+                if (fn[k] == 'l' && fn[k+1] == 'l' && fn[k+2] == 'a' &&
+                    fn[k+3] == 'm' && fn[k+4] == 'a') { ours = true; break; }
+            }
+        }
+    }
+    int idx = -1;
+    for (int i = 0; i < 5; i++) {
+        if (g_crash_signals[i] == sig) { idx = i; break; }
+    }
+    struct sigaction* old_act = (idx >= 0) ? &g_old_crash_handlers[idx] : nullptr;
+    if (ours && g_crash_dir[0] != '\0') {
+        char path[1400];
+        size_t d = 0;
+        while (g_crash_dir[d] != '\0' && d < 1000) { path[d] = g_crash_dir[d]; d++; }
+        const char* mid = "/native_crash_";
+        size_t m = 0;
+        while (mid[m] != '\0') { path[d++] = mid[m++]; }
+        // time() is async-signal-safe; digits appended manually.
+        long long t = (long long) time(nullptr);
+        char rev[22];
+        int rlen = 0;
+        if (t == 0) rev[rlen++] = '0';
+        while (t > 0 && rlen < 22) { rev[rlen++] = (char)('0' + (t % 10)); t /= 10; }
+        while (rlen > 0) path[d++] = rev[--rlen];
+        path[d++] = '.'; path[d++] = 't'; path[d++] = 'x'; path[d++] = 't';
+        path[d] = '\0';
+        int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+        if (fd >= 0) {
+            crash_write_str(fd, "signal ");
+            crash_write_dec(fd, sig);
+            crash_write_str(fd, "fault ");
+            crash_write_hex(fd, (uintptr_t)(info ? info->si_addr : nullptr));
+            crash_write_str(fd, "pcs ");
+            crash_write_dec(fd, n);
+            for (int i = 0; i < n; i++) crash_write_hex(fd, (uintptr_t)pcs[i]);
+            close(fd);
+        }
+    }
+    // Chain: previous handler (or default) still owns the death, so the
+    // OS records it in ApplicationExitInfo exactly as before.
+    if (old_act && (old_act->sa_flags & SA_SIGINFO)) {
+        old_act->sa_sigaction(sig, info, nullptr);
+    } else if (old_act && old_act->sa_handler != SIG_DFL && old_act->sa_handler != SIG_IGN) {
+        old_act->sa_handler(sig);
+    } else {
+        signal(sig, SIG_DFL);
+        raise(sig);
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeInstallCrashHandler(
+    JNIEnv* env, jobject thiz, jstring crash_dir) {
+    const char* dir = env->GetStringUTFChars(crash_dir, nullptr);
+    if (dir) {
+        size_t n = strlen(dir);
+        if (n >= sizeof(g_crash_dir)) n = sizeof(g_crash_dir) - 1;
+        memcpy(g_crash_dir, dir, n);
+        g_crash_dir[n] = '\0';
+        env->ReleaseStringUTFChars(crash_dir, dir);
+    }
+    struct sigaction act;
+    memset(&act, 0, sizeof(act));
+    act.sa_sigaction = crash_handler;
+    act.sa_flags = SA_SIGINFO | SA_RESTART;
+    sigemptyset(&act.sa_mask);
+    for (int i = 0; i < 5; i++) {
+        sigaction(g_crash_signals[i], &act, &g_old_crash_handlers[i]);
+    }
+    LOGI("Native crash handler installed (dir=%s)", g_crash_dir);
+}
 
 static ModelSlot* activeSlot() {
     const int i = g_active_slot.load(std::memory_order_acquire);

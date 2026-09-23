@@ -180,6 +180,7 @@ class LlamaFlutterAndroidPlugin : FlutterPlugin, LlamaHostApi {
 
                     // Load into the chosen slot; C++ frees that slot first.
                     // Other slots stay resident.
+                    installNativeCrashHandler()
                     nativeLoadModel(
                         config.modelPath,
                         config.nThreads,
@@ -592,6 +593,25 @@ class LlamaFlutterAndroidPlugin : FlutterPlugin, LlamaHostApi {
 
     private external fun nativeStop()
     private external fun nativeSetBatchSize(nBatch: Int, nBatchThreads: Int)
+    private external fun nativeInstallCrashHandler(crashDir: String)
+
+    // Native tombstone reporter for in-app System Logs (no adb): fatal
+    // signals inside our engine write signal + PCs to app storage;
+    // Dart surfaces them next boot for offline symbolization.
+    @Volatile private var crashHandlerInstalled = false
+
+    private fun installNativeCrashHandler() {
+        if (crashHandlerInstalled) return
+        crashHandlerInstalled = true
+        try {
+            val dir = java.io.File(
+                context.filesDir.parentFile, "app_flutter/cubiclm_crashes")
+            dir.mkdirs()
+            nativeInstallCrashHandler(dir.absolutePath)
+        } catch (t: Throwable) {
+            Log.w(TAG, "Crash handler unavailable", t)
+        }
+    }
     private external fun nativeFreeModel()
     private external fun nativeSelectSlot(slot: Int): Boolean
     private external fun nativeIsSlotLoaded(slot: Int): Boolean
