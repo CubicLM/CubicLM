@@ -125,16 +125,20 @@ class GgufEngine {
     if (availGb <= 0 || availGb >= 3.0) return threads;
     // Below 1.5GB every thread's compute buffer matters: single thread.
     if (availGb < 1.5) return threads <= 1 ? threads : 1;
-    final cap = availGb < 2.0 ? 2 : 3;
+    // Below 2.5GB a second/third thread's buffers + a hot phone after
+    // turn 1 push prefill over the edge (observed turn-2 death at
+    // 2.1GB/3 threads): cap at 2.
+    final cap = availGb < 2.5 ? 2 : 3;
     return threads <= cap ? threads : cap;
   }
 
   /// Prompt-processing batch by free RAM (pure logic, unit tested).
   /// The parallel prompt pass is the biggest transient spike after
-  /// mmap page-in: 512 needs ~3GB+ free, 256 fits ~2GB, 128 survives
-  /// ~1.2GB. Unknown RAM (≤0) keeps the historic 512.
+  /// mmap page-in. Observed turn-2 prefill death at 2.1GB free with
+  /// batch 256 — so the 128 tier now extends to 2.5GB. Unknown RAM
+  /// (≤0) keeps the historic 512.
   static int resolveBatchSize(double availGb) {
-    if (availGb > 0 && availGb < 2.0) return 128;
+    if (availGb > 0 && availGb < 2.5) return 128;
     if (availGb > 0 && availGb < 3.0) return 256;
     return 512;
   }

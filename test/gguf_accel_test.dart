@@ -117,7 +117,9 @@ void main() {
     test('scales the prompt-parallel batch to free RAM', () {
       expect(GgufEngine.resolveBatchSize(1.5), 128);
       expect(GgufEngine.resolveBatchSize(1.99), 128);
-      expect(GgufEngine.resolveBatchSize(2.0), 256);
+      expect(GgufEngine.resolveBatchSize(2.0), 128);
+      expect(GgufEngine.resolveBatchSize(2.4), 128);
+      expect(GgufEngine.resolveBatchSize(2.5), 256);
       expect(GgufEngine.resolveBatchSize(2.9), 256);
       expect(GgufEngine.resolveBatchSize(3.0), 512);
       expect(GgufEngine.resolveBatchSize(8.0), 512);

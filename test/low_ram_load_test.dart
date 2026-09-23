@@ -27,11 +27,15 @@ void main() {
       expect(GgufEngine.clampThreadsForRam(threads: 1, availGb: 1.1), 1);
     });
 
-    test('caps at 2 threads below 2GB free', () {
+    test('caps at 2 threads below 2.5GB free', () {
+      // Observed turn-2 prefill death at 2.1GB/3 threads: the third
+      // thread's buffers push a hot phone over the edge.
       expect(
           GgufEngine.clampThreadsForRam(threads: 6, availGb: 1.5), 2);
       expect(
           GgufEngine.clampThreadsForRam(threads: 1, availGb: 1.5), 1);
+      expect(
+          GgufEngine.clampThreadsForRam(threads: 4, availGb: 2.1), 2);
     });
 
     test('caps at 3 threads below 3GB free', () {
