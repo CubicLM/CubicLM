@@ -54,7 +54,7 @@ class ModelController extends GetxController {
   /// drops don't need an app release. Regenerate with
   /// `dart run tool/gen_catalog.dart` after editing AppConstants.
   static const _catalogUrl =
-      'https://raw.githubusercontent.com/abir2afridi/CubicLM/main/assets/catalog/models.json';
+      'https://raw.githubusercontent.com/CubicLM/CubicLM/main/assets/catalog/models.json';
   static const _catalogCooldown = Duration(hours: 24);
   static const _androidImportChannel =
       MethodChannel('com.cubiclm.app/model_import');

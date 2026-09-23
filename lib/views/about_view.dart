@@ -20,7 +20,7 @@ import '../theme/design_tokens.dart';
 class AboutView extends StatelessWidget {
   const AboutView({super.key});
 
-  static const _repoUrl = 'https://github.com/abir2afridi/CubicLM';
+  static const _repoUrl = 'https://github.com/CubicLM/CubicLM';
 
   Future<void> _openUrl(String url) async {
     if (url.startsWith('REPLACE_ME')) {

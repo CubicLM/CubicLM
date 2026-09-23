@@ -8,10 +8,10 @@ All three platforms' **About → Available On / What's New** sections import fro
 
 | Field | What it should be | Example |
 |-------|-------------------|---------|
-| `websiteUrl` | Your marketing / docs site root. If you have no site yet, use the GitHub repo URL. | `https://cubiclm.app` or `https://github.com/abir2afridi/CubicLM` |
-| `desktopDownloadUrl` | Direct link to the Windows installer asset on your latest GitHub Release. | `https://github.com/abir2afridi/CubicLM/releases/download/v1.0.5/CubicLM-1.0.5-windows-x64.msi` (or `.exe` / `.msix`) |
-| `androidDownloadUrl` | Direct link to the Android APK/AAB asset on your latest GitHub Release, or Play Store URL once published. | `https://github.com/abir2afridi/CubicLM/releases/download/v1.0.5/CubicLM-1.0.5-android.apk` |
-| `changelogUrl` | Centralized changelog route. Must be a single URL that all platforms open. | `https://cubiclm.app/changelog` or `https://github.com/abir2afridi/CubicLM/blob/main/CHANGELOG.md` |
+| `websiteUrl` | Your marketing / docs site root. If you have no site yet, use the GitHub repo URL. | `https://cubiclm.app` or `https://github.com/CubicLM/CubicLM` |
+| `desktopDownloadUrl` | Direct link to the Windows installer asset on your latest GitHub Release. | `https://github.com/CubicLM/CubicLM/releases/download/v1.0.5/CubicLM-1.0.5-windows-x64.msi` (or `.exe` / `.msix`) |
+| `androidDownloadUrl` | Direct link to the Android APK/AAB asset on your latest GitHub Release, or Play Store URL once published. | `https://github.com/CubicLM/CubicLM/releases/download/v1.0.5/CubicLM-1.0.5-android.apk` |
+| `changelogUrl` | Centralized changelog route. Must be a single URL that all platforms open. | `https://cubiclm.app/changelog` or `https://github.com/CubicLM/CubicLM/blob/main/CHANGELOG.md` |
 
 Optional: `iosDownloadUrl` if you later add iOS.
 

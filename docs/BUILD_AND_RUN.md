@@ -11,7 +11,7 @@
 ## Clean Clone → First Run
 
 ```bash
-git clone https://github.com/abir2afridi/CubicLM.git
+git clone https://github.com/CubicLM/CubicLM.git
 cd CubicLM
 
 # If your Windows username or project path contains spaces, create junctions once:

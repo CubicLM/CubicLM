@@ -27,7 +27,7 @@ import 'hive_service.dart';
 /// Minimal auto-update checker — polls GitHub Releases API once per 24h.
 ///
 /// - On app start (after 3s delay) does GET
-///   https://api.github.com/repos/abir2afridi/CubicLM/releases/latest,
+///   https://api.github.com/repos/CubicLM/CubicLM/releases/latest,
 ///   compares tag_name vs package_info_plus version.
 /// - Caches last check timestamp in Hive (settings box) under
 ///   [_kLastCheckMs].
@@ -38,7 +38,7 @@ import 'hive_service.dart';
 /// - Handles offline / errors gracefully; never throws to callers.
 class UpdateService extends GetxService {
   static const String _endpoint =
-      'https://api.github.com/repos/abir2afridi/CubicLM/releases/latest';
+      'https://api.github.com/repos/CubicLM/CubicLM/releases/latest';
   static const String _kLastCheckMs = 'update_last_check_ms';
   static const String _kLastKnownVersion = 'update_last_known_version';
 

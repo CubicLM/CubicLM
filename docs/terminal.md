@@ -1,6 +1,6 @@
 You are working on the existing **CubicLM** repository:
 
-https://github.com/abir2afridi/CubicLM
+https://github.com/CubicLM/CubicLM
 
 CubicLM is a mobile-first AI development application, primarily targeting Android.
 

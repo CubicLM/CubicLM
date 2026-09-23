@@ -73,7 +73,7 @@ class ToolchainStack {
 class ToolchainCatalog {
   /// Default bundle host. Override in Settings → Runtime for self-hosting.
   static const defaultBaseUrl =
-      'https://github.com/abir2afridi/CubicLM/releases/download/runtime-2026.09';
+      'https://github.com/CubicLM/CubicLM/releases/download/runtime-2026.09';
 
   /// All installable stacks in setup-wizard order.
   static List<ToolchainStack> stacks() => const [

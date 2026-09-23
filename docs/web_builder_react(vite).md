@@ -1,7 +1,7 @@
 You are working on **CubicLM**, an existing cross-platform AI coding/client application.
 
 Repository:
-https://github.com/abir2afridi/CubicLM
+https://github.com/CubicLM/CubicLM
 
 Your task is NOT to create a mock terminal, fake Node support, or a static HTML preview workaround.
 

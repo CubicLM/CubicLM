@@ -74,7 +74,7 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes-file CHANGELOG.md `
 
 ## 5. Verify
 
-- [ ] `https://github.com/abir2afridi/CubicLM/releases/tag/vX.Y.Z` — 5 assets.
+- [ ] `https://github.com/CubicLM/CubicLM/releases/tag/vX.Y.Z` — 5 assets.
 - [ ] In-app update check offers the new version (Android downloads APK).
 - [ ] Website download buttons 200 (push to main redeploys Vercel).
 - [ ] About → What's New opens the new CHANGELOG section.

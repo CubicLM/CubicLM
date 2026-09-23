@@ -3,7 +3,7 @@
 ## Production-Grade System Diagnostics & App Compatibility Layer for CubicLM
 
 Repository:
-https://github.com/abir2afridi/CubicLM
+https://github.com/CubicLM/CubicLM
 
 You are working on CubicLM, an AI-powered application development environment that can generate code, modify projects, use a terminal, run projects, and preview websites/apps.
 
