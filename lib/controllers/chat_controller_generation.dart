@@ -192,6 +192,19 @@ extension ChatControllerGeneration on ChatController {
     messages.add(userMsg);
     _hive.saveMessage(userMsg.id, userMsg.toMap());
 
+    // Hide "Suggested next steps" on older bubbles immediately: the user
+    // has moved on (tapped a chip or typed), so previous chips must vanish.
+    // UI gating (showSuggestions only for last assistant msg) hides them
+    // instantly; clearing persistence keeps it gone after restart.
+    for (var j = 0; j < messages.length - 1; j++) {
+      if (messages[j].suggestions != null &&
+          messages[j].suggestions!.isNotEmpty) {
+        final cleared = messages[j].copyWithSuggestions(null);
+        messages[j] = cleared;
+        unawaited(_hive.saveMessage(cleared.id, cleared.toMap()));
+      }
+    }
+
     textController.clear();
     inputText.value = '';
     clearImage(deleteFile: false);
@@ -1226,26 +1239,21 @@ extension ChatControllerGeneration on ChatController {
       if (jsonMatch != null) {
         final List<dynamic> list = jsonDecode(jsonMatch.group(0)!);
         final suggestions = list.map((e) => e.toString()).toList();
-        
+
         if (messages.isNotEmpty && messages.last.role == 'assistant') {
+          // Clear suggestions from all older assistant messages so only
+          // the latest reply keeps chips (old chips disappear once the
+          // user taps one / next turn starts).
+          for (var j = 0; j < messages.length - 1; j++) {
+            if (messages[j].suggestions != null &&
+                messages[j].suggestions!.isNotEmpty) {
+              final cleared = messages[j].copyWithSuggestions(null);
+              messages[j] = cleared;
+              await _hive.saveMessage(cleared.id, cleared.toMap());
+            }
+          }
           final last = messages.last;
-          final updated = ChatMessage(
-            id: last.id,
-            chatId: last.chatId,
-            role: last.role,
-            content: last.content,
-            imageBase64: last.imageBase64,
-            imagePath: last.imagePath,
-            tokensPerSec: last.tokensPerSec,
-            suggestions: suggestions,
-            timestamp: last.timestamp,
-            webSources: last.webSources,
-            usedSkills: last.usedSkills,
-            artifacts: last.artifacts,
-            citations: last.citations,
-            revisions: last.revisions,
-            revisionIndex: last.revisionIndex,
-          );
+          final updated = last.copyWithSuggestions(suggestions);
           messages[messages.length - 1] = updated;
           await _hive.saveMessage(updated.id, updated.toMap());
         }

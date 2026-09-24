@@ -120,6 +120,16 @@ extension InferenceServiceGeneration on InferenceService {
           final used = isGgufResetPath ? 0 : info.tokensUsed;
           final room = ctxTotal - used - promptEst;
           if (room <= 64) {
+            // Log the inputs, not just the refusal: a wrongly-firing
+            // guard is otherwise indistinguishable from a genuinely full
+            // context in post-mortem logs (this exact blind spot hid the
+            // stale-n_past refusal for weeks).
+            try {
+              Get.find<AppLogService>().warning(
+                '[Inference] Context guard refused turn: ctx=$ctxTotal used=$used promptEst=$promptEst room=$room source=$source',
+                category: LogCategory.model,
+              );
+            } catch (_) {}
             return '⚠️ Context is full ($used/$ctxTotal tokens used) — '
                 'this turn cannot fit. Start a new chat, or raise Context size '
                 'in Settings → Parameters (if RAM allows).';

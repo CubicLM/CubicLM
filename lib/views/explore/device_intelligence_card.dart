@@ -493,7 +493,7 @@ class DeviceIntelligenceCard extends StatelessWidget {
                 _ramInfoRow('Tier: $tierLabel',
                     'Your device class. Higher tiers can run bigger models with longer context windows.'),
               _ramInfoRow('Chip: ${advice.chipLabel}',
-                  '${advice.quantLine}. ${advice.sizeLine}.${advice.warning != null ? ' ${advice.warning}' : ''}'),
+                  '${advice.quantLine}. ${advice.sizeLine}.\n\n${advice.explainWhy}${advice.warning != null ? '\n\n${advice.warning}' : ''}'),
               _ramInfoRow('Tips',
                   '• Close heavy apps before loading\n• Prefer smaller (Q4) models on low RAM\n• If a load is blocked, free space or pick a smaller file\n• Power users: Settings → Strict RAM guard can downgrade blocks to confirmed risky loads'),
               _ramInfoRow('Strict RAM guard',

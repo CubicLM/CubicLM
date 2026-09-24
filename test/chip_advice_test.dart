@@ -75,6 +75,8 @@ void main() {
       expect(a.quantLine, contains('Q4_K_M'));
       expect(a.quantLine, contains('BF16'));
       expect(a.sizeLine, contains('≤1B'));
+      expect(a.explainWhy, contains('bandwidth'));
+      expect(a.explainWhy, contains('2 bytes'));
       expect(a.warning, isNull);
     });
 
@@ -96,6 +98,7 @@ void main() {
         totalRamGb: 8.0,
       );
       expect(a.quantLine, contains('Q4_0'));
+      expect(a.explainWhy, contains('bug'));
       expect(a.warning, isNotNull);
     });
 

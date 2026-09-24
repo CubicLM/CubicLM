@@ -686,6 +686,9 @@ class GgufEngine {
         } catch (_) {}
         waited += 2;
       }
+      if (waited > 0) {
+        print('[Inference] Native gate waited ${waited}s for in-flight call.');
+      }
       _nativeGate = Completer<void>();
     }
     try {
@@ -740,6 +743,13 @@ class GgufEngine {
     final buffer = StringBuffer();
     bool completed = false;
     bool retried = false;
+    // Lifecycle timestamps for the post-mortem outcome line: prefill vs
+    // total time is what separates "slow phone" from "hung engine".
+    // (tokenCount lives up here too so finish() can report it — it is
+    // only mutated in the stream callbacks below.)
+    final genStart = DateTime.now();
+    DateTime? firstTokenAt;
+    var tokenCount = 0;
 
     void finish(String result) {
       if (!completed && !_disposed) {
@@ -748,6 +758,24 @@ class GgufEngine {
         _idleTimer?.cancel();
         _subscription?.cancel();
         _onStop = null;
+        // One structured outcome row per generation: tokens, wall time,
+        // first-token latency (prefill cost), and ok vs which error.
+        // Post-mortem, this single row answers "did prefill fit the
+        // timeout?" without correlating native batch logs by hand.
+        try {
+          final totalS =
+              DateTime.now().difference(genStart).inMilliseconds / 1000.0;
+          final firstS = firstTokenAt == null
+              ? 'NO-TOKEN'
+              : '${(firstTokenAt!.difference(genStart).inMilliseconds / 1000.0).toStringAsFixed(1)}s';
+          final outcome = result.startsWith('ERROR')
+              ? result.split('\n').first
+              : 'ok';
+          Get.find<AppLogService>().info(
+            '[Inference] generate finished: tokens=$tokenCount total=${totalS.toStringAsFixed(1)}s firstToken=$firstS result=$outcome',
+            category: LogCategory.model,
+          );
+        } catch (_) {}
         // Hold the completer until native has actually left nativeGenerate.
         // The generate() gate releases only after completer completes —
         // completing while llama_decode still runs lets the next call
@@ -840,10 +868,10 @@ class GgufEngine {
       );
     }
 
-    int tokenCount = 0;
     _subscription = stream.listen(
       (token) {
         if (tokenCount == 0) {
+          firstTokenAt = DateTime.now();
           print('[Inference] ✓ FIRST TOKEN received! Prefill done.');
         }
         final clean = sanitizeGemmaGarbage(token);
@@ -933,6 +961,14 @@ class GgufEngine {
     if (prefillSecs > 300) prefillSecs = 300;
     _idleTimer = Timer(Duration(seconds: prefillSecs), () {
       if (tokenCount == 0) {
+        // Log the fire with its inputs: silent timeouts look exactly
+        // like a dead engine in post-mortem logs.
+        try {
+          Get.find<AppLogService>().warning(
+            '[Inference] Prefill timeout fired after ${prefillSecs}s with 0 tokens (promptEst=$estTokens) — stopping native.',
+            category: LogCategory.model,
+          );
+        } catch (_) {}
         finish(
             'ERROR: Model did not respond. Try a smaller model or shorter conversation.');
       }

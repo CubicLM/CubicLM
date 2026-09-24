@@ -186,6 +186,42 @@ class ChatMessage {
         'recalledTurns': recalledTurns,
       };
 
+  /// Returns a copy with updated suggestions (preserves all other fields).
+  ChatMessage copyWithSuggestions(List<String>? newSuggestions) => ChatMessage(
+        id: id,
+        chatId: chatId,
+        role: role,
+        content: content,
+        imageBase64: imageBase64,
+        imagePath: imagePath,
+        fileName: fileName,
+        fileContent: fileContent,
+        filePath: filePath,
+        fileType: fileType,
+        fileSize: fileSize,
+        cmdOutput: cmdOutput,
+        isCommand: isCommand,
+        tokensPerSec: tokensPerSec,
+        thoughtDurationSeconds: thoughtDurationSeconds,
+        imageGenDurationMs: imageGenDurationMs,
+        generationDurationMs: generationDurationMs,
+        timestamp: timestamp,
+        webSources: webSources,
+        usedSkills: usedSkills,
+        artifacts: artifacts,
+        citations: citations,
+        alternatives: alternatives,
+        preferredIndex: preferredIndex,
+        feedback: feedback,
+        suggestions: newSuggestions,
+        revisions: revisions,
+        revisionIndex: revisionIndex,
+        isPinned: isPinned,
+        isQueued: isQueued,
+        toolSteps: toolSteps,
+        recalledTurns: recalledTurns,
+      );
+
   /// Returns a copy with updated artifacts (for persistence after editing).
   ChatMessage copyWithArtifacts(List<Map<String, String>> newArtifacts) =>
       ChatMessage(

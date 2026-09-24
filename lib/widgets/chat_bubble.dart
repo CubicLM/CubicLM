@@ -43,6 +43,12 @@ class ChatBubble extends StatefulWidget {
   final VoidCallback? onNextRevision;
   final VoidCallback? onDelete;
 
+  /// When false, suggestion chips are hidden even if [message.suggestions]
+  /// is non-empty. Used so only the latest assistant reply shows
+  /// "Suggested next steps" (ChatGPT/Gemini behavior) — older chips
+  /// disappear as soon as the user sends the next message.
+  final bool showSuggestions;
+
   const ChatBubble({
     super.key,
     required this.message,
@@ -53,6 +59,7 @@ class ChatBubble extends StatefulWidget {
     this.onPrevRevision,
     this.onNextRevision,
     this.onDelete,
+    this.showSuggestions = true,
   });
 
   @override
@@ -380,7 +387,10 @@ class _ChatBubbleState extends State<ChatBubble> {
                             ),
                         ],
 
-                        if (!isUser && widget.message.suggestions != null)
+                        if (!isUser &&
+                            widget.showSuggestions &&
+                            widget.message.suggestions != null &&
+                            widget.message.suggestions!.isNotEmpty)
                           SuggestionChips(
                             suggestions: widget.message.suggestions!,
                             isDark: isDark,

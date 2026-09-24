@@ -130,6 +130,7 @@ class ChipAdvice {
     required this.chipLabel,
     required this.quantLine,
     required this.sizeLine,
+    required this.explainWhy,
     this.warning,
   });
 
@@ -141,6 +142,10 @@ class ChipAdvice {
 
   /// e.g. "Stick to ≤1B on 5.4GB RAM".
   final String sizeLine;
+
+  /// Plain-language WHY for the ⓘ dialog: why this quant, why not
+  /// BF16, where the size cap comes from. Device-specific.
+  final String explainWhy;
 
   /// Optional hard warning (Tensor Q4_K_M bug, …).
   final String? warning;
@@ -208,6 +213,34 @@ ChipAdvice adviseChip({
     chipLabel: label,
     quantLine: quantLine,
     sizeLine: sizeLine,
+    explainWhy: _explainWhy(cls, label, family, totalRamGb, _sizeCaps[capIdx]),
     warning: family.quantWarning,
   );
+}
+
+/// Plain-language reason behind the recommendation, naming the actual
+/// numbers: bytes-per-weight (the bandwidth math), chip age, and where
+/// the size cap comes from.
+String _explainWhy(ChipClass cls, String label, SocFamily family,
+    double totalRamGb, String cap) {
+  final ramBit = totalRamGb > 0
+      ? ' With ${totalRamGb.toStringAsFixed(1)}GB total RAM, Android leaves only part of it free, and a model needs its file size × 1.25 as working space — that is where the $cap ceiling comes from.'
+      : '';
+  switch (cls) {
+    case ChipClass.modernFlagship:
+      if (family == SocFamily.googleTensor) {
+        return '$label is fast enough for any quant — the Q4_0 / Q5_K_M advice is not about speed but a chip bug: Q4_K_M replies come out empty or garbled on Tensor, so those files are banned regardless of size.$ramBit';
+      }
+      return '$label is a recent flagship with high memory bandwidth, so it feeds weights fast: BF16 runs fine up to ~1B. Above that Q4_K_M is the sweet spot — about 4x smaller on disk and in RAM with nearly the same answers.$ramBit';
+    case ChipClass.oldFlagship:
+      return '$label is an older flagship whose memory bandwidth is far below modern chips. Every token reloads the weights, and BF16 stores 2 bytes per weight versus 0.5 for Q4 — so BF16 spends roughly 2–3x longer just waiting on RAM, while its bigger file also eats the space context needs. Q4_K_M keeps almost the same quality at a quarter of the size.$ramBit';
+    case ChipClass.upperMid:
+      return 'Upper-mid chips like $label are bandwidth-limited next to flagships: Q4 moves about 4x less data per token than BF16, which is the difference between a usable reply and a long wait. Q4_K_M / Q5_K_M also fit bigger models in the same RAM.$ramBit';
+    case ChipClass.mid:
+      return 'Mid-range chips are strongly bandwidth-limited, and BF16\u2019s 2-bytes-per-weight stalls every single token. Q4 quants (0.5 bytes per weight) are the only ones that stay usable — and on small models the quality gap to BF16 is tiny.$ramBit';
+    case ChipClass.entry:
+      return 'This chip can only feed tiny models: every extra byte per weight directly slows each token, and RAM is tight on top. Stay with tiny Q4 files (Q2_K / Q3_K_S when space is critical).$ramBit';
+    case ChipClass.unknown:
+      return 'Without chip details the safe default is Q4_K_M: a quarter of the size of BF16/F16 with nearly the same quality, so it loads and stays fast on almost any phone.$ramBit';
+  }
 }

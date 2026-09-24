@@ -137,8 +137,16 @@ class ChatView extends GetView<ChatController> {
                               }
                               final hasRevisions =
                                   msg.revisions != null && msg.revisions!.isNotEmpty;
+                              // Only the very last message (when it is an
+                              // assistant reply and not streaming) shows
+                              // "Suggested next steps". Older chips hide as
+                              // soon as the user taps one / sends next msg.
+                              final isLatestAssistant = i == n - 1 &&
+                                  !streaming &&
+                                  msg.role == 'assistant';
                               final bubble = ChatBubble(
                                 message: msg,
+                                showSuggestions: isLatestAssistant,
                                 onCopy: () {
                                   Clipboard.setData(ClipboardData(text: msg.content));
                                 },
