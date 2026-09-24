@@ -152,6 +152,19 @@ static void crash_handler(int sig, siginfo_t* info, void* /*ctx*/) {
             crash_write_str(fd, "pcs ");
             crash_write_dec(fd, n);
             for (int i = 0; i < n; i++) crash_write_hex(fd, (uintptr_t)pcs[i]);
+            // Module + file offset for the first frames: lets offline
+            // symbolization (llvm-symbolizer against the unstripped .so
+            // from the same build) name the crashing function exactly.
+            crash_write_str(fd, "mods\n");
+            int mcount = n < 8 ? n : 8;
+            for (int i = 0; i < mcount; i++) {
+                Dl_info dli2;
+                if (dladdr(pcs[i], &dli2) && dli2.dli_fname && dli2.dli_fbase) {
+                    crash_write_str(fd, dli2.dli_fname);
+                    crash_write_str(fd, " +");
+                    crash_write_hex(fd, (uintptr_t)pcs[i] - (uintptr_t)dli2.dli_fbase);
+                }
+            }
             close(fd);
         }
     }
@@ -610,14 +623,25 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenera
     // with no Dart log ("crash when context fills" despite free RAM).
     int shifts = 0;
     while (g_n_past + (int)tokens.size() > n_ctx - 1 && g_n_past > 0 && shifts < 32) {
-        const int n_discard = std::max(1, n_ctx / 4);
+        // Never remove cells that don't exist: when g_n_past is smaller
+        // than the shift window (short turn 1 + long turn 2 without a
+        // reset, or a partial failure), rm/add with p0 > p1 corrupts the
+        // KV cell list and the process dies with SIGSEGV mid-prefill
+        // (observed status=11 on turn 2). Clamp to what actually exists;
+        // an emptied cache exits the loop via g_n_past == 0 and the
+        // prompt-truncation below still bounds oversized prompts.
+        int n_discard = std::max(1, n_ctx / 4);
+        if (n_discard > g_n_past) n_discard = g_n_past;
         LOGI("Context is full, shifting KV cache by %d tokens", n_discard);
 
         // Remove the oldest tokens from the sequence
         llama_memory_seq_rm(llama_get_memory(g_ctx), 0, 0, n_discard);
 
-        // Shift the remaining tokens
-        llama_memory_seq_add(llama_get_memory(g_ctx), 0, n_discard, g_n_past, -n_discard);
+        // Shift the remaining tokens (skipped when the cache was fully
+        // emptied above — shifting an empty range is undefined).
+        if (n_discard < g_n_past) {
+            llama_memory_seq_add(llama_get_memory(g_ctx), 0, n_discard, g_n_past, -n_discard);
+        }
 
         // Update the past tokens count
         g_n_past -= n_discard;

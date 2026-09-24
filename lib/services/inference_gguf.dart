@@ -733,9 +733,15 @@ class GgufEngine {
     } catch (e) {
       print('[Inference] generateChat() failed: $e — fallback to generate()');
       try {
-        await _controller!.stop();
+        await _controller?.stop();
       } catch (_) {}
       await Future.delayed(const Duration(milliseconds: 100));
+      // The fallback path decodes the full prompt itself: reset the
+      // native session first, otherwise it prefills onto stale KV
+      // (duplicate context at best, out-of-range cells at worst).
+      try {
+        await _resetNativeSession();
+      } catch (_) {}
       final fullPrompt =
           _buildPrompt(prompt, conversationHistory, systemPrompt, modelName);
       stream = _controller!.generate(
