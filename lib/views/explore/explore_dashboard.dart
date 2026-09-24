@@ -690,14 +690,48 @@ class _DownloadedFrameState extends State<_DownloadedFrame> {
               } catch (_) {}
               if (items.isEmpty) {
                 return Center(
-                  child: Text(
-                    _query.isEmpty
-                        ? 'No models downloaded yet — grab one from Local below.'
-                        : 'No match for “$_query”.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12.5,
-                        color: Theme.of(context).hintColor),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(LucideIcons.download,
+                          size: 36,
+                          color: Theme.of(context)
+                              .hintColor
+                              .withValues(alpha: 0.6)),
+                      const SizedBox(height: 10),
+                      Text(
+                        _query.isEmpty
+                            ? 'No models downloaded yet.'
+                            : 'No match for “$_query”.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context).hintColor),
+                      ),
+                      if (_query.isEmpty) ...[
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          onPressed: () {
+                            try {
+                              Get.find<ModelController>()
+                                  .modelScope
+                                  .value = 'local';
+                            } catch (_) {}
+                          },
+                          icon: const Icon(LucideIcons.download, size: 17),
+                          label: Text('Download models',
+                              style: GoogleFonts.plusJakartaSans(
+                                  fontWeight: FontWeight.w700)),
+                          style: FilledButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 12),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 );
               }

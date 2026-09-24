@@ -303,15 +303,15 @@ class _TypedGreetingState extends State<TypedGreeting> {
     _cancelAllTimers();
 
     // Fade in
-    _delayTimer = Timer(const Duration(milliseconds: 50), () {
+    _delayTimer = Timer(const Duration(milliseconds: 40), () {
       if (!mounted || token != _fadeToken) return;
       setState(() {
         _opacity = 1.0;
       });
 
-      // Start typing after fade-in initiates
+      // Start typing
       final text = _frozen[_lineIndex % _frozen.length];
-      const typingSpeed = Duration(milliseconds: 75); // Slower typing speed
+      const typingSpeed = Duration(milliseconds: 75);
 
       _typingTimer = Timer.periodic(typingSpeed, (timer) {
         if (!mounted || token != _fadeToken) {
@@ -338,8 +338,8 @@ class _TypedGreetingState extends State<TypedGreeting> {
         _opacity = 0.0; // Fade out
       });
 
-      // Wait for fade out duration (400ms) before switching to next line
-      _delayTimer = Timer(const Duration(milliseconds: 420), () {
+      // Wait for fade out duration (500ms) before switching to next line
+      _delayTimer = Timer(const Duration(milliseconds: 520), () {
         if (!mounted || token != _fadeToken) return;
         setState(() {
           _lineIndex = (_lineIndex + 1) % _frozen.length;
@@ -375,17 +375,23 @@ class _TypedGreetingState extends State<TypedGreeting> {
     final style = (widget.style ?? GoogleFonts.plusJakartaSans(
       fontSize: 20,
       fontWeight: FontWeight.w600,
+      height: 1.3,
     ));
 
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 400), // Smooth fade in and out
-      opacity: _opacity,
-      child: Text(
-        displayedText,
-        textAlign: TextAlign.center,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: style.copyWith(color: color),
+    return SizedBox(
+      height: 60, // Fixed height reserved for up to 2 lines to prevent layout jumping
+      child: Center(
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 500), // Smooth fade in and out
+          opacity: _opacity,
+          child: Text(
+            displayedText,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: style.copyWith(color: color),
+          ),
+        ),
       ),
     );
   }

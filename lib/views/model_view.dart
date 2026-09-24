@@ -9,7 +9,6 @@ import '../core/colors.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../theme/design_tokens.dart';
 import '../services/usage_tracker_service.dart';
-import '../services/inference_service.dart';
 import 'explore_skills_mcp_tabs.dart';
 import 'explore/add_model_sheet.dart';
 import 'explore/explore_dashboard.dart';
@@ -236,42 +235,8 @@ class ModelView extends GetView<ModelController> {
     });
   }
 
-
-
-
-  Widget _buildLocalActions(BuildContext context) {
-    final inference = Get.find<InferenceService>();
-    return Row(
-      children: [
-        Expanded(
-          child: Obx(() => OutlinedButton.icon(
-                onPressed: controller.isImporting.value ||
-                        inference.isLoadingModel.value
-                    ? null
-                    : () => showAddModelUrlDialog(context, controller),
-                icon: const Icon(Icons.add_link, size: 16),
-                label: const Text('URL'),
-              )),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Obx(() => OutlinedButton.icon(
-                onPressed: controller.isImporting.value ||
-                        inference.isLoadingModel.value
-                    ? null
-                    : () => controller.importModelFromStorage(),
-                icon: const Icon(Icons.file_upload_outlined, size: 16),
-                label: const Text('Import'),
-              )),
-        ),
-      ],
-    );
-  }
-
-
   Widget _buildLocalFilterChips(BuildContext context) {
     final labels = {
-      'downloaded': 'model_filter_downloaded'.tr,
       'general': 'model_filter_general'.tr,
       'fits': 'model_filter_fits'.tr,
       'image': 'model_filter_image'.tr,
@@ -342,12 +307,9 @@ class ModelView extends GetView<ModelController> {
     final filter = controller.localFilter.value.isEmpty
         ? controller.defaultLocalFilter
         : controller.localFilter.value;
-    final title = filter == 'downloaded'
-        ? 'model_no_downloaded'.tr
-        : 'No ${filter == 'vision' ? 'vision' : filter == 'image' ? 'image generation' : filter} models found';
-    final subtitle = filter == 'downloaded'
-        ? 'model_import_hint'.tr
-        : 'model_no_models_filtered'.tr;
+    final title =
+        'No ${filter == 'vision' ? 'vision' : filter == 'image' ? 'image generation' : filter} models found';
+    const subtitle = 'model_no_models_filtered';
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -370,17 +332,13 @@ class ModelView extends GetView<ModelController> {
           ),
           const SizedBox(height: 5),
           Text(
-            subtitle,
+            subtitle.tr,
             textAlign: TextAlign.center,
             style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               color: Theme.of(context).hintColor,
             ),
           ),
-          if (filter == 'downloaded') ...[
-            const SizedBox(height: 14),
-            _buildLocalActions(context),
-          ],
         ],
       ),
     );

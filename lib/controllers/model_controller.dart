@@ -100,7 +100,6 @@ class ModelController extends GetxController {
       : 'your Downloads folder';
 
   static const localFilters = [
-    'downloaded',
     'general',
     'fits',
     'image',
@@ -134,8 +133,6 @@ class ModelController extends GetxController {
         localFilter.value.isEmpty ? defaultLocalFilter : localFilter.value;
     return displayedModels.where((model) {
       switch (filter) {
-        case 'downloaded':
-          return isDownloaded(model.filename);
         case 'uncensored':
           return isUncensoredModel(model);
         case 'vision':
@@ -178,8 +175,9 @@ class ModelController extends GetxController {
         RamFit.blocked;
   }
 
-  String get defaultLocalFilter =>
-      downloadedFiles.isNotEmpty ? 'downloaded' : 'general';
+  // Downloaded models live in the Dashboard frame now (not a Local
+  // filter anymore) — default to the full catalog.
+  String get defaultLocalFilter => 'general';
 
   /// Chosen quant per catalog entry (base filename → variant filename).
   /// Absent = default entry. Reactive so quant chips rebuild.
@@ -403,7 +401,9 @@ class ModelController extends GetxController {
         fileSizes[filename] = await File(destPath).length();
 
         await refreshDownloaded();
-        localFilter.value = 'downloaded';
+        // Land on the Dashboard: the downloaded frame is the new home
+        // for on-device models (replaces the old 'downloaded' filter).
+        modelScope.value = 'dashboard';
         importStatus.value = 'Import complete';
         Get.snackbar('Import Successful', 'Model $filename imported.',
             snackPosition: SnackPosition.BOTTOM);
@@ -449,7 +449,9 @@ class ModelController extends GetxController {
         fileSizes[filename] = (result?['bytes'] as num?)?.toInt() ??
             await _download.getModelSize(filename);
         await refreshDownloaded();
-        localFilter.value = 'downloaded';
+        // Land on the Dashboard: the downloaded frame is the new home
+        // for on-device models (replaces the old 'downloaded' filter).
+        modelScope.value = 'dashboard';
         Get.snackbar('Import Successful', 'Model $filename imported.',
             snackPosition: SnackPosition.BOTTOM);
       }
