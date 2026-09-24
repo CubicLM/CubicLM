@@ -74,7 +74,7 @@ class HubDashboardTab extends StatelessWidget {
               style: GoogleFonts.plusJakartaSans(
                   fontSize: 22, fontWeight: FontWeight.w800)),
           const SizedBox(height: 2),
-          Text("Here's your setup at a glance",
+          Text(_todayLine(),
               style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -116,7 +116,7 @@ class HubDashboardTab extends StatelessWidget {
           ]),
           const SizedBox(height: 20),
           const HubSectionTitle('Features'),
-          _featureGrid(context),
+          _featureGrid(context, chatCount, modelCount),
         ],
       );
     });
@@ -231,23 +231,52 @@ class HubDashboardTab extends StatelessWidget {
     );
   }
 
-  Widget _featureGrid(BuildContext context) {
+  /// "Wednesday, 24 September" — hand-rolled (no intl dependency).
+  String _todayLine() {
+    const weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
+    ];
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
+    ];
+    final now = DateTime.now();
+    return '${weekdays[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
+  }
+
+  Widget _featureGrid(BuildContext context, int chatCount, int modelCount) {
     final home = _home;
-    Tile go(String label, IconData icon, VoidCallback onTap) =>
-        Tile(label: label, icon: icon, onTap: onTap);
+    Tile go(String label, IconData icon, VoidCallback onTap, [String? sub]) =>
+        Tile(label: label, icon: icon, onTap: onTap, sub: sub);
     final tiles = <Tile>[
       go('New Chat', LucideIcons.messageSquarePlus, () {
         home?.changeTab(0);
         try {
           Get.find<ChatController>().createNewChat();
         } catch (_) {}
-      }),
+      }, '$chatCount chats'),
       go('Local Models', LucideIcons.download, () {
         try {
           Get.find<ModelController>().modelScope.value = 'local';
         } catch (_) {}
         home?.changeTab(1);
-      }),
+      }, '$modelCount on device'),
       go('Cloud Models', LucideIcons.cloud, () {
         try {
           Get.find<ModelController>().modelScope.value = 'online';
@@ -279,12 +308,14 @@ class Tile extends StatelessWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
+  final String? sub;
 
   const Tile(
       {super.key,
       required this.label,
       required this.icon,
-      required this.onTap});
+      required this.onTap,
+      this.sub});
 
   @override
   Widget build(BuildContext context) {
@@ -303,13 +334,22 @@ class Tile extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 22, color: Theme.of(context).primaryColor),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(label,
                 textAlign: TextAlign.center,
                 style: GoogleFonts.plusJakartaSans(
                     fontSize: 11, fontWeight: FontWeight.w700),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis),
+            if (sub != null)
+              Text(sub!,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).hintColor),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
           ],
         ),
       ),

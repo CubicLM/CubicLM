@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../controllers/chat_controller.dart';
 import '../../controllers/home_controller.dart';
 import '../../controllers/model_controller.dart';
+import '../../controllers/profile_controller.dart';
 import '../../controllers/settings_controller.dart';
 import '../../core/colors.dart';
 import '../../theme/design_tokens.dart';
+import '../../utils/greetings.dart';
 import 'chat_widgets.dart';
 
 /// Empty state + suggestion cards.
@@ -50,12 +54,23 @@ Widget emptyState(BuildContext context, bool isDark) {
       const SizedBox(height: 16),
       AnimatedAppName(isDark: isDark),
       const SizedBox(height: 20),
-      Text('chat_empty_title'.tr,
+      Obx(() {
+        String name = '';
+        try {
+          name = Get.find<ProfileController>().name.value;
+        } catch (_) {}
+        final lines = greetingsNow(name, DateTime.now());
+        // Restart the typewriter when the name or time segment changes.
+        return TypedGreeting(
+          key: ValueKey('$name-${segmentFor(DateTime.now()).index}'),
+          lines: lines,
           style: GoogleFonts.plusJakartaSans(
               fontSize: 22,
               fontWeight: FontWeight.w600,
               letterSpacing: -0.3,
-              color: isDark ? AppColors.textPrimary : Dt.textPrimary)),
+              color: isDark ? AppColors.textPrimary : Dt.textPrimary),
+        );
+      }),
       const SizedBox(height: 8),
       Text('chat_empty_subtitle'.tr,
           style: GoogleFonts.plusJakartaSans(
@@ -188,4 +203,88 @@ Widget suggestionCard(BuildContext context, String text, IconData icon,
       ),
     ),
   );
+}
+
+/// Typewriter greeting: types a line, holds it, erases fast, then moves
+/// to the next greeting in a loop — so the empty state feels alive.
+class TypedGreeting extends StatefulWidget {
+  final List<String> lines;
+  final TextStyle? style;
+
+  const TypedGreeting({super.key, required this.lines, this.style});
+
+  @override
+  State<TypedGreeting> createState() => _TypedGreetingState();
+}
+
+class _TypedGreetingState extends State<TypedGreeting> {
+  static const _holdTicks = 58; // ≈2.2s hold on a finished line
+
+  Timer? _timer;
+  int _line = 0;
+  int _chars = 0;
+  bool _deleting = false;
+  int _hold = 0;
+  bool _blinkOn = true;
+  int _blinkTick = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer =
+        Timer.periodic(const Duration(milliseconds: 38), (_) => _tick());
+  }
+
+  void _tick() {
+    if (!mounted) return;
+    setState(() {
+      _blinkTick++;
+      if (_blinkTick % 13 == 0) _blinkOn = !_blinkOn;
+      if (widget.lines.isEmpty) return;
+      final full = widget.lines[_line % widget.lines.length];
+      if (!_deleting) {
+        if (_chars < full.length) {
+          _chars++;
+        } else if (_hold < _holdTicks) {
+          _hold++;
+        } else {
+          _deleting = true;
+        }
+      } else if (_chars > 0) {
+        // Erase ~2 chars per tick: visibly faster than typing.
+        _chars = (_chars - 2).clamp(0, full.length);
+        if (_chars == 0) {
+          _deleting = false;
+          _hold = 0;
+          _line = (_line + 1) % widget.lines.length;
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final full =
+        widget.lines.isEmpty ? '' : widget.lines[_line % widget.lines.length];
+    final shown = full.substring(0, _chars.clamp(0, full.length));
+    return Text.rich(
+      TextSpan(children: [
+        TextSpan(text: shown),
+        TextSpan(
+          text: _blinkOn ? '▍' : ' ',
+          style: TextStyle(
+              color: Theme.of(context).primaryColor,
+              fontWeight: FontWeight.w400),
+        ),
+      ]),
+      textAlign: TextAlign.center,
+      style: widget.style,
+    );
+  }
 }
