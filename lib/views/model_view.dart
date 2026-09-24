@@ -12,7 +12,7 @@ import '../services/usage_tracker_service.dart';
 import '../services/inference_service.dart';
 import 'explore_skills_mcp_tabs.dart';
 import 'explore/add_model_sheet.dart';
-import 'explore/device_intelligence_card.dart';
+import 'explore/explore_dashboard.dart';
 import 'explore/local_model_card.dart';
 import 'explore/provider_cards.dart';
 import 'gallery_view.dart';
@@ -76,11 +76,6 @@ class ModelView extends GetView<ModelController> {
                   child: _buildScopeToggle(context),
                 ),
                 const SizedBox(height: 14),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: DeviceIntelligenceCard(),
-                ),
-                const SizedBox(height: 12),
                 Expanded(
                   child: _buildHubList(context),
                 ),
@@ -105,7 +100,9 @@ class ModelView extends GetView<ModelController> {
       child: Obx(() => ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              if (controller.modelScope.value == 'local') ...[
+              if (controller.modelScope.value == 'dashboard') ...[
+                const ExploreDashboard(),
+              ] else if (controller.modelScope.value == 'local') ...[
                 _buildImportingProgress(context),
                 _buildLocalFilterChips(context),
                 Row(
@@ -178,9 +175,10 @@ class ModelView extends GetView<ModelController> {
 
   Widget _buildScopeToggle(BuildContext context) {
     return Obx(() {
-      // Ensure legacy value still works; keep 5-way toggle incl. gallery.
+      // Ensure legacy value still works; dashboard leads the toggle.
       final sel = controller.modelScope.value;
-      final normalized = (sel == 'local' ||
+      final normalized = (sel == 'dashboard' ||
+              sel == 'local' ||
               sel == 'online' ||
               sel == 'skills' ||
               sel == 'mcp' ||
@@ -191,6 +189,11 @@ class ModelView extends GetView<ModelController> {
         scrollDirection: Axis.horizontal,
         child: SegmentedButton<String>(
           segments: [
+            const ButtonSegment(
+              value: 'dashboard',
+              icon: Icon(LucideIcons.layoutDashboard, size: 16),
+              label: Text('Dashboard', style: TextStyle(fontSize: 13)),
+            ),
             ButtonSegment(
               value: 'local',
               icon: const Icon(LucideIcons.smartphone, size: 16),

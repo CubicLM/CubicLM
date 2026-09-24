@@ -1,15 +1,42 @@
-/// Contains: HubProfileTab (avatar picker, editable name, profession
-/// chips, member stats).
-part of 'hub_view.dart';
+/// Profile page: avatar picker, editable name, profession chips,
+/// member stats. Opened from the Settings header icon and the chat
+/// sidebar identity footer.
+library;
 
-class HubProfileTab extends StatefulWidget {
-  const HubProfileTab({super.key});
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+
+import '../controllers/chat_controller.dart';
+import '../controllers/profile_controller.dart';
+import 'hub/hub_widgets.dart';
+
+/// Standalone profile page.
+class ProfileView extends StatelessWidget {
+  const ProfileView({super.key});
 
   @override
-  State<HubProfileTab> createState() => _HubProfileTabState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Profile',
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800)),
+        centerTitle: false,
+      ),
+      body: const _ProfileBody(),
+    );
+  }
 }
 
-class _HubProfileTabState extends State<HubProfileTab> {
+class _ProfileBody extends StatefulWidget {
+  const _ProfileBody();
+
+  @override
+  State<_ProfileBody> createState() => _ProfileBodyState();
+}
+
+class _ProfileBodyState extends State<_ProfileBody> {
   final _nameCtrl = TextEditingController();
   bool _nameInit = false;
 

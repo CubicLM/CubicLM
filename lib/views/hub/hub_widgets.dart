@@ -1,5 +1,9 @@
-/// Contains: HubRing (circular percent indicator), HubSectionTitle, HubStatTile.
-part of 'hub_view.dart';
+/// Shared Hub/Explore widgets: HubRing (circular percent indicator),
+/// HubSectionTitle, HubStatTile.
+library;
+
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Circular percent indicator: background track + progress arc + center
 /// label. Hand-rolled (no chart dependency) for the advanced-feel rings.

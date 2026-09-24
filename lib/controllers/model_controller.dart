@@ -67,7 +67,7 @@ class ModelController extends GetxController {
   final isImporting = false.obs;
   final customModels = <AiModel>[].obs;
   final fileSizes = <String, int>{}.obs;
-  final modelScope = 'local'.obs;
+  final modelScope = 'dashboard'.obs;
   final localFilter = ''.obs;
   final importFileName = ''.obs;
   final importStatus = ''.obs;

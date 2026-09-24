@@ -1,9 +1,31 @@
-/// Contains: HubDashboardTab (greeting, advanced Active Intelligence with
-/// rings, usage stats, feature shortcuts).
-part of 'hub_view.dart';
+/// Explore → Dashboard scope: greeting, full Active Intelligence (rings,
+/// RAM zone, chip advice — everything the old standalone card had),
+/// downloaded-models framed box with search, usage stats, shortcuts.
+library;
 
-class HubDashboardTab extends StatelessWidget {
-  const HubDashboardTab({super.key});
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+
+import '../../controllers/chat_controller.dart';
+import '../../controllers/home_controller.dart';
+import '../../controllers/model_controller.dart';
+import '../../controllers/profile_controller.dart';
+import '../../controllers/settings_controller.dart';
+import '../../core/colors.dart';
+import '../../core/routes.dart';
+import '../../models/ai_model.dart';
+import '../../services/chip_advice.dart';
+import '../../services/device_info_service.dart';
+import '../../services/inference_service.dart';
+import '../../services/soc_family.dart';
+import '../hub/hub_widgets.dart';
+import 'local_model_card.dart';
+
+/// Dashboard page content hosted inside Explore (ModelView).
+class ExploreDashboard extends StatelessWidget {
+  const ExploreDashboard({super.key});
 
   HomeController? get _home {
     try {
@@ -79,8 +101,11 @@ class HubDashboardTab extends StatelessWidget {
       final ctxFrac =
           ctxTotal > 0 ? (ctxUsed / ctxTotal).clamp(0.0, 1.0) : 0.0;
 
-      return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      // No own ListView: this renders inline inside ModelView's outer
+      // ListView (nested scrollables break). Only the downloaded frame
+      // below owns a fixed-height inner scroll.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(greeting,
               style: GoogleFonts.plusJakartaSans(
@@ -115,6 +140,9 @@ class HubDashboardTab extends StatelessWidget {
                 } catch (_) {}
               }),
           const SizedBox(height: 20),
+          const HubSectionTitle('Downloaded Models'),
+          const _DownloadedFrame(),
+          const SizedBox(height: 20),
           const HubSectionTitle('Usage'),
           Row(children: [
             Expanded(
@@ -138,9 +166,39 @@ class HubDashboardTab extends StatelessWidget {
           const SizedBox(height: 20),
           const HubSectionTitle('Features'),
           _featureGrid(context, chatCount, modelCount),
+          const SizedBox(height: 16),
         ],
       );
     });
+  }
+
+  /// "Wednesday, 24 September" — hand-rolled (no intl dependency).
+  String _todayLine() {
+    const weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
+    ];
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
+    ];
+    final now = DateTime.now();
+    return '${weekdays[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
   }
 
   Widget _activeCard(
@@ -211,7 +269,7 @@ class HubDashboardTab extends StatelessWidget {
           Text(
             loaded
                 ? '$backend${ctxTotal > 0 ? ' · ctx $ctxTotal' : ''}${tps != null ? ' · ${tps.toStringAsFixed(1)} tok/s' : ''}'
-                : 'Pick a model in Explore to run it on this device',
+                : 'Pick a model below to run it on this device',
             style: GoogleFonts.firaCode(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
@@ -244,7 +302,7 @@ class HubDashboardTab extends StatelessWidget {
               height: 1,
               color: Theme.of(context).dividerColor.withValues(alpha: 0.4)),
           const SizedBox(height: 12),
-          // ── RAM zone (Explore parity): label + tier + refresh + info ──
+          // ── RAM zone: label + tier + refresh + info ──
           Row(children: [
             const Icon(LucideIcons.memoryStick, size: 15),
             const SizedBox(width: 8),
@@ -367,8 +425,8 @@ class HubDashboardTab extends StatelessWidget {
     );
   }
 
-  /// Full explainer dialog (Explore parity + chip WHY): every number on
-  /// the card, what it means, and what to do about it.
+  /// Full explainer dialog: every number on the card, what it means, and
+  /// what to do about it (chip WHY included).
   void _showHubInfoDialog(
     BuildContext context, {
     required double totalGb,
@@ -410,6 +468,8 @@ class HubDashboardTab extends StatelessWidget {
                   '${advice.quantLine}. ${advice.sizeLine}.\n\n${advice.explainWhy}${advice.warning != null ? '\n\n${advice.warning}' : ''}'),
               _hubInfoRow('Tips',
                   '• Close heavy apps before loading\n• Prefer smaller (Q4) models on low RAM\n• Rings turn warning-colored past 85–90% — that\u2019s your cue to free space or trim context'),
+              _hubInfoRow('Strict RAM guard',
+                  'ON blocks loads that would crash the app; OFF asks to proceed anyway instead. Change it in Settings → Strict RAM guard.'),
             ],
           ),
         ),
@@ -441,35 +501,6 @@ class HubDashboardTab extends StatelessWidget {
     );
   }
 
-  /// "Wednesday, 24 September" — hand-rolled (no intl dependency).
-  String _todayLine() {
-    const weekdays = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday'
-    ];
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December'
-    ];
-    final now = DateTime.now();
-    return '${weekdays[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
-  }
-
   Widget _featureGrid(BuildContext context, int chatCount, int modelCount) {
     final home = _home;
     Tile go(String label, IconData icon, VoidCallback onTap, [String? sub]) =>
@@ -496,7 +527,7 @@ class HubDashboardTab extends StatelessWidget {
       go('Toolkit', LucideIcons.wrench, () => home?.changeTab(2)),
       go('Personalize', LucideIcons.palette,
           () => Get.toNamed(AppRoutes.personalization)),
-      go('Settings', LucideIcons.settings, () => home?.changeTab(4)),
+      go('Settings', LucideIcons.settings, () => home?.changeTab(3)),
     ];
     return GridView.builder(
       shrinkWrap: true,
@@ -562,6 +593,123 @@ class Tile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Downloaded-models framed box with search, shown under Active
+/// Intelligence on the Dashboard. Fixed height with its own scroll so the
+/// page keeps moving.
+class _DownloadedFrame extends StatefulWidget {
+  const _DownloadedFrame();
+
+  @override
+  State<_DownloadedFrame> createState() => _DownloadedFrameState();
+}
+
+class _DownloadedFrameState extends State<_DownloadedFrame> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(LucideIcons.download,
+                size: 15, color: Theme.of(context).primaryColor),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Obx(() {
+                var n = 0;
+                try {
+                  n = Get.find<ModelController>().downloadedCount;
+                } catch (_) {}
+                return Text('Downloaded models ($n)',
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13, fontWeight: FontWeight.w800),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis);
+              }),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _searchCtrl,
+            onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+            decoration: InputDecoration(
+              hintText: 'Search downloaded models…',
+              prefixIcon: const Icon(LucideIcons.search, size: 17),
+              suffixIcon: _query.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(LucideIcons.x, size: 16),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() => _query = '');
+                      },
+                    ),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 10),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 300,
+            child: Obx(() {
+              List<AiModel> items = const [];
+              try {
+                final mc = Get.find<ModelController>();
+                items = mc.displayedModels
+                    .where((m) => mc.isDownloaded(m.filename))
+                    .where((m) =>
+                        _query.isEmpty ||
+                        m.name.toLowerCase().contains(_query) ||
+                        m.filename.toLowerCase().contains(_query))
+                    .toList();
+              } catch (_) {}
+              if (items.isEmpty) {
+                return Center(
+                  child: Text(
+                    _query.isEmpty
+                        ? 'No models downloaded yet — grab one from Local below.'
+                        : 'No match for “$_query”.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12.5,
+                        color: Theme.of(context).hintColor),
+                  ),
+                );
+              }
+              return ListView.separated(
+                itemCount: items.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (_, i) =>
+                    buildModelCard(context, items[i]),
+              );
+            }),
+          ),
+        ],
       ),
     );
   }

@@ -9,6 +9,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../controllers/chat_controller.dart';
 import '../../controllers/home_controller.dart';
 import '../../controllers/profile_controller.dart';
+import '../profile_view.dart';
 import '../../core/colors.dart';
 import '../../models/chat_session.dart';
 import '../../models/project_model.dart';
@@ -470,11 +471,11 @@ class _ChatSidebarState extends State<ChatSidebar> {
         ),
         const SizedBox(height: 4),
         const Divider(height: 1),
-        // ── Pinned footer: identity + settings gear ──
+        // ── Pinned footer: identity (opens Profile) + settings gear ──
         InkWell(
           onTap: () {
             Navigator.pop(context);
-            Get.find<HomeController>().changeTab(3);
+            Get.to(() => const ProfileView());
           },
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 12, 14),
@@ -488,7 +489,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
                 tooltip: 'App Settings',
                 onPressed: () {
                   Navigator.pop(context);
-                  Get.find<HomeController>().changeTab(4);
+                  Get.find<HomeController>().changeTab(3);
                 },
                 icon: Icon(LucideIcons.settings,
                     size: 20,

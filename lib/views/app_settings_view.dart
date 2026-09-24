@@ -11,6 +11,7 @@ import '../services/tts_service.dart';
 import 'about_view.dart';
 import 'language_picker_view.dart';
 import 'log_view.dart';
+import 'profile_view.dart';
 import 'memory_view.dart';
 import 'server_view.dart';
 import 'settings_view.dart';
@@ -168,6 +169,11 @@ class AppSettingsView extends GetView<SettingsController> {
                   }
                 },
               )),
+          IconButton(
+            tooltip: 'Profile',
+            icon: const Icon(LucideIcons.user, size: 20),
+            onPressed: () => Get.to(() => const ProfileView()),
+          ),
           IconButton(
             tooltip: 'System logs',
             icon: const Icon(LucideIcons.terminal, size: 20),

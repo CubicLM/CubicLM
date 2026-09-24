@@ -15,7 +15,6 @@ import '../utils/app_snackbar.dart';
 import 'chat_view.dart';
 import 'model_view.dart';
 import 'toolkit_view.dart';
-import 'hub/hub_view.dart';
 import 'app_settings_view.dart';
 
 class HomeView extends StatefulWidget {
@@ -75,10 +74,6 @@ class _HomeViewState extends State<HomeView> {
             activeIcon: LucideIcons.wrench,
             label: 'nav_toolkit'.tr),
         _NavItem(
-            icon: LucideIcons.layoutDashboard,
-            activeIcon: LucideIcons.layoutDashboard,
-            label: 'nav_hub'.tr),
-        _NavItem(
             icon: LucideIcons.settings,
             activeIcon: LucideIcons.settings,
             label: 'nav_settings'.tr),
@@ -101,7 +96,6 @@ class _HomeViewState extends State<HomeView> {
             const ChatView(),
             const ModelView(),
             const ToolkitView(),
-            const HubView(),
             AppSettingsView()
           ],
         );
@@ -142,8 +136,6 @@ class _HomeViewState extends State<HomeView> {
               _shortcutTab2,
           const SingleActivator(LogicalKeyboardKey.digit4, control: true):
               _shortcutTab3,
-          const SingleActivator(LogicalKeyboardKey.digit5, control: true):
-              _shortcutTab4,
         },
         child: scaffold,
       );
@@ -163,12 +155,11 @@ class _HomeViewState extends State<HomeView> {
     } catch (_) {}
   }
 
-  void _shortcutSettings() => controller.changeTab(4);
+  void _shortcutSettings() => controller.changeTab(3);
   void _shortcutTab0() => controller.changeTab(0);
   void _shortcutTab1() => controller.changeTab(1);
   void _shortcutTab2() => controller.changeTab(2);
   void _shortcutTab3() => controller.changeTab(3);
-  void _shortcutTab4() => controller.changeTab(4);
 
   Widget _buildBottomNav(BuildContext context, bool isDark) {
     return Container(
