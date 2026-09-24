@@ -17,51 +17,54 @@ DaySegment segmentFor(DateTime now) {
 }
 
 /// Raw templates for a segment (8 each → 32 total).
+/// Only the FIRST line of each segment names the user — repeating the
+/// name in every line reads robotic. All lines stay ≤44 chars so the
+/// single-line typewriter never wraps.
 List<String> greetingsFor(DaySegment segment) {
   switch (segment) {
     case DaySegment.morning:
       return const [
-        'Good morning, {name}. What are we exploring today?',
-        'Morning, {name}! Fresh day, fresh questions — shoot.',
-        'Hi {name}, good morning. What\u2019s on your mind?',
-        'Rise and shine, {name}. What shall we dive into?',
-        'Good morning, {name}. Coffee\u2019s on — questions ready?',
-        'Hey {name}, morning! What are we learning today?',
-        'A new day, {name}. What do you want to figure out?',
-        'Morning! {name}, what can I help you untangle today?',
+        'Good morning, {name}. Exploring today?',
+        'Morning! Fresh questions — shoot.',
+        'Hi, good morning. What\u2019s up?',
+        'Rise and shine. Dive into what?',
+        'Morning. Coffee\u2019s on — ask away.',
+        'Hey! What are we learning?',
+        'New day. Figure out what?',
+        'Morning! Untangle what today?',
       ];
     case DaySegment.afternoon:
       return const [
-        'Good afternoon, {name}. What are we exploring?',
-        'Hey {name}, afternoon! What\u2019s the next question?',
-        'Hi {name}. Midday curiosity — I like it. Go on.',
-        'Afternoon, {name}. What shall we work through?',
-        'Good afternoon! {name}, what\u2019s on the agenda?',
-        'Hey {name} — afternoon slump or afternoon spark? Ask away.',
-        'Hi {name}, good afternoon. What are we solving?',
-        'Afternoon, {name}! Pick a topic, any topic.',
+        'Good afternoon, {name}. Exploring?',
+        'Hey! Next question?',
+        'Midday curiosity — go on.',
+        'Afternoon! What shall we solve?',
+        'Good afternoon. Agenda?',
+        'Slump or spark? Ask away!',
+        'Solving what this noon?',
+        'Pick any topic.',
       ];
     case DaySegment.evening:
       return const [
-        'Good evening, {name}. What are we exploring tonight?',
-        'Evening, {name}! Unwind with a good question?',
-        'Hi {name}, good evening. What\u2019s sparking curiosity?',
-        'Hey {name} — evening edition. What shall we explore?',
-        'Good evening! {name}, teach me what you\u2019re wondering.',
-        'Evening, {name}. Big questions or small ones — both welcome.',
-        'Hi {name}. Winding down or gearing up? Ask me anything.',
-        'Good evening, {name}. What did today make you curious about?',
+        'Good evening, {name}. Tonight\u2019s quest?',
+        'Evening! Unwind with a question?',
+        'What\u2019s sparking tonight?',
+        'Evening edition. Ask!',
+        'Evening! What\u2019s on your mind?',
+        'Big or small — all welcome.',
+        'Winding down? Ask anything.',
+        'Today sparked what?',
       ];
     case DaySegment.night:
       return const [
-        'Up late, {name}? Let\u2019s explore something quietly brilliant.',
-        'Good night, {name} — one more question before sleep?',
-        'Night owl mode, {name}. What are we wondering about?',
-        'Hey {name}, burning the midnight oil? Ask away.',
-        'It\u2019s late, {name} — perfect time for deep questions.',
-        'Good night! {name}, what\u2019s keeping that mind busy?',
-        'Late-night thoughts, {name}? I\u2019m all ears.',
-        'Hey {name}. The night is young — what shall we explore?',
+        'Up late, {name}? Explore quietly.',
+        'Good night! One more question?',
+        'Night owl mode. Wondering what?',
+        'Midnight oil? Ask away.',
+        'It\u2019s late — deep questions.',
+        'Night! What\u2019s buzzing?',
+        'Late thoughts? I\u2019m listening.',
+        'Night is young. Explore?',
       ];
   }
 }

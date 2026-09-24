@@ -391,6 +391,7 @@ class _OnboardingViewState extends State<OnboardingView> {
                     desc: 'onboarding_page1_desc'.tr,
                     isDark: isDark,
                     extra: _buildNameField(),
+                    scrollable: true,
                   ),
                   _OnboardPage(
                     icon: LucideIcons.cloud,
@@ -466,15 +467,17 @@ class _OnboardPage extends StatelessWidget {  final IconData icon;
   final String desc;
   final bool isDark;
   final Widget? extra;
-  const _OnboardPage({required this.icon, required this.title, required this.desc, required this.isDark, this.extra});
+  // Page 1 carries the mandatory name field: allow scrolling on short
+  // screens instead of overflowing (other pages keep fixed layout —
+  // page 3 owns an inner scroll that must not nest).
+  final bool scrollable;
+  const _OnboardPage({required this.icon, required this.title, required this.desc, required this.isDark, this.extra, this.scrollable = false});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [          Container(
+    final body = Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [          Container(
             width: 96,
             height: 96,
             decoration: BoxDecoration(
@@ -494,8 +497,13 @@ class _OnboardPage extends StatelessWidget {  final IconData icon;
               style: GoogleFonts.plusJakartaSans(
                   fontSize: 15, height: 1.5, fontWeight: FontWeight.w500, color: Theme.of(context).hintColor)),
           if (extra != null) extra!,
-        ],
-      ),
+      ],
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: scrollable
+          ? SingleChildScrollView(child: body)
+          : body,
     );
   }
 }

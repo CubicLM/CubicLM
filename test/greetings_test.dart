@@ -38,5 +38,26 @@ void main() {
       expect(lines.every((l) => !l.contains('{name}')), isTrue);
       expect(lines.first, contains('Siam'));
     });
+
+    test('templates fit the single-line typewriter', () {
+      for (final s in DaySegment.values) {
+        for (final t in greetingsFor(s)) {
+          expect(t.length, lessThanOrEqualTo(44),
+              reason: 'too long for one line: $t');
+        }
+      }
+    });
+
+    test('only the first line per segment names the user', () {
+      for (final s in DaySegment.values) {
+        final lines = greetingsFor(s);
+        expect(lines.first, contains('{name}'),
+            reason: 'segment $s should open with the name');
+        for (var i = 1; i < lines.length; i++) {
+          expect(lines[i], isNot(contains('{name}')),
+              reason: 'repeat name in $s line $i: ${lines[i]}');
+        }
+      }
+    });
   });
 }

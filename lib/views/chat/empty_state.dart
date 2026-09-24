@@ -59,16 +59,22 @@ Widget emptyState(BuildContext context, bool isDark) {
         try {
           name = Get.find<ProfileController>().name.value;
         } catch (_) {}
-        final lines = greetingsNow(name, DateTime.now());
-        // Restart the typewriter when the name or time segment changes.
+        final now = DateTime.now();
+        final seg = segmentFor(now);
+        final lines = greetingsNow(name, now);
+        final label = seg.name;
+        // Stable key per (name, segment): parent rebuilds must never
+        // recreate this state, or the typewriter restarts every frame.
+        final greetingStyle = GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.3,
+            color: isDark ? AppColors.textPrimary : Dt.textPrimary);
         return TypedGreeting(
-          key: ValueKey('$name-${segmentFor(DateTime.now()).index}'),
+          key: ValueKey('$name-$label'),
           lines: lines,
-          style: GoogleFonts.plusJakartaSans(
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.3,
-              color: isDark ? AppColors.textPrimary : Dt.textPrimary),
+          debugLabel: label,
+          style: greetingStyle,
         );
       }),
       const SizedBox(height: 8),
@@ -83,43 +89,86 @@ Widget emptyState(BuildContext context, bool isDark) {
         final models = Get.find<ModelController>();
         final isLocal = settings.inferenceMode.value == 'local';
         if (isLocal && models.downloadedCount == 0) {
+          // Compact banner — same card language as suggestionCard
+          // (paper surface, hairline border, icon chip) so it sits
+          // quietly in the empty state instead of dominating it.
           return Container(
-            padding: const EdgeInsets.all(28),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.warning.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(28),
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                  color: AppColors.warning.withValues(alpha: 0.2), width: 1.5),
-            ),
-            child: Column(children: [
-              const Icon(Icons.cloud_download_rounded,
-                  color: AppColors.warning, size: 48),
-              const SizedBox(height: 16),
-              Text('chat_no_local_models_title'.tr,
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.onSurface)),
-              const SizedBox(height: 10),
-              Text('chat_no_local_models_desc'.tr,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      color: Theme.of(context).hintColor,
-                      height: 1.5)),
-              const SizedBox(height: 28),
-              FilledButton.icon(
-                onPressed: () => Get.find<HomeController>().changeTab(1),
-                icon: const Icon(Icons.arrow_right_alt_rounded, size: 22),
-                label: Text('chat_go_to_hub'.tr),
-                style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.warning,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 32, vertical: 16),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20))),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.05),
               ),
-            ]),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.cloud_download_rounded,
+                      color: AppColors.warning, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('chat_no_local_models_title'.tr,
+                          style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              height: 1.3,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface)),
+                      const SizedBox(height: 4),
+                      Text('chat_no_local_models_desc'.tr,
+                          style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12.5,
+                              color: Theme.of(context).hintColor,
+                              height: 1.45)),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: () =>
+                            Get.find<HomeController>().changeTab(1),
+                        icon: const Icon(Icons.arrow_right_alt_rounded,
+                            size: 16),
+                        label: Text('chat_go_to_hub'.tr,
+                            style: GoogleFonts.plusJakartaSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700)),
+                        style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.warning,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
+                            minimumSize: Size.zero,
+                            tapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(14))),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           );
         }
         return LayoutBuilder(
@@ -205,86 +254,128 @@ Widget suggestionCard(BuildContext context, String text, IconData icon,
   );
 }
 
-/// Typewriter greeting: types a line, holds it, erases fast, then moves
-/// to the next greeting in a loop — so the empty state feels alive.
+/// Shine-sweep greeting (CodePen "CSS Text Animation" style): a bright
+/// band sweeps across dim uppercase text on loop, and the greeting swaps
+/// every few seconds with a fade. Single line only, no cursor. Lines are
+/// frozen in initState so a mid-session rebuild can never mix segments.
 class TypedGreeting extends StatefulWidget {
   final List<String> lines;
   final TextStyle? style;
 
-  const TypedGreeting({super.key, required this.lines, this.style});
+  /// Forensic tag printed on init + each line switch (proves on-device
+  /// which segment/lines are actually rendering).
+  final String debugLabel;
+
+  const TypedGreeting(
+      {super.key, required this.lines, this.style, this.debugLabel = ''});
 
   @override
   State<TypedGreeting> createState() => _TypedGreetingState();
 }
 
-class _TypedGreetingState extends State<TypedGreeting> {
-  static const _holdTicks = 58; // ≈2.2s hold on a finished line
+class _TypedGreetingState extends State<TypedGreeting>
+    with SingleTickerProviderStateMixin {
+  /// Matches the pen: 3s linear infinite sweep.
+  static const _shineMs = 3000;
 
-  Timer? _timer;
+  /// How long each greeting stays before the fade-swap.
+  static const _showMs = 4200;
+  static const _fadeMs = 300;
+
+  /// Band half-width as a fraction of the text width (pen: 80% size).
+  static const _band = 0.28;
+
+  late final List<String> _frozen;
+  late final AnimationController _shine;
+  Timer? _switchTimer;
   int _line = 0;
-  int _chars = 0;
-  bool _deleting = false;
-  int _hold = 0;
-  bool _blinkOn = true;
-  int _blinkTick = 0;
+  double _opacity = 1.0;
+  int _fadeToken = 0;
 
   @override
   void initState() {
     super.initState();
-    _timer =
-        Timer.periodic(const Duration(milliseconds: 38), (_) => _tick());
+    _frozen = List<String>.of(widget.lines);
+    // ignore: avoid_print
+    print(
+        '[GreetingV3] shine start segment=${widget.debugLabel} lines=${_frozen.length}');
+    _shine = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: _shineMs),
+    )..repeat();
+    _switchTimer =
+        Timer.periodic(const Duration(milliseconds: _showMs), (_) => _swap());
   }
 
-  void _tick() {
-    if (!mounted) return;
-    setState(() {
-      _blinkTick++;
-      if (_blinkTick % 13 == 0) _blinkOn = !_blinkOn;
-      if (widget.lines.isEmpty) return;
-      final full = widget.lines[_line % widget.lines.length];
-      if (!_deleting) {
-        if (_chars < full.length) {
-          _chars++;
-        } else if (_hold < _holdTicks) {
-          _hold++;
-        } else {
-          _deleting = true;
-        }
-      } else if (_chars > 0) {
-        // Erase ~2 chars per tick: visibly faster than typing.
-        _chars = (_chars - 2).clamp(0, full.length);
-        if (_chars == 0) {
-          _deleting = false;
-          _hold = 0;
-          _line = (_line + 1) % widget.lines.length;
-        }
-      }
+  void _swap() {
+    if (!mounted || _frozen.isEmpty) return;
+    setState(() => _opacity = 0.0);
+    final token = ++_fadeToken;
+    Future.delayed(const Duration(milliseconds: _fadeMs), () {
+      if (!mounted || token != _fadeToken) return;
+      setState(() {
+        _line = (_line + 1) % _frozen.length;
+        _opacity = 1.0;
+      });
+      // ignore: avoid_print
+      print('[GreetingV3] line=$_line: ${_frozen[_line]}');
     });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _fadeToken++; // invalidate pending fade callback
+    _switchTimer?.cancel();
+    _shine.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final full =
-        widget.lines.isEmpty ? '' : widget.lines[_line % widget.lines.length];
-    final shown = full.substring(0, _chars.clamp(0, full.length));
-    return Text.rich(
-      TextSpan(children: [
-        TextSpan(text: shown),
-        TextSpan(
-          text: _blinkOn ? '▍' : ' ',
-          style: TextStyle(
-              color: Theme.of(context).primaryColor,
-              fontWeight: FontWeight.w400),
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final base = onSurface.withValues(alpha: 0.35);
+    final shine = Theme.of(context).primaryColor;
+    final raw = _frozen.isEmpty ? '' : _frozen[_line % _frozen.length];
+    final style = (widget.style ?? const TextStyle())
+        .copyWith(letterSpacing: 2.0);
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: _fadeMs),
+      opacity: _opacity,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: AnimatedBuilder(
+          animation: _shine,
+          builder: (_, __) {
+            // Sweep position -0.4 → 1.4 (band fully off-screen at both
+            // ends, like background-position -500% → 500%).
+            final p = -0.4 + 1.8 * _shine.value;
+            var s0 = (p - _band).clamp(0.0, 1.0);
+            var s1 = p.clamp(0.0, 1.0);
+            var s2 = (p + _band).clamp(0.0, 1.0);
+            // Keep stops strictly increasing (clamping can equalize).
+            if (s1 <= s0) s1 = (s0 + 0.002).clamp(0.0, 1.0);
+            if (s2 <= s1) s2 = (s1 + 0.002).clamp(0.0, 1.0);
+            if (s1 >= s2) s1 = (s2 - 0.002).clamp(0.0, 1.0);
+            if (s0 >= s1) s0 = (s1 - 0.002).clamp(0.0, 1.0);
+            return ShaderMask(
+              blendMode: BlendMode.srcIn,
+              shaderCallback: (bounds) => LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [base, shine, base],
+                stops: [s0, s1, s2],
+              ).createShader(bounds),
+              child: Text(
+                raw.toUpperCase(),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: style,
+              ),
+            );
+          },
         ),
-      ]),
-      textAlign: TextAlign.center,
-      style: widget.style,
+      ),
     );
   }
 }
