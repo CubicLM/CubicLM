@@ -11,6 +11,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 import 'controllers/settings_controller.dart';
+import 'controllers/profile_controller.dart';
 import 'controllers/chat_controller.dart';
 import 'controllers/browser_controller.dart';
 import 'controllers/cloud_model_controller.dart';
@@ -254,6 +255,9 @@ void main() {
     }
 
     // Lightweight sync services — no async, never blocks first frame.
+    try {
+      Get.put(ProfileController());
+    } catch (_) {}
     try {
       Get.put(CloudModelController());
       Get.put(InferenceService());

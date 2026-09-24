@@ -451,12 +451,16 @@ extension ChatControllerGeneration on ChatController {
       // then cut off by context/output limits before writing the
       // answer) — brutal on low-RAM devices for big asks like a full
       // game file. Say so + how to fix instead of showing blank.
-      var effectiveContent = cleanContent;
+      // Strip <tool_call> tags so raw tool syntax never shows in chat
+      // (tiny models often emit malformed variants). Tool steps render
+      // via ToolStepsWidget instead.
+      var effectiveContent = _stripToolCalls(cleanContent);
       final replacement = emptyResponseReplacement(
         rawResponse: rawResponse,
-        cleanContent: cleanContent,
+        cleanContent: effectiveContent,
         hasArtifacts: artifactsDetected.isNotEmpty,
-        hasToolSteps: currentToolSteps.isNotEmpty,
+        hasToolSteps:
+            currentToolSteps.isNotEmpty || _hasToolCallTag(rawResponse),
         isCloud: isCloud,
       );
       if (replacement != null) {
@@ -528,18 +532,22 @@ extension ChatControllerGeneration on ChatController {
       }
 
       // ── Tool Call Detection & Execution ──
-      final toolCallMatches = RegExp(r'<tool_call name="(.*?)">([\s\S]*?)</tool_call>').allMatches(rawResponse);
+      // Tolerant: tiny local models emit malformed variants like
+      // <tool_call name="run_shell" arg="/path"</tool_call> or a plain
+      // path string instead of JSON. Parse leniently; display is
+      // always stripped (see _stripToolCalls) so raw syntax never leaks.
+      final toolCalls = _parseToolCalls(rawResponse);
       final StringBuffer loopOutputs = StringBuffer();
-      
-      if (toolCallMatches.isNotEmpty) {
-        for (final match in toolCallMatches) {
-          final name = match.group(1)!;
-          final argsStr = match.group(2)!;
+
+      if (toolCalls.isNotEmpty) {
+        for (final call in toolCalls) {
+          final name = call['name'] as String;
+          final args = call['args'] as Map<String, dynamic>;
           try {
-            final args = jsonDecode(argsStr) as Map<String, dynamic>;
             addToolStep(name: name, args: args, running: true);
-            final output = await Get.find<ToolService>().executeTool(name, args);
-            
+            final output =
+                await Get.find<ToolService>().executeTool(name, args);
+
             if (currentToolSteps.isNotEmpty) {
               currentToolSteps[currentToolSteps.length - 1] = {
                 ...currentToolSteps.last,
@@ -586,7 +594,7 @@ extension ChatControllerGeneration on ChatController {
       _hive.saveMessage(aiMsg.id, aiMsg.toMap());
       imageGenStartTime.value = null;
 
-      if (toolCallMatches.isNotEmpty && agenticLoopCount < 2) {
+      if (toolCalls.isNotEmpty && agenticLoopCount < 2) {
         unawaited(_generateAIResponse(
           prompt: prompt,
           imagePath: imagePath,
@@ -1259,6 +1267,105 @@ extension ChatControllerGeneration on ChatController {
         }
       }
     } catch (_) {}
+  }
+
+  /// True when raw text contains any <tool_call> tag (even malformed).
+  bool _hasToolCallTag(String raw) {
+    return raw.toLowerCase().contains('<tool_call');
+  }
+
+  /// Remove all <tool_call> blocks so raw tool syntax never shows in chat.
+  /// Handles well-formed + malformed tiny-model variants.
+  String _stripToolCalls(String text) {
+    var s = text.replaceAll(
+        RegExp(r'<tool_call\b[^>]*>([\s\S]*?)</tool_call>',
+            caseSensitive: false),
+        '');
+    s = s.replaceAll(
+        RegExp(r'<tool_call\b[^>]*?</tool_call>', caseSensitive: false), '');
+    s = s.replaceAll(RegExp(r'<tool_call\b[^>]*>', caseSensitive: false), '');
+    s = s.replaceAll(RegExp(r'</tool_call>', caseSensitive: false), '');
+    return s.trim();
+  }
+
+  /// Tolerant tool-call parser: accepts canonical JSON body plus the
+  /// malformed shapes tiny local models emit (arg="..." attribute,
+  /// plain path/command string). Returns [{name, args}].
+  List<Map<String, dynamic>> _parseToolCalls(String raw) {
+    final out = <Map<String, dynamic>>[];
+    // Well-formed: <tool_call name="x">BODY</tool_call>
+    final wellFormed = RegExp(
+        r'<tool_call\b([^>]*)>([\s\S]*?)</tool_call>',
+        caseSensitive: false);
+    // Malformed (missing '>'): <tool_call ... </tool_call>
+    final malformed = RegExp(r'<tool_call\b([^>]*?)</tool_call>',
+        caseSensitive: false);
+    final seen = <String>{};
+    for (final m in [...wellFormed.allMatches(raw), ...malformed.allMatches(raw)]) {
+      final key = '${m.start}:${m.end}';
+      if (!seen.add(key)) continue;
+      final attr = m.groupCount >= 1 ? (m.group(1) ?? '') : '';
+      String body = '';
+      try {
+        body = m.groupCount >= 2 ? (m.group(2) ?? '') : '';
+      } catch (_) {
+        body = '';
+      }
+      final nameMatch =
+          RegExp(r'name\s*=\s*"([^"]+)"').firstMatch(attr) ??
+              RegExp(r"name\s*=\s*'([^']+)'").firstMatch(attr);
+      var name = nameMatch?.group(1)?.trim() ?? '';
+      // Malformed capture may swallow name into one blob —
+      // e.g. name="run_shell" arg="/path" — re-extract first token.
+      if (name.contains(' ')) {
+        name = name.split(RegExp(r'\s+')).first.replaceAll('"', '').trim();
+      }
+      if (name.isEmpty || name.contains(' ') || name.contains('=')) continue;
+
+      Map<String, dynamic>? args;
+      // 1. JSON body: {"path": "..."} / {"command": "..."}
+      final trimmedBody = body.trim();
+      if (trimmedBody.startsWith('{')) {
+        try {
+          final decoded = jsonDecode(trimmedBody);
+          if (decoded is Map) args = Map<String, dynamic>.from(decoded);
+        } catch (_) {}
+      }
+      // 2. arg="..." / command="..." / path="..." attributes.
+      args ??= _argsFromAttributes(attr);
+      // 3. Plain string body (a path or shell command).
+      if (args == null && trimmedBody.isNotEmpty) {
+        args = _argsFromPlainBody(name, trimmedBody);
+      }
+      args ??= _argsFromAttributes(attr) ?? <String, dynamic>{};
+      out.add({'name': name, 'args': args});
+    }
+    return out;
+  }
+
+  Map<String, dynamic>? _argsFromAttributes(String attr) {
+    String? pick(String key) {
+      return RegExp('$key\\s*=\\s*"([^"]+)"')
+              .firstMatch(attr)
+              ?.group(1) ??
+          RegExp("$key\\s*=\\s*'([^']+)'").firstMatch(attr)?.group(1);
+    }
+
+    final path = pick('path');
+    final command = pick('command');
+    final arg = pick('arg');
+    if (path == null && command == null && arg == null) return null;
+    final value = (path ?? command ?? arg ?? '').trim();
+    if (value.isEmpty) return null;
+    // Route generic arg="..." by tool: shell needs `command`, files need `path`.
+    return {'path': value, 'command': value};
+  }
+
+  Map<String, dynamic> _argsFromPlainBody(String name, String body) {
+    var v = body.trim().replaceAll(RegExp(r'^["\x27]+|["\x27]+$'), '').trim();
+    // Strip stray attribute tail if model crammed it into the body.
+    v = v.split(RegExp(r'\s+arg\s*=')).first.trim();
+    return {'path': v, 'command': v};
   }
 
   Future<bool> _enqueueOutbox({

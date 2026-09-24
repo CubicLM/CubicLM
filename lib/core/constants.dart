@@ -218,6 +218,13 @@ class AppConstants {
   // Onboarding
   static const String keyOnboardingDone = 'onboarding_done_v1';
 
+  // User profile (Hub tab; name is mandatory at first setup)
+  static const String keyUserName = 'user_name';
+  static const String keyUserProfession = 'user_profession';
+  static const String keyUserAvatar = 'user_avatar';
+  static const String keyUserAvatarColor = 'user_avatar_color';
+  static const String keyProfileSetupAt = 'profile_setup_at';
+
   // Default Model Config
   static const double defaultTemperature = 0.7;
   // Local sampling defaults (match previous hardcoded generateChat values).

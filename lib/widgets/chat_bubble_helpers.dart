@@ -152,10 +152,20 @@ extension _ChatBubbleHelpers on _ChatBubbleState {
   }
 
   String _cleanAssistantText(String text) {
-    return sanitizeUtf16(text
+    // Safety net: never show raw <tool_call> tags (old saved msgs may
+    // contain them, incl. malformed tiny-model variants). Tool steps
+    // render via ToolStepsWidget instead.
+    var s = text
         .replaceAll('<|endoftext|>', '')
         .replaceAll('<|im_end|>', '')
-        .replaceAll('<|end|>', '')
-        .trim());
+        .replaceAll('<|end|>', '');
+    s = s.replaceAll(
+        RegExp(r'<tool_call\b[^>]*>([\s\S]*?)</tool_call>',
+            caseSensitive: false),
+        '');
+    s = s.replaceAll(
+        RegExp(r'<tool_call\b[^>]*?</tool_call>', caseSensitive: false), '');
+    s = s.replaceAll(RegExp(r'<tool_call\b[^>]*>', caseSensitive: false), '');
+    return sanitizeUtf16(s.trim());
   }
 }

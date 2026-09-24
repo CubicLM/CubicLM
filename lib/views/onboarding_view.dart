@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../core/constants.dart';
+import '../controllers/profile_controller.dart';
 import '../models/ai_model.dart';
 import '../services/device_info_service.dart';
 import '../services/download_service.dart';
@@ -24,6 +25,7 @@ class OnboardingView extends StatefulWidget {
 class _OnboardingViewState extends State<OnboardingView> {
   final _page = PageController();
   int _index = 0;
+  final _nameCtrl = TextEditingController();
 
   // Recommended model download state
   AiModel? _recommendedModel;
@@ -116,6 +118,7 @@ class _OnboardingViewState extends State<OnboardingView> {
   }
 
   void _next() {
+    if (_index == 0 && !_saveNameOrWarn()) return;
     if (_index < 3) {
       _page.nextPage(duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic);
     } else {
@@ -133,6 +136,9 @@ class _OnboardingViewState extends State<OnboardingView> {
   }
 
   Future<void> _skip() async {
+    // The name is the one mandatory setup item: everything else can be
+    // skipped, but the app may not proceed without it.
+    if (!_saveNameOrWarn()) return;
     try {
       if (Get.isRegistered<HiveService>()) {
         await Get.find<HiveService>().setSetting(AppConstants.keyOnboardingDone, true);
@@ -154,6 +160,7 @@ class _OnboardingViewState extends State<OnboardingView> {
 
   @override
   void dispose() {
+    _nameCtrl.dispose();
     _page.dispose();
     super.dispose();
   }
@@ -290,6 +297,61 @@ class _OnboardingViewState extends State<OnboardingView> {
     });
   }
 
+  /// Mandatory profile name: returns false (with a warning) when empty.
+  /// Saved through ProfileController so Hub/sidebar see it immediately;
+  /// falls back to a direct Hive write when the controller is absent.
+  bool _saveNameOrWarn() {
+    final v = _nameCtrl.text.trim();
+    if (v.isEmpty) {
+      Get.snackbar('Name needed', 'onboarding_name_required'.tr,
+          snackPosition: SnackPosition.BOTTOM);
+      return false;
+    }
+    try {
+      if (Get.isRegistered<ProfileController>()) {
+        Get.find<ProfileController>().saveName(v);
+        return true;
+      }
+    } catch (_) {}
+    try {
+      if (Get.isRegistered<HiveService>()) {
+        Get.find<HiveService>().setSetting(AppConstants.keyUserName, v);
+        return true;
+      }
+    } catch (_) {}
+    return true;
+  }
+
+  Widget _buildNameField() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('onboarding_name_label'.tr,
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _nameCtrl,
+            textCapitalization: TextCapitalization.words,
+            decoration: InputDecoration(
+              hintText: 'onboarding_name_hint'.tr,
+              prefixIcon: const Icon(LucideIcons.user, size: 18),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14)),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 12),
+            ),
+            onSubmitted: (_) {
+              if (_saveNameOrWarn()) _next();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -328,6 +390,7 @@ class _OnboardingViewState extends State<OnboardingView> {
                     title: 'onboarding_page1_title'.tr,
                     desc: 'onboarding_page1_desc'.tr,
                     isDark: isDark,
+                    extra: _buildNameField(),
                   ),
                   _OnboardPage(
                     icon: LucideIcons.cloud,

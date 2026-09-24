@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../controllers/chat_controller.dart';
 import '../../controllers/home_controller.dart';
+import '../../controllers/profile_controller.dart';
 import '../../core/colors.dart';
 import '../../models/chat_session.dart';
 import '../../models/project_model.dart';
@@ -478,32 +479,16 @@ class _ChatSidebarState extends State<ChatSidebar> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 12, 14),
             child: Row(children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                    color: Dt.accent, shape: BoxShape.circle),
-                alignment: Alignment.center,
-                child: Text('C',
-                    style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white)),
-              ),
+              const _IdentityAvatar(),
               const SizedBox(width: 12),
               Expanded(
-                child: Text('CubicLM',
-                    style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color:
-                            isDark ? AppColors.textPrimary : Dt.textPrimary)),
+                child: _IdentityName(isDark: isDark),
               ),
               IconButton(
                 tooltip: 'App Settings',
                 onPressed: () {
                   Navigator.pop(context);
-                  Get.find<HomeController>().changeTab(3);
+                  Get.find<HomeController>().changeTab(4);
                 },
                 icon: Icon(LucideIcons.settings,
                     size: 20,
@@ -1021,5 +1006,61 @@ class _ChatSidebarState extends State<ChatSidebar> {
               context, s, _c.currentSessionId.value == s.id, isDark))
           .toList(),
     );
+  }
+}
+
+/// Sidebar footer avatar: the user's picked emoji, or initial fallback.
+class _IdentityAvatar extends StatelessWidget {
+  const _IdentityAvatar();
+
+  @override
+  Widget build(BuildContext context) {
+    ProfileController? p;
+    try {
+      p = Get.find<ProfileController>();
+    } catch (_) {}
+    return Obx(() {
+      final hasProfile = p != null && p.hasName;
+      final bg = hasProfile
+          ? Color(ProfileController.avatarColors[p.safeAvatarColor])
+          : Dt.accent;
+      final label = hasProfile ? p.avatar.value : p?.initials ?? 'C';
+      return Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+        alignment: Alignment.center,
+        child: Text(label,
+            style: GoogleFonts.plusJakartaSans(
+                fontSize: hasProfile ? 16 : 14,
+                fontWeight: FontWeight.w800,
+                color: Colors.white)),
+      );
+    });
+  }
+}
+
+/// Sidebar footer name: user name, or "CubicLM" before setup.
+class _IdentityName extends StatelessWidget {
+  final bool isDark;
+  const _IdentityName({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    ProfileController? p;
+    try {
+      p = Get.find<ProfileController>();
+    } catch (_) {}
+    return Obx(() {
+      final display =
+          (p != null && p.hasName) ? p.name.value : 'CubicLM';
+      return Text(display,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppColors.textPrimary : Dt.textPrimary));
+    });
   }
 }
