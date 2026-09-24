@@ -61,6 +61,18 @@ class HubDashboardTab extends StatelessWidget {
         totalRamGb: totalRam,
       );
       final backend = gpu ? 'GPU · $gpuName' : 'CPU Neural Engine';
+      final tier = dev?.deviceTier.value ?? '';
+      final tierLabel =
+          tier.isEmpty ? '' : '${tier[0].toUpperCase()}${tier.substring(1)}';
+      final roomMb = ((availRam - 0.25) / 1.25 * 1024).round();
+      String? quant;
+      try {
+        quant = Get.find<SettingsController>().recommendedQuantization;
+      } catch (_) {}
+      String? best;
+      try {
+        best = models?.bestBenchmarkedFilename();
+      } catch (_) {}
 
       final ramFrac =
           totalRam > 0 ? ((totalRam - availRam) / totalRam).clamp(0.0, 1.0) : 0.0;
@@ -92,7 +104,16 @@ class HubDashboardTab extends StatelessWidget {
               ctxFrac: ctxFrac,
               availRam: availRam,
               totalRam: totalRam,
-              advice: advice),
+              tierLabel: tierLabel,
+              roomMb: roomMb,
+              quant: quant,
+              best: best,
+              advice: advice,
+              onRefresh: () {
+                try {
+                  dev?.refreshMemoryInfo();
+                } catch (_) {}
+              }),
           const SizedBox(height: 20),
           const HubSectionTitle('Usage'),
           Row(children: [
@@ -134,9 +155,16 @@ class HubDashboardTab extends StatelessWidget {
     required double ctxFrac,
     required double availRam,
     required double totalRam,
+    required String tierLabel,
+    required int roomMb,
+    required String? quant,
+    required String? best,
     required ChipAdvice advice,
+    required VoidCallback onRefresh,
   }) {
     final primary = Theme.of(context).primaryColor;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final usedRam = (totalRam - availRam).clamp(0.0, totalRam);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -168,7 +196,16 @@ class HubDashboardTab extends StatelessWidget {
             ),
             if (loaded)
               const Icon(LucideIcons.checkCircle,
-                  color: AppColors.success, size: 22),
+                  color: AppColors.success, size: 22)
+            else
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Theme.of(context).hintColor.withValues(alpha: 0.35),
+                ),
+              ),
           ]),
           const SizedBox(height: 4),
           Text(
@@ -202,6 +239,105 @@ class HubDashboardTab extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 14),
+          Container(
+              height: 1,
+              color: Theme.of(context).dividerColor.withValues(alpha: 0.4)),
+          const SizedBox(height: 12),
+          // ── RAM zone (Explore parity): label + tier + refresh + info ──
+          Row(children: [
+            const Icon(LucideIcons.memoryStick, size: 15),
+            const SizedBox(width: 8),
+            Text('RAM Status',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12.5, fontWeight: FontWeight.w800)),
+            const Spacer(),
+            if (tierLabel.isNotEmpty)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(tierLabel,
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: primary)),
+              ),
+            const SizedBox(width: 4),
+            InkWell(
+              onTap: onRefresh,
+              borderRadius: BorderRadius.circular(20),
+              child: const Padding(
+                padding: EdgeInsets.all(6),
+                child: Icon(LucideIcons.refreshCw, size: 14),
+              ),
+            ),
+            InkWell(
+              onTap: () => _showHubInfoDialog(context,
+                  totalGb: totalRam,
+                  availGb: availRam,
+                  usedGb: usedRam,
+                  roomMb: roomMb,
+                  tierLabel: tierLabel,
+                  advice: advice,
+                  modelLine: loaded
+                      ? '$name · $backend${ctxTotal > 0 ? ' · ctx $ctxTotal' : ''}'
+                      : null),
+              borderRadius: BorderRadius.circular(20),
+              child: const Padding(
+                padding: EdgeInsets.all(6),
+                child: Icon(LucideIcons.info, size: 14),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              height: 8,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.07),
+              child: FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: ramFrac,
+                child: Container(
+                    color: ramFrac > 0.85 ? AppColors.warning : primary),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(children: [
+            Text('${usedRam.toStringAsFixed(1)} GB used',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).hintColor)),
+            const Spacer(),
+            Text(
+                '${availRam.toStringAsFixed(1)} GB free of ${totalRam.toStringAsFixed(1)} GB',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: availRam < 1.5 ? AppColors.warning : null)),
+          ]),
+          const SizedBox(height: 4),
+          Text(
+            roomMb > 0
+                ? 'Room for ≈$roomMb MB${quant != null ? ' · $quant' : ''}${best != null ? ' · ⚡ $best' : ''}'
+                : 'Memory critically low — close other apps before loading',
+            style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                fontWeight: roomMb > 0 ? FontWeight.w500 : FontWeight.w600,
+                color: roomMb > 0
+                    ? Theme.of(context).hintColor
+                    : AppColors.warning),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 12),
           Container(
               height: 1,
@@ -226,6 +362,80 @@ class HubDashboardTab extends StatelessWidget {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Full explainer dialog (Explore parity + chip WHY): every number on
+  /// the card, what it means, and what to do about it.
+  void _showHubInfoDialog(
+    BuildContext context, {
+    required double totalGb,
+    required double availGb,
+    required double usedGb,
+    required int roomMb,
+    required String tierLabel,
+    required ChipAdvice advice,
+    required String? modelLine,
+  }) {
+    final needForRoom =
+        roomMb > 0 ? (roomMb * 1.25 / 1024 + 0.25) : availGb;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Active Intelligence'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (modelLine != null)
+                _hubInfoRow('Active model', modelLine),
+              _hubInfoRow('Total RAM',
+                  '${totalGb.toStringAsFixed(1)} GB — your phone\u2019s full memory.'),
+              _hubInfoRow('Used',
+                  '${usedGb.toStringAsFixed(1)} GB — Android system plus all running apps.'),
+              _hubInfoRow('Free',
+                  '${availGb.toStringAsFixed(1)} GB — free right now and available for loading a model.'),
+              _hubInfoRow(
+                  roomMb > 0 ? 'Room for ≈$roomMb MB' : 'No room right now',
+                  roomMb > 0
+                      ? 'A model file up to ≈$roomMb MB should load (file size × 1.25 working space + safety reserve ≈ ${needForRoom.toStringAsFixed(1)} GB free needed).'
+                      : 'Free space is below the safety reserve — close other apps, then tap refresh.'),
+              if (tierLabel.isNotEmpty)
+                _hubInfoRow('Tier: $tierLabel',
+                    'Your device class. Higher tiers run bigger models with longer context windows.'),
+              _hubInfoRow('Chip: ${advice.chipLabel}',
+                  '${advice.quantLine}. ${advice.sizeLine}.\n\n${advice.explainWhy}${advice.warning != null ? '\n\n${advice.warning}' : ''}'),
+              _hubInfoRow('Tips',
+                  '• Close heavy apps before loading\n• Prefer smaller (Q4) models on low RAM\n• Rings turn warning-colored past 85–90% — that\u2019s your cue to free space or trim context'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _hubInfoRow(String title, String body) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text(body,
+              style:
+                  GoogleFonts.plusJakartaSans(fontSize: 12.5, height: 1.45)),
         ],
       ),
     );

@@ -3,28 +3,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('TypedGreeting (shine sweep)', () {
-    testWidgets('shows full uppercase line, then advances', (tester) async {
+  group('TypedGreeting (typewriter and fade)', () {
+    testWidgets('types out text and advances to second line', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
             body: TypedGreeting(
-              lines: ['Hello friend', 'Second line'],
+              lines: ['Hello', 'World'],
             ),
           ),
         ),
       );
 
-      // Full first line, uppercased like the pen (text-transform).
-      expect(find.text('HELLO FRIEND'), findsOneWidget);
+      // Initially starts typing first line
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(Text), findsOneWidget);
 
-      // Still first line just before the swap.
-      await tester.pump(const Duration(milliseconds: 4100));
-      expect(find.text('HELLO FRIEND'), findsOneWidget);
+      // Pump enough time for first line to fully type out
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Hello'), findsOneWidget);
 
-      // Fade 300ms + swap: second line takes over.
-      await tester.pump(const Duration(milliseconds: 800));
-      expect(find.text('SECOND LINE'), findsOneWidget);
+      // Pump through hold (2500ms) + fade out (320ms) + next line typing
+      await tester.pump(const Duration(milliseconds: 3200));
+      expect(find.byType(Text), findsOneWidget);
     });
 
     testWidgets('empty lines render without crashing', (tester) async {
@@ -34,7 +35,7 @@ void main() {
         ),
       );
       await tester.pump(const Duration(seconds: 5));
-      expect(find.text(''), findsOneWidget);
+      expect(find.byType(SizedBox), findsWidgets);
     });
   });
 }

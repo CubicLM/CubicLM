@@ -13,6 +13,7 @@ import '../../controllers/chat_controller.dart';
 import '../../controllers/home_controller.dart';
 import '../../controllers/model_controller.dart';
 import '../../controllers/profile_controller.dart';
+import '../../controllers/settings_controller.dart';
 import '../../core/colors.dart';
 import '../../core/routes.dart';
 import '../../services/chip_advice.dart';

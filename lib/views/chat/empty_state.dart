@@ -254,16 +254,14 @@ Widget suggestionCard(BuildContext context, String text, IconData icon,
   );
 }
 
-/// Shine-sweep greeting (CodePen "CSS Text Animation" style): a bright
-/// band sweeps across dim uppercase text on loop, and the greeting swaps
-/// every few seconds with a fade. Single line only, no cursor. Lines are
-/// frozen in initState so a mid-session rebuild can never mix segments.
+/// Typewriter greeting with fade in/out:
+/// - Fades in and types out character by character slowly.
+/// - Once the sentence completes, pauses briefly, then fades out.
+/// - When a new sentence arrives, fades in and starts typing again.
+/// - Text size remains consistent across all greetings (no auto-scaling down).
 class TypedGreeting extends StatefulWidget {
   final List<String> lines;
   final TextStyle? style;
-
-  /// Forensic tag printed on init + each line switch (proves on-device
-  /// which segment/lines are actually rendering).
   final String debugLabel;
 
   const TypedGreeting(
@@ -273,23 +271,13 @@ class TypedGreeting extends StatefulWidget {
   State<TypedGreeting> createState() => _TypedGreetingState();
 }
 
-class _TypedGreetingState extends State<TypedGreeting>
-    with SingleTickerProviderStateMixin {
-  /// Matches the pen: 3s linear infinite sweep.
-  static const _shineMs = 3000;
-
-  /// How long each greeting stays before the fade-swap.
-  static const _showMs = 4200;
-  static const _fadeMs = 300;
-
-  /// Band half-width as a fraction of the text width (pen: 80% size).
-  static const _band = 0.28;
-
+class _TypedGreetingState extends State<TypedGreeting> {
   late final List<String> _frozen;
-  late final AnimationController _shine;
-  Timer? _switchTimer;
-  int _line = 0;
-  double _opacity = 1.0;
+  int _lineIndex = 0;
+  int _charIndex = 0;
+  double _opacity = 0.0;
+  Timer? _typingTimer;
+  Timer? _delayTimer;
   int _fadeToken = 0;
 
   @override
@@ -298,83 +286,106 @@ class _TypedGreetingState extends State<TypedGreeting>
     _frozen = List<String>.of(widget.lines);
     // ignore: avoid_print
     print(
-        '[GreetingV3] shine start segment=${widget.debugLabel} lines=${_frozen.length}');
-    _shine = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: _shineMs),
-    )..repeat();
-    _switchTimer =
-        Timer.periodic(const Duration(milliseconds: _showMs), (_) => _swap());
+        '[TypedGreeting] start segment=${widget.debugLabel} lines=${_frozen.length}');
+    if (_frozen.isNotEmpty) {
+      _startLine();
+    }
   }
 
-  void _swap() {
+  void _startLine() {
     if (!mounted || _frozen.isEmpty) return;
-    setState(() => _opacity = 0.0);
+    setState(() {
+      _charIndex = 0;
+      _opacity = 0.0;
+    });
+
     final token = ++_fadeToken;
-    Future.delayed(const Duration(milliseconds: _fadeMs), () {
+    _cancelAllTimers();
+
+    // Fade in
+    _delayTimer = Timer(const Duration(milliseconds: 50), () {
       if (!mounted || token != _fadeToken) return;
       setState(() {
-        _line = (_line + 1) % _frozen.length;
         _opacity = 1.0;
       });
-      // ignore: avoid_print
-      print('[GreetingV3] line=$_line: ${_frozen[_line]}');
+
+      // Start typing after fade-in initiates
+      final text = _frozen[_lineIndex % _frozen.length];
+      const typingSpeed = Duration(milliseconds: 75); // Slower typing speed
+
+      _typingTimer = Timer.periodic(typingSpeed, (timer) {
+        if (!mounted || token != _fadeToken) {
+          timer.cancel();
+          return;
+        }
+        setState(() {
+          if (_charIndex < text.length) {
+            _charIndex++;
+          } else {
+            timer.cancel();
+            _scheduleFadeOut(token);
+          }
+        });
+      });
     });
+  }
+
+  void _scheduleFadeOut(int token) {
+    // Hold fully visible for 2.2 seconds after typing completes
+    _delayTimer = Timer(const Duration(milliseconds: 2200), () {
+      if (!mounted || token != _fadeToken) return;
+      setState(() {
+        _opacity = 0.0; // Fade out
+      });
+
+      // Wait for fade out duration (400ms) before switching to next line
+      _delayTimer = Timer(const Duration(milliseconds: 420), () {
+        if (!mounted || token != _fadeToken) return;
+        setState(() {
+          _lineIndex = (_lineIndex + 1) % _frozen.length;
+        });
+        _startLine();
+      });
+    });
+  }
+
+  void _cancelAllTimers() {
+    _typingTimer?.cancel();
+    _delayTimer?.cancel();
+    _typingTimer = null;
+    _delayTimer = null;
   }
 
   @override
   void dispose() {
-    _fadeToken++; // invalidate pending fade callback
-    _switchTimer?.cancel();
-    _shine.dispose();
+    _fadeToken++;
+    _cancelAllTimers();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final base = onSurface.withValues(alpha: 0.35);
-    final shine = Theme.of(context).primaryColor;
-    final raw = _frozen.isEmpty ? '' : _frozen[_line % _frozen.length];
-    final style = (widget.style ?? const TextStyle())
-        .copyWith(letterSpacing: 2.0);
+    if (_frozen.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final text = _frozen[_lineIndex % _frozen.length];
+    final displayedText =
+        _charIndex <= text.length ? text.substring(0, _charIndex) : text;
+    final color = Theme.of(context).colorScheme.onSurface;
+    final style = (widget.style ?? GoogleFonts.plusJakartaSans(
+      fontSize: 20,
+      fontWeight: FontWeight.w600,
+    ));
+
     return AnimatedOpacity(
-      duration: const Duration(milliseconds: _fadeMs),
+      duration: const Duration(milliseconds: 400), // Smooth fade in and out
       opacity: _opacity,
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: AnimatedBuilder(
-          animation: _shine,
-          builder: (_, __) {
-            // Sweep position -0.4 → 1.4 (band fully off-screen at both
-            // ends, like background-position -500% → 500%).
-            final p = -0.4 + 1.8 * _shine.value;
-            var s0 = (p - _band).clamp(0.0, 1.0);
-            var s1 = p.clamp(0.0, 1.0);
-            var s2 = (p + _band).clamp(0.0, 1.0);
-            // Keep stops strictly increasing (clamping can equalize).
-            if (s1 <= s0) s1 = (s0 + 0.002).clamp(0.0, 1.0);
-            if (s2 <= s1) s2 = (s1 + 0.002).clamp(0.0, 1.0);
-            if (s1 >= s2) s1 = (s2 - 0.002).clamp(0.0, 1.0);
-            if (s0 >= s1) s0 = (s1 - 0.002).clamp(0.0, 1.0);
-            return ShaderMask(
-              blendMode: BlendMode.srcIn,
-              shaderCallback: (bounds) => LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [base, shine, base],
-                stops: [s0, s1, s2],
-              ).createShader(bounds),
-              child: Text(
-                raw.toUpperCase(),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: style,
-              ),
-            );
-          },
-        ),
+      child: Text(
+        displayedText,
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: style.copyWith(color: color),
       ),
     );
   }
