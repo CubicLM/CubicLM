@@ -208,8 +208,11 @@ extension AppLogServicePersistence on AppLogService {
         if (body.trim().isEmpty) continue;
         count++;
         if (count > 3) continue;
-        if (body.length > 2800) body = '${body.substring(0, 2800)}…';
         final isNative = f.path.contains('native_crash_');
+        // Native tombstones carry signal + PCs + modules + log tail
+        // (~5KB): give them a bigger cap so the log tail survives.
+        final cap = isNative ? 6000 : 2800;
+        if (body.length > cap) body = '${body.substring(0, cap)}…';
         error(
           isNative
               ? '[Previous run] NATIVE CRASH — fatal signal inside the engine'

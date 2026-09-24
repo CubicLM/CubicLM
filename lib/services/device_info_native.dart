@@ -238,17 +238,44 @@ String _buildProcessorName({
 
   const qualcommNames = <String, String>{
     'SM8750': 'Snapdragon 8 Elite',
+    'SM8850': 'Snapdragon 8s Gen 4',
     'SM8650': 'Snapdragon 8 Gen 3',
+    'SM8635': 'Snapdragon 8s Gen 3',
     'SM8550-AC': 'Snapdragon 8 Gen 2',
     'SM8550': 'Snapdragon 8 Gen 2',
     'SM8475': 'Snapdragon 8+ Gen 1',
     'SM8450': 'Snapdragon 8 Gen 1',
     'SM8350': 'Snapdragon 888',
     'SM8250': 'Snapdragon 865',
-    'SM7325': 'Snapdragon 778G',
+    'SM8150': 'Snapdragon 855',
+    'SM7750': 'Snapdragon 7 Gen 4',
+    'SM7675': 'Snapdragon 7+ Gen 3',
+    'SM7550': 'Snapdragon 7 Gen 3',
     'SM7450-AB': 'Snapdragon 7 Gen 1',
+    'SM7435': 'Snapdragon 7s Gen 2',
+    'SM7325': 'Snapdragon 778G',
+    'SM7150': 'Snapdragon 730',
+    'SM6450': 'Snapdragon 6 Gen 1',
     'SM6375': 'Snapdragon 695',
+    'SM6225': 'Snapdragon 680',
+    'SM6150': 'Snapdragon 675',
+    'SM6125': 'Snapdragon 665',
+    'SM4450': 'Snapdragon 4 Gen 2',
+    'SM4375': 'Snapdragon 480',
+    'SDM845': 'Snapdragon 845',
+    'SDM835': 'Snapdragon 835',
+    'SDM821': 'Snapdragon 821',
+    'SDM820': 'Snapdragon 820',
+    'SDM765': 'Snapdragon 765G',
+    'SDM730': 'Snapdragon 730',
+    'SDM712': 'Snapdragon 712',
+    'SDM710': 'Snapdragon 710',
     'SDM678': 'Snapdragon 675',
+    'SDM670': 'Snapdragon 670',
+    'SDM660': 'Snapdragon 660',
+    'SDM636': 'Snapdragon 636',
+    'MSM8953': 'Snapdragon 625',
+    'MSM8937': 'Snapdragon 430',
     'QCM6490': 'Snapdragon 778G',
   };
 
@@ -295,8 +322,8 @@ String _buildProcessorName({
 }
 
 String? _fuzzyQualcomm(String model) {
-  // SM8xxx → Snapdragon 8 series; SM7xxx → 7 series etc.
-  final match = RegExp(r'^SM([678])(\d{3})').firstMatch(model);
+  // SM8xxx/SDM8xx → Snapdragon 8 series; SM7xxx → 7 series etc.
+  final match = RegExp(r'^(?:SM|SDM)([678])(\d{2,3})').firstMatch(model);
   if (match == null) return null;
   final series = match.group(1);
   return 'Snapdragon $series series (${model.toLowerCase()})';

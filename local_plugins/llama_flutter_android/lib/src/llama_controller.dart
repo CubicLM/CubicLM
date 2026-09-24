@@ -166,9 +166,15 @@ class LlamaController implements LlamaFlutterApi {
 
   /// Stop current generation
   Future<void> stop() async {
-    if (!_isGenerating) return;
-    await _api.stop();
-    _isGenerating = false;
+    // Always hit the platform side (even if _isGenerating looks idle):
+    // Kotlin joins generationJob before acking, so this is how Dart waits
+    // for nativeGenerate to fully leave llama_decode. Early-return on the
+    // Dart flag alone desyncs when onError/onDone raced a timeout finish.
+    try {
+      await _api.stop();
+    } finally {
+      _isGenerating = false;
+    }
   }
 
   /// Unload model and free resources

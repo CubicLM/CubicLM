@@ -295,11 +295,24 @@ class LlamaFlutterAndroidPlugin : FlutterPlugin, LlamaHostApi {
 
     override fun stop(callback: (Result<Unit>) -> Unit) {
         isStopping.set(true)
-        generationJob?.cancel()
         if (nativeLoadError == null) {
             nativeStop()
         }
-        callback(Result.success(Unit))
+        // Do NOT cancel generationJob — nativeGenerate drains via
+        // g_stop_flag; cancel would skip its completion path. Join first,
+        // then ack, so Dart never proceeds while llama_decode is live
+        // (otherwise the next clearContext/generate races it → SIGSEGV).
+        val job = generationJob
+        scope.launch {
+            try {
+                job?.join()
+            } catch (_: CancellationException) {
+                // join() only throws if THIS coroutine is cancelled.
+            }
+            withContext(Dispatchers.Main) {
+                callback(Result.success(Unit))
+            }
+        }
     }
 
     override fun dispose(callback: (Result<Unit>) -> Unit) {

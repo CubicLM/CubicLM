@@ -109,9 +109,18 @@ extension InferenceServiceGeneration on InferenceService {
                   (systemPrompt ?? AppConstants.systemPrompt).length +
                   histChars) ~/
               4;
-          final room = ctxTotal - info.tokensUsed - promptEst;
+          // GGUF path resets the native session to 0 BEFORE every prefill
+          // (_resetNativeSession in _generateInner), so the pre-existing
+          // n_past is stale by design and must NOT count against this
+          // turn — counting it refused every turn after the first with
+          // "Context is full" (room = ctx − stale − promptEst < 0).
+          // Only LiteRT/server accumulate across turns.
+          final isGgufResetPath =
+              !useServer && loadedModelRuntime.value != 'litert';
+          final used = isGgufResetPath ? 0 : info.tokensUsed;
+          final room = ctxTotal - used - promptEst;
           if (room <= 64) {
-            return '⚠️ Context is full (${info.tokensUsed}/$ctxTotal tokens used) — '
+            return '⚠️ Context is full ($used/$ctxTotal tokens used) — '
                 'this turn cannot fit. Start a new chat, or raise Context size '
                 'in Settings → Parameters (if RAM allows).';
           }

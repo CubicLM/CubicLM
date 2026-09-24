@@ -53,7 +53,15 @@ extension ChatControllerGeneration on ChatController {
       }
       if (!inference.isModelLoaded.value) return null;
       if (!_bgGenAllowed()) return null;
-      final raw = await inference.generate(prompt: prompt, source: source);
+      // One-shot task prompts are self-contained: use the light system
+      // prompt (~25 tok) instead of the full chat persona (~200 tok).
+      // Same reason as _generateSuggestions — prefill dominates on-device
+      // latency and these hold the native gate.
+      final raw = await inference.generate(
+        prompt: prompt,
+        source: source,
+        systemPrompt: AppConstants.lightSystemPrompt,
+      );
       if (raw.startsWith('ERROR:') || raw.trim().isEmpty) return null;
       return raw;
     } catch (_) {
@@ -606,7 +614,10 @@ extension ChatControllerGeneration on ChatController {
       unawaited(_generateSuggestions(rawResponse));
 
       // ── Auto Categorization ──
-      if (agenticLoopCount == 0 && !isSecond && !isThird) {
+      // Never chain another local generate onto an ERROR reply: the failed
+      // call's native loop may still be unwinding (overlap → SIGSEGV).
+      if (agenticLoopCount == 0 && !isSecond && !isThird &&
+          !rawResponse.startsWith('ERROR')) {
          unawaited(autoCategorizeChat(currentSessionId.value));
       }
       
@@ -1180,6 +1191,10 @@ extension ChatControllerGeneration on ChatController {
 
   Future<void> _generateSuggestions(String lastAnswer) async {
     if (lastAnswer.isEmpty || lastAnswer.startsWith('[IMAGE_BASE64]')) return;
+    // Never spend a background generation on an error reply: besides
+    // wasting a slow prefill, it fires while the failed call's native
+    // loop may still be unwinding (observed overlap → SIGSEGV).
+    if (lastAnswer.startsWith('ERROR')) return;
     
     try {
       final cloud = Get.find<CloudService>();
@@ -1203,6 +1218,7 @@ extension ChatControllerGeneration on ChatController {
         raw = await inference.generate(
           prompt: prompt,
           source: 'suggestions',
+          systemPrompt: AppConstants.lightSystemPrompt,
         );
       }
 

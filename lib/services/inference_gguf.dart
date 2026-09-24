@@ -144,11 +144,16 @@ class GgufEngine {
   }
 
   /// Batch thread count by free RAM (pure logic, unit tested).
-  /// Prompt-parallel work scales with threads; on <2.5GB phones a
-  /// single batch thread halves the transient spike (slower prefill,
-  /// but alive). -1 keeps the native default (= generation threads).
+  /// Prompt-parallel work scales with threads. 1 thread halves the
+  /// transient spike but makes prefill ~4x slower than release-era
+  /// defaults — on 1.5–2.5GB phones that pushed a 300-token prefill
+  /// past every first-token timeout (healthy prefill murdered as
+  /// "Model did not respond"). 2 threads halves prefill time back
+  /// (~35s) while keeping batch=128's small spike; <1.5GB stays at
+  /// 1 thread. -1 keeps the native default (= generation threads).
   static int resolveBatchThreads(double availGb) {
-    if (availGb > 0 && availGb < 2.5) return 1;
+    if (availGb > 0 && availGb < 1.5) return 1;
+    if (availGb > 0 && availGb < 2.5) return 2;
     return -1;
   }
   /// Returns [contextSize] unchanged when already minimal.
@@ -266,6 +271,12 @@ class GgufEngine {
   /// prefill recomputes exactly what was sent. Best effort: a failed
   /// reset must never block generation.
   Future<void> _resetNativeSession() async {
+    try {
+      // Fully stop any in-flight native run first: clearContext under an
+      // active decode is the observed SIGSEGV path (gate may have been
+      // released by a timeout while native was still mid-batch).
+      await _controller?.stop().timeout(const Duration(seconds: 3));
+    } catch (_) {}
     try {
       await _controller?.clearContext();
     } catch (_) {
@@ -651,9 +662,6 @@ class GgufEngine {
     String? audioPath,
     void Function(String token)? onToken,
   }) async {
-    final p = topP ?? 0.9;
-    final k = topK ?? 40;
-    final r = repeatPenalty ?? 1.1;
 
     if (_controller == null) throw Exception('No model loaded');
     if (imagePath != null && imagePath.isNotEmpty) {
@@ -663,6 +671,71 @@ class GgufEngine {
       return 'GGUF audio input is not available in this build yet. Text files can be read when their content is attached, but audio needs a model/runtime path that supports audio input.';
     }
 
+    // Serialize native generations: llama.cpp contexts die with SIGSEGV
+    // on overlapping decodes (observed turn-2 death). A newcomer waits
+    // for the in-flight call (bounded); only a stuck holder (>45s past
+    // every timeout) yields a clean busy-error instead of overlapping.
+    if (!_nestedNativeCall) {
+      var waited = 0;
+      while (_nativeGate != null) {
+        if (waited >= 45) {
+          return 'ERROR: Engine is busy finishing the previous reply — wait a moment and send again.';
+        }
+        try {
+          await _nativeGate!.future.timeout(const Duration(seconds: 2));
+        } catch (_) {}
+        waited += 2;
+      }
+      _nativeGate = Completer<void>();
+    }
+    try {
+      return await _generateInner(
+        prompt: prompt,
+        conversationHistory: conversationHistory,
+        systemPrompt: systemPrompt,
+        modelName: modelName,
+        maxTokens: maxTokens,
+        temperature: temperature,
+        topP: topP,
+        topK: topK,
+        repeatPenalty: repeatPenalty,
+        imagePath: imagePath,
+        audioPath: audioPath,
+        onToken: onToken,
+      );
+    } finally {
+      if (!_nestedNativeCall) {
+        final gate = _nativeGate;
+        _nativeGate = null;
+        if (gate != null && !gate.isCompleted) gate.complete();
+      }
+    }
+  }
+
+  /// Set while [generate] runs its post-failure self-retry so the nested
+  /// call skips the gate (the outer call still holds it).
+  bool _nestedNativeCall = false;
+
+  /// Chain of in-flight native calls (completers, never errors).
+  Completer<void>? _nativeGate;
+
+  Future<String> _generateInner({
+    required String prompt,
+    List<Map<String, String>>? conversationHistory,
+    required String systemPrompt,
+    required String modelName,
+    required int maxTokens,
+    required double temperature,
+    double? topP,
+    int? topK,
+    double? repeatPenalty,
+    String? imagePath,
+    String? audioPath,
+    void Function(String token)? onToken,
+  }) async {
+    final p = topP ?? 0.9;
+    final k = topK ?? 40;
+    final r = repeatPenalty ?? 1.1;
     final completer = Completer<String>();
     final buffer = StringBuffer();
     bool completed = false;
@@ -675,7 +748,16 @@ class GgufEngine {
         _idleTimer?.cancel();
         _subscription?.cancel();
         _onStop = null;
-        if (!completer.isCompleted) completer.complete(result);
+        // Hold the completer until native has actually left nativeGenerate.
+        // The generate() gate releases only after completer completes —
+        // completing while llama_decode still runs lets the next call
+        // clearContext under the live graph (SIGSEGV in mul_mat).
+        () async {
+          try {
+            await _controller?.stop().timeout(const Duration(seconds: 5));
+          } catch (_) {}
+          if (!completer.isCompleted) completer.complete(result);
+        }();
       }
     }
 
@@ -797,7 +879,11 @@ class GgufEngine {
             retried = true;
             _decodeFailStreak = 0;
             if (await _hardReloadGguf()) {
-              finish(await generate(
+              // Nested retry: bypass the native gate (outer call holds
+              // it until its own finish()).
+              _nestedNativeCall = true;
+              try {
+                finish(await generate(
                 prompt: prompt,
                 conversationHistory: conversationHistory,
                 systemPrompt: systemPrompt,
@@ -811,6 +897,9 @@ class GgufEngine {
                 audioPath: audioPath,
                 onToken: onToken,
               ));
+              } finally {
+                _nestedNativeCall = false;
+              }
               return;
             }
           }
@@ -822,16 +911,36 @@ class GgufEngine {
       },
     );
 
-    // Prefill timeout
-    _idleTimer = Timer(const Duration(seconds: 60), () {
+    // Prefill timeout, scaled to FULL prompt size: the native prompt is
+    // dominated by the system prompt + tools (~250-300 tokens even for a
+    // one-word user message). Estimating from the user message alone kept
+    // the timeout at ~61s while 1-thread prefill needs ~70s+ — the timer
+    // fired mid-prefill, finish() stopped native, and every prompt died
+    // with "Model did not respond" (healthy prefill murdered, no crash).
+    var histChars = 0;
+    try {
+      final hist = conversationHistory;
+      if (hist != null) {
+        for (final m in hist) {
+          histChars += (m['content'] ?? '').length;
+        }
+      }
+    } catch (_) {}
+    final estTokens =
+        (systemPrompt.length + prompt.length + histChars) ~/ 4;
+    var prefillSecs = 60 + estTokens ~/ 2;
+    if (prefillSecs < 90) prefillSecs = 90;
+    if (prefillSecs > 300) prefillSecs = 300;
+    _idleTimer = Timer(Duration(seconds: prefillSecs), () {
       if (tokenCount == 0) {
         finish(
             'ERROR: Model did not respond. Try a smaller model or shorter conversation.');
       }
     });
 
-    // Hard timeout
-    Future.delayed(const Duration(seconds: 180), () {
+    // Hard timeout (bounds a truly-hung native; slow-but-healthy runs
+    // must fit: 512 reply tokens at ~2 tok/s on 1 thread ≈ 250s).
+    Future.delayed(const Duration(seconds: 300), () {
       if (!completed) {
         final partial = buffer.toString();
         finish(partial.isEmpty ? 'ERROR: Generation timed out.' : partial);

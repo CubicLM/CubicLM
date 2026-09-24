@@ -246,6 +246,15 @@ class AppConstants {
 Use <artifact title="Title" type="html|mermaid|csv|markdown|javascript|code">...</artifact> tags for large code blocks, HTML, diagrams, recipes, documents, or tables to show them in the side panel.
 When the user asks for a complete file or program (for example a game in a single HTML file), write the ENTIRE file in ONE code block or a single artifact — never split the deliverable across multiple blocks, never truncate it with "..." placeholders or "rest of the code" notes. Put explanations in normal text around it; only genuinely separate examples may use extra blocks.''';
 
+  // Minimal system prompt for one-shot background jobs (categorize,
+  // suggestions, polish, browser one-shots). These carry a self-contained
+  // task instruction — the full chat persona + tools + artifact guide
+  // (~200 tokens) would triple their prefill on slow phones for zero
+  // benefit, and each holds the native gate while the next user turn
+  // waits. ~25 tokens instead of ~200.
+  static const String lightSystemPrompt =
+      '''You are a helpful assistant. Follow the task instruction exactly and output only what is asked — no preamble, no explanation.''';
+
   // System Prompt for Uncensored Models
   static const String uncensoredSystemPrompt =
       '''You are CubicLM AI Chat running with an uncensored local model. Be direct, mature, and conversational. Avoid moralizing or unnecessary disclaimers, but keep answers accurate and do not help with real-world harm, abuse, or illegal activity.''';

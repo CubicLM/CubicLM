@@ -114,9 +114,11 @@ void main() {
   });
 
   group('resolveBatchThreads', () {
-    test('single batch thread below 2.5GB free', () {
-      expect(GgufEngine.resolveBatchThreads(1.5), 1);
-      expect(GgufEngine.resolveBatchThreads(2.1), 1);
+    test('tiers batch threads to free RAM', () {
+      expect(GgufEngine.resolveBatchThreads(1.0), 1);
+      expect(GgufEngine.resolveBatchThreads(1.49), 1);
+      expect(GgufEngine.resolveBatchThreads(1.5), 2);
+      expect(GgufEngine.resolveBatchThreads(2.1), 2);
       expect(GgufEngine.resolveBatchThreads(2.5), -1);
       expect(GgufEngine.resolveBatchThreads(8.0), -1);
       expect(GgufEngine.resolveBatchThreads(0), -1);

@@ -19,9 +19,11 @@ import '../../controllers/cloud_model_controller.dart';
 import '../../controllers/model_controller.dart';
 import '../../controllers/settings_controller.dart';
 import '../../core/colors.dart';
+import '../../services/chip_advice.dart';
 import '../../services/device_info_service.dart';
 import '../../services/inference_service.dart';
 import '../../services/local_image_service.dart';
+import '../../services/soc_family.dart';
 
 /// Combined Active Intelligence + RAM Status card for the Explore hub.
 
@@ -279,6 +281,14 @@ class DeviceIntelligenceCard extends StatelessWidget {
     try {
       dev = Get.find<DeviceInfoService>();
     } catch (_) {}
+    final chipLabel = dev?.processorName.value ?? '';
+    final socFam = dev?.socFamily.value ?? SocFamily.unknown;
+    final advice = adviseChip(
+      family: socFam,
+      processorName: chipLabel,
+      socHardware: dev?.socHardware.value ?? '',
+      totalRamGb: total,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,7 +333,8 @@ class DeviceIntelligenceCard extends StatelessWidget {
                 availGb: avail,
                 usedGb: used,
                 roomMb: roomMb,
-                tierLabel: tierLabel),
+                tierLabel: tierLabel,
+                advice: advice),
             borderRadius: BorderRadius.circular(20),
             child: const Padding(
               padding: EdgeInsets.all(6),
@@ -375,6 +386,74 @@ class DeviceIntelligenceCard extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
+        const SizedBox(height: 10),
+        Container(height: 1, color: Theme.of(context).dividerColor.withValues(alpha: 0.4)),
+        const SizedBox(height: 10),
+        _chipAdviceRow(context, advice),
+      ],
+    );
+  }
+
+  /// Smart per-device recommendation: names the actual chip ("Snapdragon
+  /// 845"), says which quants it handles and which size to stick to.
+  Widget _chipAdviceRow(BuildContext context, ChipAdvice advice) {
+    final sub = Theme.of(context).hintColor;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(LucideIcons.cpu,
+              color: Theme.of(context).primaryColor, size: 15),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                advice.chipLabel,
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: Theme.of(context).colorScheme.onSurface),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                advice.quantLine,
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11, fontWeight: FontWeight.w500, color: sub),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                advice.sizeLine,
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11, fontWeight: FontWeight.w600, color: sub),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (advice.warning != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  advice.warning!,
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.warning),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -386,6 +465,7 @@ class DeviceIntelligenceCard extends StatelessWidget {
     required double usedGb,
     required int roomMb,
     required String tierLabel,
+    required ChipAdvice advice,
   }) {
     final needForRoom =
         roomMb > 0 ? (roomMb * 1.25 / 1024 + 0.25) : availGb;
@@ -412,6 +492,8 @@ class DeviceIntelligenceCard extends StatelessWidget {
               if (tierLabel.isNotEmpty)
                 _ramInfoRow('Tier: $tierLabel',
                     'Your device class. Higher tiers can run bigger models with longer context windows.'),
+              _ramInfoRow('Chip: ${advice.chipLabel}',
+                  '${advice.quantLine}. ${advice.sizeLine}.${advice.warning != null ? ' ${advice.warning}' : ''}'),
               _ramInfoRow('Tips',
                   '• Close heavy apps before loading\n• Prefer smaller (Q4) models on low RAM\n• If a load is blocked, free space or pick a smaller file\n• Power users: Settings → Strict RAM guard can downgrade blocks to confirmed risky loads'),
               _ramInfoRow('Strict RAM guard',

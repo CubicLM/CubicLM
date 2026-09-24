@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 #include <atomic>
+#include <chrono>
+#include <thread>
 #include <ctime>
 #include <cstring>
 #include <fstream>
@@ -11,11 +13,59 @@
 #include <fcntl.h>
 #include <unwind.h>
 #include <dlfcn.h>
+#include <cstdarg>
 #include <android/log.h>
 #include "llama.cpp/include/llama.h"
 #define LOG_TAG "LlamaJNI"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
+// ── Diagnostics ring buffer (for tombstones, no adb) ───────────────
+// Every LOGI/LOGE line is also appended here (lock-free, newest ~8KB
+// kept). On a fatal signal the handler dumps the tail into the
+// tombstone file, so the in-app System Logs show what the engine was
+// doing right before death — logcat lines without logcat access.
+static char g_logring[8192];
+static std::atomic<size_t> g_logring_pos{0};
+
+static void log_ring_append(const char* s, size_t len) {
+    size_t base = g_logring_pos.fetch_add(len + 1, std::memory_order_relaxed);
+    for (size_t i = 0; i < len; i++) {
+        g_logring[(base + i) % sizeof(g_logring)] = s[i];
+    }
+    g_logring[(base + len) % sizeof(g_logring)] = '\n';
+}
+
+static void log_both(int prio, const char* fmt, va_list ap) {
+    char tmp[512];
+    va_list ap2;
+    va_copy(ap2, ap);
+    int n = vsnprintf(tmp, sizeof(tmp), fmt, ap);
+    va_end(ap2);
+    if (n > 0) {
+        size_t len = (size_t)n < sizeof(tmp) - 1 ? (size_t)n : sizeof(tmp) - 1;
+        log_ring_append(tmp, len);
+    }
+    __android_log_vprint(prio, LOG_TAG, fmt, ap);
+}
+
+static inline void log_info(const char* fmt, ...) {
+    va_list ap; va_start(ap, fmt);
+    log_both(ANDROID_LOG_INFO, fmt, ap);
+    va_end(ap);
+}
+
+static inline void log_err(const char* fmt, ...) {
+    va_list ap; va_start(ap, fmt);
+    log_both(ANDROID_LOG_ERROR, fmt, ap);
+    va_end(ap);
+}
+
+#define LOGI(...) log_info(__VA_ARGS__)
+#define LOGE(...) log_err(__VA_ARGS__)
+
+// Crash-time snapshot: plain ints written on the hot path, read by the
+// signal handler. Tells "died at token P of C with batch B" for free.
+static int g_crash_nctx = 0;
+static int g_crash_past = 0;
 
 // ── Multi-model slot registry ────────────────────────────────────────────────
 // Multiple GGUF models can stay resident at once; generation always targets
@@ -33,6 +83,10 @@ struct ModelSlot {
 static ModelSlot g_slots[MAX_SLOTS];
 static std::atomic<int> g_active_slot{-1};
 static std::atomic<bool> g_stop_flag{false};
+// True only while nativeGenerate is inside prefill/sample. clearContext
+// must never touch KV during that window: llama_memory_seq_rm under an
+// active llama_decode corrupts mul_mat inputs (SIGSEGV 0x1e190/0xa0f10).
+static std::atomic<bool> g_generating{false};
 static std::mutex g_load_log_mutex;
 static std::string g_load_error;
 static bool g_capture_load_error = false;
@@ -149,12 +203,18 @@ static void crash_handler(int sig, siginfo_t* info, void* /*ctx*/) {
             crash_write_dec(fd, sig);
             crash_write_str(fd, "fault ");
             crash_write_hex(fd, (uintptr_t)(info ? info->si_addr : nullptr));
+            // Crash-time snapshot: position, window, batch.
+            crash_write_str(fd, "ctx ");
+            crash_write_dec(fd, g_crash_nctx);
+            crash_write_str(fd, "past ");
+            crash_write_dec(fd, g_crash_past);
+            crash_write_str(fd, "batch ");
+            crash_write_dec(fd, g_batch_size);
             crash_write_str(fd, "pcs ");
             crash_write_dec(fd, n);
             for (int i = 0; i < n; i++) crash_write_hex(fd, (uintptr_t)pcs[i]);
-            // Module + file offset for the first frames: lets offline
-            // symbolization (llvm-symbolizer against the unstripped .so
-            // from the same build) name the crashing function exactly.
+            // Module + best-effort symbol per frame (dladdr reads the
+            // dynamic table, so this works on stripped release libs).
             crash_write_str(fd, "mods\n");
             int mcount = n < 8 ? n : 8;
             for (int i = 0; i < mcount; i++) {
@@ -163,7 +223,29 @@ static void crash_handler(int sig, siginfo_t* info, void* /*ctx*/) {
                     crash_write_str(fd, dli2.dli_fname);
                     crash_write_str(fd, " +");
                     crash_write_hex(fd, (uintptr_t)pcs[i] - (uintptr_t)dli2.dli_fbase);
+                    if (dli2.dli_sname) {
+                        crash_write_str(fd, " ");
+                        // Bounded copy: symbol names can be long.
+                        const char* sn = dli2.dli_sname;
+                        size_t sl = 0;
+                        while (sn[sl] != '\0' && sl < 160) sl++;
+                        if (sl > 0) (void) write(fd, sn, sl);
+                        crash_write_str(fd, "\n");
+                    }
                 }
+            }
+            // Last native log lines: what the engine was doing.
+            crash_write_str(fd, "logtail\n");
+            {
+                size_t total = g_logring_pos.load(std::memory_order_relaxed);
+                size_t keep = total > 2048 ? 2048 : total;
+                size_t start = total - keep;
+                // Write in at most two contiguous chunks (ring wrap).
+                size_t first = keep;
+                size_t off0 = start % sizeof(g_logring);
+                if (off0 + keep > sizeof(g_logring)) first = sizeof(g_logring) - off0;
+                if (first > 0) (void) write(fd, g_logring + off0, first);
+                if (keep > first) (void) write(fd, g_logring, keep - first);
             }
             close(fd);
         }
@@ -487,6 +569,12 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeLoadMo
     ctx_params.n_ctx = ctx_size;
     ctx_params.n_threads = n_threads;
     ctx_params.n_threads_batch = (g_batch_threads > 0) ? g_batch_threads : n_threads;
+    // Flash Attention OFF: the auto-enabled FA-CPU path produces NaN
+    // activations on longer prefills (observed: turn-1 short prefill OK,
+    // turn-2 ~477-token prefill -> NaN -> swiglu !isnan abort). Standard
+    // attention is exact fp32 and battle-tested on old ARM CPUs.
+    // Prefill gets somewhat slower; output stays correct.
+    ctx_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
 
     // Memory optimization: prompt-processing batch comes from
     // nativeSetBatchSize (default 512). Small batches keep the parallel
@@ -546,6 +634,21 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeLoadMo
 
 static jobject g_token_callback = nullptr;
 
+// RAII: mark nativeGenerate in-flight; clears on every exit path.
+struct GeneratingGuard {
+    GeneratingGuard() { g_generating.store(true, std::memory_order_release); }
+    ~GeneratingGuard() { g_generating.store(false, std::memory_order_release); }
+};
+
+static bool wait_not_generating(int timeout_ms) {
+    const int step = 5;
+    for (int waited = 0; waited < timeout_ms; waited += step) {
+        if (!g_generating.load(std::memory_order_acquire)) return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(step));
+    }
+    return !g_generating.load(std::memory_order_acquire);
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenerate(
     JNIEnv* env, jobject thiz,
@@ -555,7 +658,21 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenera
     jlong mirostat, jdouble mirostat_tau, jdouble mirostat_eta,
     jlong seed, jboolean penalize_newline,
     jobject token_callback) {
-    
+    // Exclusive generate: if a previous nativeGenerate is still inside
+    // llama_decode (Dart stop() timed out, etc.), ask it to stop and wait —
+    // two concurrent decodes on one context die in mul_mat.
+    if (g_generating.load(std::memory_order_acquire)) {
+        g_stop_flag = true;
+        if (!wait_not_generating(8000)) {
+            LOGE("nativeGenerate: previous run still active after 8s — refuse overlap");
+            jclass exception = env->FindClass("java/lang/IllegalStateException");
+            env->ThrowNew(exception, "Engine still generating");
+            return;
+        }
+    }
+    g_stop_flag = false;
+    GeneratingGuard gen_guard;
+
     if (g_token_callback != nullptr) {
         env->DeleteGlobalRef(g_token_callback);
         g_token_callback = nullptr;
@@ -615,6 +732,7 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenera
     env->ReleaseStringUTFChars(prompt, prompt_str);
 
     const int n_ctx = llama_n_ctx(g_ctx);
+    g_crash_nctx = n_ctx;
 
     // Keep every decode position strictly inside the window. A single
     // 25% shift is NOT enough when the prompt alone exceeds 75% of
@@ -672,7 +790,11 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenera
 
     LOGI("Context size: %d", llama_n_ctx(g_ctx));
 
-    while (tokens_processed < tokens.size()) {
+    // The stop flag is honored here too (previously only the token
+    // loop checked it): aborting mid-prefill lets a new generation
+    // start without overlapping a runaway native decode on the same
+    // context — overlapping decodes corrupt the graph heap (SIGSEGV).
+    while (tokens_processed < tokens.size() && !g_stop_flag) {
         batch.n_tokens = 0;
         int batch_size = std::min((int)tokens.size() - tokens_processed, max_batch_size);
 
@@ -698,11 +820,17 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenera
         }
         tokens_processed += batch_size;
     }
+    if (g_stop_flag) {
+        LOGI("Prefill aborted by stop flag after %d tokens", tokens_processed);
+        llama_batch_free(batch);
+        return;
+    }
 
     LOGI("✅ Decode successful! Processed %d total tokens", tokens_processed);
 
     // Update position counter after decoding the whole prompt
     g_n_past += tokens.size();
+    g_crash_past = g_n_past;
 
     // Create sampler chain with all parameters
     if (S->sampler) {
@@ -826,6 +954,7 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenera
         
         // Update position counter after each generated token
         g_n_past++;
+        if ((i & 63) == 0) g_crash_past = g_n_past;
     }
     LOGI("Generation loop finished.");
 
@@ -920,6 +1049,17 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeClearC
     if (!S || !S->ctx) {
         LOGE("Cannot clear context: context is null");
         return;
+    }
+
+    // Never mutate KV while nativeGenerate is mid-decode: seq_rm under an
+    // active graph is the proven SIGSEGV path (mul_mat fault 0x1e190).
+    // Request abort, wait for the generate thread to leave, then clear.
+    if (g_generating.load(std::memory_order_acquire)) {
+        g_stop_flag = true;
+        if (!wait_not_generating(8000)) {
+            LOGE("clearContext: generate still running after 8s — skip clear");
+            return;
+        }
     }
 
     llama_memory_t mem = llama_get_memory(S->ctx);
