@@ -76,7 +76,11 @@ extension CloudModelControllerModels on CloudModelController {
               DateTime.now().toIso8601String());
         }
       } catch (_) {}
-      Future.microtask(() => refreshModels(provider));
+      Future.microtask(() async {
+        try {
+          await refreshModels(provider);
+        } catch (_) {}
+      });
     }
   }
 

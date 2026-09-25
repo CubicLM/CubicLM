@@ -269,9 +269,15 @@ extension CloudModelControllerProviders on CloudModelController {
 
   void _unpin(String provider) {
     if (pinnedProviders.remove(provider)) {
-      try {
-        _hive.setSetting(CloudModelController._pinnedKey, pinnedProviders.toList());
-      } catch (_) {}
+      // Awaited inside a guarded microtask: a bare unawaited future lets
+      // a late platform/Hive error surface as an unhandled async error
+      // (flaky "failed after test completion" in parallel test runs).
+      Future.microtask(() async {
+        try {
+          await _hive.setSetting(
+              CloudModelController._pinnedKey, pinnedProviders.toList());
+        } catch (_) {}
+      });
     }
   }
 

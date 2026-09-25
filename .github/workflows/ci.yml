@@ -21,4 +21,8 @@ jobs:
           channel: stable
       - run: flutter pub get
       - run: flutter analyze
-      - run: flutter test
+      # Sequential: test files share Hive backing paths on disk, so
+      # parallel runs flake (known cross-file interference, e.g.
+      # cloud_provider_order). Sequential is deterministic and fits
+      # the timeout (~4 min).
+      - run: flutter test --concurrency=1
