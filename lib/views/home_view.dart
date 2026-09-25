@@ -70,12 +70,12 @@ class _HomeViewState extends State<HomeView> {
             activeIcon: LucideIcons.compass,
             label: 'nav_explore'.tr),
         _NavItem(
-            icon: LucideIcons.wrench,
-            activeIcon: LucideIcons.wrench,
+            icon: LucideIcons.layoutGrid,
+            activeIcon: LucideIcons.layoutGrid,
             label: 'nav_toolkit'.tr),
         _NavItem(
-            icon: LucideIcons.settings,
-            activeIcon: LucideIcons.settings,
+            icon: LucideIcons.slidersHorizontal,
+            activeIcon: LucideIcons.slidersHorizontal,
             label: 'nav_settings'.tr),
       ];
 
@@ -162,10 +162,11 @@ class _HomeViewState extends State<HomeView> {
   void _shortcutTab3() => controller.changeTab(3);
 
   Widget _buildBottomNav(BuildContext context, bool isDark) {
+    final activeColor = Theme.of(context).primaryColor;
     return Container(
-      height: 72 + MediaQuery.of(context).padding.bottom,
+      height: 64 + MediaQuery.of(context).padding.bottom,
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.8),
+        color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.85),
         border: Border(
           top: BorderSide(
             color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
@@ -176,32 +177,40 @@ class _HomeViewState extends State<HomeView> {
       child: ClipRRect(
         child: Obx(() => BackdropFilter(
           filter: ImageFilter.blur(sigmaX: AppColors.blurSigma, sigmaY: AppColors.blurSigma),
-          child: BottomNavigationBar(
-            currentIndex: controller.currentTab.value,
-            onTap: controller.changeTab,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            type: BottomNavigationBarType.fixed,
-            selectedLabelStyle: GoogleFonts.plusJakartaSans(
-                fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 0.2),
-            unselectedLabelStyle: GoogleFonts.plusJakartaSans(
-                fontWeight: FontWeight.w600, fontSize: 10, letterSpacing: 0.2),
-            items: [
-              for (final tab in _tabs)
-                BottomNavigationBarItem(
-                  icon: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Icon(tab.icon, size: 22),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              splashFactory: NoSplash.splashFactory,
+            ),
+            child: BottomNavigationBar(
+              currentIndex: controller.currentTab.value,
+              onTap: controller.changeTab,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              enableFeedback: false,
+              type: BottomNavigationBarType.fixed,
+              selectedItemColor: activeColor,
+              unselectedItemColor: isDark ? Colors.white38 : Colors.black38,
+              selectedLabelStyle: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w700, fontSize: 10, letterSpacing: 0.2),
+              unselectedLabelStyle: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w600, fontSize: 10, letterSpacing: 0.2),
+              items: [
+                for (int i = 0; i < _tabs.length; i++)
+                  BottomNavigationBarItem(
+                    icon: Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Icon(_tabs[i].icon, size: 22),
+                    ),
+                    activeIcon: Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Icon(_tabs[i].activeIcon, size: 22),
+                    ),
+                    label: _tabs[i].label,
                   ),
-                  activeIcon: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Icon(tab.activeIcon, size: 22),
-                  ),
-                  label: tab.label,
-                ),
-            ],
+              ],
+            ),
           ),
         )),
       ),

@@ -17,6 +17,13 @@ void main() {
           'assets/device_soc/Exynos.png');
     });
 
+    test('desktop vendors map to their logos', () {
+      expect(SocBrandIcon.assetFor(SocFamily.amd),
+          'assets/device_soc/amd-color.png');
+      expect(SocBrandIcon.assetFor(SocFamily.intel),
+          'assets/device_soc/intel.png');
+    });
+
     test('families without a logo fall back to the CPU icon', () {
       expect(SocBrandIcon.assetFor(SocFamily.apple), isNull);
       expect(SocBrandIcon.assetFor(SocFamily.unisoc), isNull);

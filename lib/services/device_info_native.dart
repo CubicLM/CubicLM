@@ -221,6 +221,20 @@ Future<Map<String, dynamic>> getDeviceInfo() async {
         }
         processor = 'Windows PC · ${win.numberOfCores} cores';
         hardware = 'x86_64';
+        // Desktop CPU vendor from the OS env (no plugin exposes it):
+        // "…GenuineIntel" → Intel logo, "…AuthenticAMD" → AMD logo.
+        try {
+          final ident =
+              (Platform.environment['PROCESSOR_IDENTIFIER'] ?? '')
+                  .toLowerCase();
+          if (ident.contains('genuineintel')) {
+            socFamily = SocFamily.intel;
+            processor = 'Intel PC · ${win.numberOfCores} cores';
+          } else if (ident.contains('authenticamd')) {
+            socFamily = SocFamily.amd;
+            processor = 'AMD PC · ${win.numberOfCores} cores';
+          }
+        } catch (_) {}
         deviceBrand = win.computerName.isNotEmpty ? 'PC' : '';
         deviceModel = win.computerName;
         osVersion = 'Windows ${win.displayVersion} (build ${win.buildNumber})';

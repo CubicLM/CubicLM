@@ -32,6 +32,10 @@ class SocBrandIcon extends StatelessWidget {
         return 'assets/device_soc/Kirin.png';
       case SocFamily.exynos:
         return 'assets/device_soc/Exynos.png';
+      case SocFamily.amd:
+        return 'assets/device_soc/amd-color.png';
+      case SocFamily.intel:
+        return 'assets/device_soc/intel.png';
       case SocFamily.apple:
       case SocFamily.unisoc:
       case SocFamily.rockchip:

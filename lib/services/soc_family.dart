@@ -10,6 +10,13 @@ enum SocFamily {
   rockchip,
   hisilicon,
   unknown,
+
+  /// Appended AFTER unknown on purpose: the native layer exchanges the
+  /// family as an index (0-8) and clamps anything above 8 to unknown,
+  /// so inserting earlier would shift the whole contract. Native never
+  /// sends these — Dart sets them (desktop CPU vendor detection).
+  amd,
+  intel,
 }
 
 extension SocFamilyExt on SocFamily {
@@ -31,6 +38,10 @@ extension SocFamilyExt on SocFamily {
         return 'Rockchip';
       case SocFamily.hisilicon:
         return 'Huawei Kirin';
+      case SocFamily.amd:
+        return 'AMD Ryzen';
+      case SocFamily.intel:
+        return 'Intel Core';
       case SocFamily.unknown:
         return 'Unknown';
     }
@@ -54,6 +65,10 @@ extension SocFamilyExt on SocFamily {
         return 'Q4_K_M (recommended)';
       case SocFamily.hisilicon:
         return 'Q4_K_M (recommended)';
+      case SocFamily.amd:
+        return 'Q4_K_M (recommended) · bigger models OK on desktop RAM';
+      case SocFamily.intel:
+        return 'Q4_K_M (recommended) · bigger models OK on desktop RAM';
       case SocFamily.unknown:
         return 'Q4_K_M (universal default)';
     }

@@ -44,6 +44,13 @@ void main() {
           isNot(ChipClass.mid));
     });
 
+    test('desktop vendors classify as modern flagship', () {
+      expect(classifyChip(SocFamily.amd, 'AMD PC · 16 cores'),
+          ChipClass.modernFlagship);
+      expect(classifyChip(SocFamily.intel, 'Intel PC · 12 cores'),
+          ChipClass.modernFlagship);
+    });
+
     test('MediaTek / Exynos / Tensor / Apple', () {
       expect(classifyChip(SocFamily.mediatek, 'Dimensity 9200'),
           ChipClass.modernFlagship);

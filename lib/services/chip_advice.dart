@@ -47,6 +47,8 @@ ChipClass classifyChip(SocFamily family, String chipLabel) {
   final n = chipLabel.toLowerCase();
   switch (family) {
     case SocFamily.apple:
+    case SocFamily.amd:
+    case SocFamily.intel:
       return ChipClass.modernFlagship;
     case SocFamily.googleTensor:
       return ChipClass.modernFlagship;

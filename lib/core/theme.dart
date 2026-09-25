@@ -168,6 +168,7 @@ class AppTheme {
         unselectedItemColor: isBold ? Colors.white.withValues(alpha: 0.7) : textMuted,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
+        enableFeedback: false,
         selectedLabelStyle: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w800),
         unselectedLabelStyle: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600),
       ),
