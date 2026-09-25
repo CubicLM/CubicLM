@@ -5,6 +5,14 @@ All notable changes to CubicLM are documented here. This is the **single source 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.1+27] - 2026-09-26
+
+### Fixed
+- **Share sheet dead in release builds** - R8 keep rules for share_plus + FileProvider (debug never minifies, which is why it only broke in the release APK).
+- **Share failure visibility** - share errors now log a full System Logs row (exception + size + OS) instead of a bare snackbar.
+- **Share fallback** - when the share sheet is unavailable, logs/files save to Downloads with the path shown, so exports always leave the device.
+- **CI flake** - fire-and-forget futures guarded (`_unpin` persist, `refreshModels` microtask); CI runs tests sequentially (shared Hive paths on disk made parallel runs flaky).
+
 ## [1.17.0+26] - 2026-09-25
 
 ### Added
