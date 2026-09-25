@@ -9,6 +9,7 @@ import '../../services/inference_service.dart';
 import '../../services/local_image_service.dart';
 import '../../services/soc_family.dart';
 import '../../theme/design_tokens.dart';
+import '../../widgets/soc_brand_icon.dart';
 import 'apple_widgets.dart';
 
 /// Device spec card.
@@ -114,7 +115,15 @@ Widget buildDeviceCard(BuildContext context, bool isDark) {
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(children: [
-          iconBox(AppColors.secondary, LucideIcons.cpu),
+          Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10)),
+              alignment: Alignment.center,
+              child: SocBrandIcon(
+                  family: soc, size: 20, fallbackColor: AppColors.secondary)),
           const SizedBox(width: 16),
           Expanded(
             child: Column(

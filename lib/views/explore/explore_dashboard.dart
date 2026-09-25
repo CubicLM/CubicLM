@@ -3,6 +3,8 @@
 /// downloaded-models framed box with search, usage stats, shortcuts.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -20,12 +22,54 @@ import '../../services/chip_advice.dart';
 import '../../services/device_info_service.dart';
 import '../../services/inference_service.dart';
 import '../../services/soc_family.dart';
+import '../../theme/design_tokens.dart';
+import '../../widgets/soc_brand_icon.dart';
 import '../hub/hub_widgets.dart';
+import 'add_model_sheet.dart';
 import 'local_model_card.dart';
 
 /// Dashboard page content hosted inside Explore (ModelView).
-class ExploreDashboard extends StatelessWidget {
+class ExploreDashboard extends StatefulWidget {
   const ExploreDashboard({super.key});
+
+  @override
+  State<ExploreDashboard> createState() => _ExploreDashboardState();
+}
+
+class _ExploreDashboardState extends State<ExploreDashboard> {
+  Timer? _retryTimer;
+  int _retries = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Self-heal: if DeviceInfoService wasn't registered on the first
+    // build, the Obx below tracked nothing from it — RAM would sit at
+    // zeros forever (until some unrelated rebuild). Retry a few times
+    // so RAM info always appears on its own.
+    _retryTimer =
+        Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted) return;
+      double total = 0;
+      try {
+        if (Get.isRegistered<DeviceInfoService>()) {
+          total = Get.find<DeviceInfoService>().totalRamGB.value;
+        }
+      } catch (_) {}
+      _retries++;
+      if (total > 0 || _retries >= 4) {
+        _retryTimer?.cancel();
+        _retryTimer = null;
+      }
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    super.dispose();
+  }
 
   HomeController? get _home {
     try {
@@ -95,6 +139,20 @@ class ExploreDashboard extends StatelessWidget {
       try {
         best = models?.bestBenchmarkedFilename();
       } catch (_) {}
+      // Last load impact (before → after free RAM). Rx: tracked below.
+      String snapName = '';
+      double snapBefore = 0;
+      double snapAfter = 0;
+      try {
+        snapName = dev?.lastLoadModelName.value ?? '';
+        snapBefore = dev?.ramBeforeLoadGb.value ?? 0;
+        snapAfter = dev?.ramAfterLoadGb.value ?? 0;
+      } catch (_) {}
+      final showImpact = modelLoaded &&
+          snapAfter > 0 &&
+          snapBefore > 0 &&
+          (snapName.isEmpty || snapName == modelName);
+      final impactDelta = snapBefore - snapAfter;
 
       final ramFrac =
           totalRam > 0 ? ((totalRam - availRam) / totalRam).clamp(0.0, 1.0) : 0.0;
@@ -134,6 +192,11 @@ class ExploreDashboard extends StatelessWidget {
               quant: quant,
               best: best,
               advice: advice,
+              socFam: dev?.socFamily.value ?? SocFamily.unknown,
+              showImpact: showImpact,
+              snapBefore: snapBefore,
+              snapAfter: snapAfter,
+              impactDelta: impactDelta,
               onRefresh: () {
                 try {
                   dev?.refreshMemoryInfo();
@@ -218,6 +281,11 @@ class ExploreDashboard extends StatelessWidget {
     required String? quant,
     required String? best,
     required ChipAdvice advice,
+    required SocFamily socFam,
+    required bool showImpact,
+    required double snapBefore,
+    required double snapAfter,
+    required double impactDelta,
     required VoidCallback onRefresh,
   }) {
     final primary = Theme.of(context).primaryColor;
@@ -283,7 +351,7 @@ class ExploreDashboard extends StatelessWidget {
             children: [
               HubRing(
                 fraction: ramFrac,
-                center: '${(ramFrac * 100).round()}%',
+                center: totalRam > 0 ? '${(ramFrac * 100).round()}%' : '—',
                 label: totalRam > 0
                     ? 'RAM · ${availRam.toStringAsFixed(1)} free'
                     : 'RAM',
@@ -343,7 +411,11 @@ class ExploreDashboard extends StatelessWidget {
                   advice: advice,
                   modelLine: loaded
                       ? '$name · $backend${ctxTotal > 0 ? ' · ctx $ctxTotal' : ''}'
-                      : null),
+                      : null,
+                  showImpact: showImpact,
+                  snapBefore: snapBefore,
+                  snapAfter: snapAfter,
+                  impactDelta: impactDelta),
               borderRadius: BorderRadius.circular(20),
               child: const Padding(
                 padding: EdgeInsets.all(6),
@@ -352,50 +424,83 @@ class ExploreDashboard extends StatelessWidget {
             ),
           ]),
           const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: Container(
-              height: 8,
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.black.withValues(alpha: 0.07),
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: ramFrac,
-                child: Container(
-                    color: ramFrac > 0.85 ? AppColors.warning : primary),
+          if (totalRam <= 0)
+            // Service not ready yet (or unreadable): never show zeros
+            // as fact — invite a retry instead of a false "critical".
+            Row(children: [
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: primary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('Reading device memory…',
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).hintColor)),
+              ),
+            ])
+          else ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                height: 8,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.07),
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: ramFrac,
+                  child: Container(
+                      color: ramFrac > 0.85 ? AppColors.warning : primary),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(children: [
-            Text('${usedRam.toStringAsFixed(1)} GB used',
+            const SizedBox(height: 8),
+            Row(children: [
+              Text('${usedRam.toStringAsFixed(1)} GB used',
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).hintColor)),
+              const Spacer(),
+              Text(
+                  '${availRam.toStringAsFixed(1)} GB free of ${totalRam.toStringAsFixed(1)} GB',
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: availRam < 1.5 ? AppColors.warning : null)),
+            ]),
+            const SizedBox(height: 4),
+            Text(
+              roomMb > 0
+                  ? 'Room for ≈$roomMb MB${quant != null ? ' · $quant' : ''}${best != null ? ' · ⚡ $best' : ''}'
+                  : 'Memory critically low — close other apps before loading',
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: roomMb > 0 ? FontWeight.w500 : FontWeight.w600,
+                  color: roomMb > 0
+                      ? Theme.of(context).hintColor
+                      : AppColors.warning),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (showImpact) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Load impact: ${snapBefore.toStringAsFixed(1)} → ${snapAfter.toStringAsFixed(1)} GB free (${impactDelta >= 0 ? '−' : '+'}${impactDelta.abs().toStringAsFixed(1)} by this model)',
                 style: GoogleFonts.plusJakartaSans(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(context).hintColor)),
-            const Spacer(),
-            Text(
-                '${availRam.toStringAsFixed(1)} GB free of ${totalRam.toStringAsFixed(1)} GB',
-                style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: availRam < 1.5 ? AppColors.warning : null)),
-          ]),
-          const SizedBox(height: 4),
-          Text(
-            roomMb > 0
-                ? 'Room for ≈$roomMb MB${quant != null ? ' · $quant' : ''}${best != null ? ' · ⚡ $best' : ''}'
-                : 'Memory critically low — close other apps before loading',
-            style: GoogleFonts.plusJakartaSans(
-                fontSize: 11,
-                fontWeight: roomMb > 0 ? FontWeight.w500 : FontWeight.w600,
-                color: roomMb > 0
-                    ? Theme.of(context).hintColor
-                    : AppColors.warning),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
+                    color: Theme.of(context).primaryColor),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ],
           const SizedBox(height: 12),
           Container(
               height: 1,
@@ -404,8 +509,10 @@ class ExploreDashboard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(LucideIcons.cpu,
-                  size: 15, color: Theme.of(context).hintColor),
+              SocBrandIcon(
+                  family: socFam,
+                  size: 16,
+                  fallbackColor: Theme.of(context).hintColor),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -436,6 +543,10 @@ class ExploreDashboard extends StatelessWidget {
     required String tierLabel,
     required ChipAdvice advice,
     required String? modelLine,
+    required bool showImpact,
+    required double snapBefore,
+    required double snapAfter,
+    required double impactDelta,
   }) {
     final needForRoom =
         roomMb > 0 ? (roomMb * 1.25 / 1024 + 0.25) : availGb;
@@ -450,6 +561,9 @@ class ExploreDashboard extends StatelessWidget {
             children: [
               if (modelLine != null)
                 _hubInfoRow('Active model', modelLine),
+              if (showImpact)
+                _hubInfoRow('Load impact',
+                    '${snapBefore.toStringAsFixed(1)} → ${snapAfter.toStringAsFixed(1)} GB free — this model costs about ${impactDelta.abs().toStringAsFixed(1)} GB of working RAM.'),
               _hubInfoRow('Total RAM',
                   '${totalGb.toStringAsFixed(1)} GB — your phone\u2019s full memory.'),
               _hubInfoRow('Used',
@@ -651,27 +765,104 @@ class _DownloadedFrameState extends State<_DownloadedFrame> {
             ),
           ]),
           const SizedBox(height: 10),
-          TextField(
-            controller: _searchCtrl,
-            onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
-            decoration: InputDecoration(
-              hintText: 'Search downloaded models…',
-              prefixIcon: const Icon(LucideIcons.search, size: 17),
-              suffixIcon: _query.isEmpty
-                  ? null
-                  : IconButton(
-                      icon: const Icon(LucideIcons.x, size: 16),
-                      onPressed: () {
-                        _searchCtrl.clear();
-                        setState(() => _query = '');
-                      },
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchCtrl,
+                  onChanged: (v) =>
+                      setState(() => _query = v.trim().toLowerCase()),
+                  decoration: InputDecoration(
+                    hintText: 'Search downloaded models…',
+                    prefixIcon:
+                        const Icon(LucideIcons.search, size: 17),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            icon:
+                                const Icon(LucideIcons.x, size: 16),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              setState(() => _query = '');
+                            },
+                          ),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Empty-state Import/URL actions live here once the list
+              // is non-empty (empty state owns them when it shows).
+              Obx(() {
+                bool busy = false;
+                try {
+                  busy =
+                      Get.find<ModelController>().isImporting.value;
+                } catch (_) {}
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: Theme.of(context)
+                                .dividerColor
+                                .withValues(alpha: 0.8)),
+                      ),
+                      child: IconButton(
+                        tooltip: 'Import from storage',
+                        onPressed: busy
+                            ? null
+                            : () {
+                                try {
+                                  Get.find<ModelController>()
+                                      .importModelFromStorage();
+                                } catch (_) {}
+                              },
+                        icon: const Icon(
+                          Icons.file_upload_outlined,
+                          size: 20,
+                          color: Dt.accent,
+                        ),
+                      ),
                     ),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 10),
-              isDense: true,
-            ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: Theme.of(context)
+                                .dividerColor
+                                .withValues(alpha: 0.8)),
+                      ),
+                      child: IconButton(
+                        tooltip: 'model_add_url_title'.tr,
+                        onPressed: () {
+                          try {
+                            showAddModelUrlDialog(context,
+                                Get.find<ModelController>());
+                          } catch (_) {}
+                        },
+                        icon: const Icon(
+                          LucideIcons.link,
+                          size: 20,
+                          color: Dt.accent,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }),
+            ],
           ),
           const SizedBox(height: 10),
           SizedBox(
@@ -729,6 +920,72 @@ class _DownloadedFrameState extends State<_DownloadedFrame> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 20, vertical: 12),
                           ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                try {
+                                  Get.find<ModelController>()
+                                      .importModelFromStorage();
+                                } catch (_) {}
+                              },
+                              icon: const Icon(
+                                  Icons.file_upload_outlined,
+                                  size: 16),
+                              label: Text('Import from storage',
+                                  style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface,
+                                side: BorderSide(
+                                    color: Theme.of(context)
+                                        .dividerColor
+                                        .withValues(alpha: 0.8)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                              ),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                try {
+                                  showAddModelUrlDialog(
+                                      context,
+                                      Get.find<ModelController>());
+                                } catch (_) {}
+                              },
+                              icon: const Icon(LucideIcons.link,
+                                  size: 16),
+                              label: Text('Add model URL',
+                                  style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface,
+                                side: BorderSide(
+                                    color: Theme.of(context)
+                                        .dividerColor
+                                        .withValues(alpha: 0.8)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ],

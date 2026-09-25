@@ -153,7 +153,7 @@ Widget emptyState(BuildContext context, bool isDark) {
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700)),
                         style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.warning,
+                            backgroundColor: Dt.accent,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 10),
@@ -271,13 +271,13 @@ class TypedGreeting extends StatefulWidget {
   State<TypedGreeting> createState() => _TypedGreetingState();
 }
 
-class _TypedGreetingState extends State<TypedGreeting> {
+class _TypedGreetingState extends State<TypedGreeting>
+    with TickerProviderStateMixin {
   late final List<String> _frozen;
   int _lineIndex = 0;
-  int _charIndex = 0;
-  double _opacity = 0.0;
-  Timer? _typingTimer;
-  Timer? _delayTimer;
+  late AnimationController _fadeController;
+  late AnimationController _typingController;
+  Timer? _holdTimer;
   int _fadeToken = 0;
 
   @override
@@ -287,6 +287,29 @@ class _TypedGreetingState extends State<TypedGreeting> {
     // ignore: avoid_print
     print(
         '[TypedGreeting] start segment=${widget.debugLabel} lines=${_frozen.length}');
+
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+
+    _typingController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+
+    _typingController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _onTypingCompleted();
+      }
+    });
+
+    _fadeController.addStatusListener((status) {
+      if (status == AnimationStatus.dismissed) {
+        _onFadeOutCompleted();
+      }
+    });
+
     if (_frozen.isNotEmpty) {
       _startLine();
     }
@@ -294,72 +317,42 @@ class _TypedGreetingState extends State<TypedGreeting> {
 
   void _startLine() {
     if (!mounted || _frozen.isEmpty) return;
+
+    ++_fadeToken;
+    _holdTimer?.cancel();
+
+    final text = _frozen[_lineIndex % _frozen.length];
+    final typingMs = (text.length * 90).clamp(600, 6000);
+    _typingController.duration = Duration(milliseconds: typingMs);
+
+    _fadeController.forward(from: 0.0);
+    _typingController.forward(from: 0.0);
+  }
+
+  void _onTypingCompleted() {
+    if (!mounted) return;
+    final token = _fadeToken;
+    _holdTimer?.cancel();
+    _holdTimer = Timer(const Duration(milliseconds: 2200), () {
+      if (!mounted || token != _fadeToken) return;
+      _fadeController.reverse();
+    });
+  }
+
+  void _onFadeOutCompleted() {
+    if (!mounted) return;
     setState(() {
-      _charIndex = 0;
-      _opacity = 0.0;
+      _lineIndex = (_lineIndex + 1) % _frozen.length;
     });
-
-    final token = ++_fadeToken;
-    _cancelAllTimers();
-
-    // Fade in
-    _delayTimer = Timer(const Duration(milliseconds: 40), () {
-      if (!mounted || token != _fadeToken) return;
-      setState(() {
-        _opacity = 1.0;
-      });
-
-      // Start typing
-      final text = _frozen[_lineIndex % _frozen.length];
-      const typingSpeed = Duration(milliseconds: 75);
-
-      _typingTimer = Timer.periodic(typingSpeed, (timer) {
-        if (!mounted || token != _fadeToken) {
-          timer.cancel();
-          return;
-        }
-        setState(() {
-          if (_charIndex < text.length) {
-            _charIndex++;
-          } else {
-            timer.cancel();
-            _scheduleFadeOut(token);
-          }
-        });
-      });
-    });
-  }
-
-  void _scheduleFadeOut(int token) {
-    // Hold fully visible for 2.2 seconds after typing completes
-    _delayTimer = Timer(const Duration(milliseconds: 2200), () {
-      if (!mounted || token != _fadeToken) return;
-      setState(() {
-        _opacity = 0.0; // Fade out
-      });
-
-      // Wait for fade out duration (500ms) before switching to next line
-      _delayTimer = Timer(const Duration(milliseconds: 520), () {
-        if (!mounted || token != _fadeToken) return;
-        setState(() {
-          _lineIndex = (_lineIndex + 1) % _frozen.length;
-        });
-        _startLine();
-      });
-    });
-  }
-
-  void _cancelAllTimers() {
-    _typingTimer?.cancel();
-    _delayTimer?.cancel();
-    _typingTimer = null;
-    _delayTimer = null;
+    _startLine();
   }
 
   @override
   void dispose() {
     _fadeToken++;
-    _cancelAllTimers();
+    _holdTimer?.cancel();
+    _fadeController.dispose();
+    _typingController.dispose();
     super.dispose();
   }
 
@@ -368,9 +361,7 @@ class _TypedGreetingState extends State<TypedGreeting> {
     if (_frozen.isEmpty) {
       return const SizedBox.shrink();
     }
-    final text = _frozen[_lineIndex % _frozen.length];
-    final displayedText =
-        _charIndex <= text.length ? text.substring(0, _charIndex) : text;
+
     final color = Theme.of(context).colorScheme.onSurface;
     final style = (widget.style ?? GoogleFonts.plusJakartaSans(
       fontSize: 20,
@@ -381,16 +372,25 @@ class _TypedGreetingState extends State<TypedGreeting> {
     return SizedBox(
       height: 60, // Fixed height reserved for up to 2 lines to prevent layout jumping
       child: Center(
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 500), // Smooth fade in and out
-          opacity: _opacity,
-          child: Text(
-            displayedText,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: style.copyWith(color: color),
-          ),
+        child: AnimatedBuilder(
+          animation: Listenable.merge([_fadeController, _typingController]),
+          builder: (context, _) {
+            final text = _frozen[_lineIndex % _frozen.length];
+            final charCount =
+                (text.length * _typingController.value).floor().clamp(0, text.length);
+            final displayedText = text.substring(0, charCount);
+
+            return Opacity(
+              opacity: _fadeController.value,
+              child: Text(
+                displayedText,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: style.copyWith(color: color),
+              ),
+            );
+          },
         ),
       ),
     );

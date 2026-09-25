@@ -24,6 +24,41 @@ class DeviceInfoService extends GetxService {
   /// thread auto-tuning: [SettingsController.recommendedThreads].
   final cpuCores = 0.obs;
 
+  // Last model-load RAM impact (before → after free RAM), for the
+  // Dashboard's "what did this model cost me" line. Recorded by the
+  // load facade around every successful load; cleared on unload.
+  final lastLoadModelName = ''.obs;
+  final ramBeforeLoadGb = 0.0.obs;
+  final ramAfterLoadGb = 0.0.obs;
+
+  /// Snapshot free RAM before a load starts (pure Rx, test-safe).
+  void snapshotBeforeLoad(String modelName) {
+    try {
+      lastLoadModelName.value = modelName;
+      ramBeforeLoadGb.value = availableRamGB.value;
+      ramAfterLoadGb.value = 0;
+    } catch (_) {}
+  }
+
+  /// Re-read RAM after a load finished and snapshot it.
+  Future<void> snapshotAfterLoad() async {
+    try {
+      await refreshMemoryInfo();
+    } catch (_) {}
+    try {
+      ramAfterLoadGb.value = availableRamGB.value;
+    } catch (_) {}
+  }
+
+  /// Drop the snapshot (unload frees the RAM again).
+  void clearLoadSnapshot() {
+    try {
+      lastLoadModelName.value = '';
+      ramBeforeLoadGb.value = 0;
+      ramAfterLoadGb.value = 0;
+    } catch (_) {}
+  }
+
   /// Re-read everything (available RAM drifts; cheap enough on demand).
   Future<void> refresh() => refreshMemoryInfo();
 
@@ -90,7 +125,9 @@ class DeviceInfoService extends GetxService {
 
     print('[DeviceInfo] RAM: ${totalRamGB.value.toStringAsFixed(1)}GB total, '
         '${availableRamGB.value.toStringAsFixed(1)}GB available, '
-        'tier: ${deviceTier.value}, tensor: ${isTensorSoC.value}');
+        'tier: ${deviceTier.value}, tensor: ${isTensorSoC.value}, '
+        'soc: ${socFamily.value.name}, hw: ${socHardware.value}, '
+        'proc: ${processorName.value}');
     return this;
   }
 

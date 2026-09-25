@@ -94,9 +94,11 @@ Widget _ramFitDot(BuildContext context, AiModel model) {
   });
 }
 
-/// Stored speed-benchmark line + one-tap Benchmark action. Rebuilds off
-/// the `benchmarking` map; the Hive result is re-read on every rebuild,
-/// so the line appears as soon as a run finishes.
+/// Stored speed-benchmark line + one-tap Benchmark action + explainer.
+/// Rebuilds off the `benchmarking` map; the Hive result is re-read on
+/// every rebuild, so the line appears as soon as a run finishes.
+/// Benchmarks are per-device (stored locally) — the line always
+/// describes THIS device, with tier chip + run date.
 Widget _benchmarkRow(
     BuildContext context, AiModel model, bool disableActions) {
   return Obx(() {
@@ -113,42 +115,308 @@ Widget _benchmarkRow(
     } else {
       label = 'Not benchmarked on this device';
     }
-    return Row(
+    String? sub;
+    if (!running && res != null) {
+      final at = (res['at'] ?? '').toString();
+      String date = '';
+      try {
+        if (at.isNotEmpty) {
+          final dt = DateTime.parse(at).toLocal();
+          date = '${dt.day}/${dt.month}/${dt.year}';
+        }
+      } catch (_) {}
+      try {
+        if (Get.isRegistered<DeviceInfoService>()) {
+          final dev = Get.find<DeviceInfoService>();
+          final tier = dev.deviceTier.value;
+          final tierTxt = tier.isEmpty ? '' : ' · ${tier.toUpperCase()} device';
+          sub = 'This device$tierTxt${date.isEmpty ? '' : ' · $date'}';
+        } else if (date.isNotEmpty) {
+          sub = 'This device · $date';
+        } else {
+          sub = 'This device';
+        }
+      } catch (_) {
+        sub = date.isEmpty ? 'This device' : 'This device · $date';
+      }
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        if (running)
-          const SizedBox(
-            width: 12,
-            height: 12,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
-        else
-          Icon(LucideIcons.zap,
-              size: 12, color: hint.withValues(alpha: 0.5)),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Text(
-            label,
-            style: GoogleFonts.firaCode(
-              fontSize: 11,
-              color: hint.withValues(alpha: 0.7),
-              fontWeight: FontWeight.w500,
+        Row(
+          children: [
+            if (running)
+              const SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Icon(LucideIcons.zap,
+                  size: 12, color: hint.withValues(alpha: 0.5)),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.firaCode(
+                  fontSize: 11,
+                  color: hint.withValues(alpha: 0.7),
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 2,
+              ),
             ),
-            overflow: TextOverflow.ellipsis,
-          ),
+            TextButton(
+              onPressed: (disableActions || running || !_c.canLoadLocal)
+                  ? null
+                  : () => _c.runBenchmark(model.filename),
+              style: TextButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('Benchmark'),
+            ),
+            IconButton(
+              tooltip: 'How is benchmark measured?',
+              onPressed: () => _showBenchmarkInfo(context),
+              icon: Icon(LucideIcons.info,
+                  size: 14, color: hint.withValues(alpha: 0.6)),
+              padding: EdgeInsets.zero,
+              constraints:
+                  const BoxConstraints(minWidth: 28, minHeight: 28),
+            ),
+          ],
         ),
-        TextButton(
-          onPressed: (disableActions || running || !_c.canLoadLocal)
-              ? null
-              : () => _c.runBenchmark(model.filename),
-          style: TextButton.styleFrom(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        if (sub != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Text(
+              sub,
+              style: GoogleFonts.firaCode(
+                fontSize: 10,
+                color: hint.withValues(alpha: 0.55),
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          child: const Text('Benchmark'),
+      ],
+    );
+  });
+}
+
+/// Explainer: how the on-device benchmark is counted.
+void _showBenchmarkInfo(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          const Icon(LucideIcons.info, size: 18, color: Dt.accent),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('How benchmark works',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 15, fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _benchBullet(
+              'Runs a fixed short prompt once, on THIS device only — scores never transfer between devices.'),
+          _benchBullet(
+              'tok/s = generated tokens ÷ total seconds. TTFT = time to first token.'),
+          _benchBullet(
+              'GPU tag = GPU layers used; otherwise the run was CPU-only.'),
+          _benchBullet(
+              'Score depends on device chip + free RAM + background apps + settings — re-run Benchmark after changes.'),
+          _benchBullet(
+              '⚡ badge = fastest benchmarked download on this device.'),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Got it'),
         ),
       ],
+    ),
+  );
+}
+
+Widget _benchBullet(String text) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('•  ',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+        Expanded(
+          child: Text(text,
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12.5, height: 1.45)),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Rounded free-RAM chip: live free memory next to the model, so the
+/// Load decision is one glance. Turns amber/red as free RAM shrinks.
+Widget _ramFreeChip(BuildContext context) {
+  return Obx(() {
+    double freeGb = 0;
+    String tier = '';
+    try {
+      if (Get.isRegistered<DeviceInfoService>()) {
+        final dev = Get.find<DeviceInfoService>();
+        freeGb = dev.availableRamGB.value;
+        tier = dev.deviceTier.value;
+      }
+    } catch (_) {}
+    if (freeGb <= 0) return const SizedBox.shrink();
+    // Status lives in the little dot (same language as the
+    // "Fits in RAM" row) — the pill itself stays neutral app surface.
+    final dot = freeGb >= 3
+        ? AppColors.success
+        : freeGb >= 1.5
+            ? AppColors.warning
+            : AppColors.error;
+    return Tooltip(
+      message: tier.isEmpty
+          ? 'Free RAM right now'
+          : 'Free RAM right now · $tier-tier device',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+              color:
+                  Theme.of(context).dividerColor.withValues(alpha: 0.6)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration:
+                  BoxDecoration(color: dot, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              'Free ${freeGb.toStringAsFixed(1)}GB',
+              style: GoogleFonts.firaCode(
+                fontSize: 10,
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  });
+}
+
+/// Device-tier (ranking) chip: LOW / MID / HIGH / ULTRA from RAM.
+Widget _tierChip(BuildContext context) {
+  return Obx(() {
+    String tier = '';
+    try {
+      if (Get.isRegistered<DeviceInfoService>()) {
+        tier = Get.find<DeviceInfoService>().deviceTier.value;
+      }
+    } catch (_) {}
+    if (tier.isEmpty) return const SizedBox.shrink();
+    String desc = '';
+    try {
+      if (Get.isRegistered<DeviceInfoService>()) {
+        desc = Get.find<DeviceInfoService>().tierDescription;
+      }
+    } catch (_) {}
+    // Neutral app-surface pill (no yellow wash) — matches the
+    // dashboard tier label language.
+    return Tooltip(
+      message: desc.isEmpty ? '$tier-tier device' : desc,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+              color:
+                  Theme.of(context).dividerColor.withValues(alpha: 0.6)),
+        ),
+        child: Text(
+          '${tier.toUpperCase()} DEVICE',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 9,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ),
+    );
+  });
+}
+
+/// "What did this model cost me" line: RAM delta of the last load.
+/// Shown only for the model that was loaded last.
+Widget _ramCostLine(BuildContext context, String filename) {
+  return Obx(() {
+    String last = '';
+    double before = 0;
+    double after = 0;
+    try {
+      if (!Get.isRegistered<DeviceInfoService>()) {
+        return const SizedBox.shrink();
+      }
+      final dev = Get.find<DeviceInfoService>();
+      last = dev.lastLoadModelName.value;
+      before = dev.ramBeforeLoadGb.value;
+      after = dev.ramAfterLoadGb.value;
+    } catch (_) {
+      return const SizedBox.shrink();
+    }
+    if (last != filename || before <= 0 || after <= 0) {
+      return const SizedBox.shrink();
+    }
+    final used = (before - after).clamp(0.0, before);
+    final hint = Theme.of(context).hintColor;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(LucideIcons.memoryStick,
+              size: 12, color: hint.withValues(alpha: 0.5)),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              'Loaded: used ~${used.toStringAsFixed(1)} GB '
+              '(${before.toStringAsFixed(1)} → ${after.toStringAsFixed(1)} GB free)',
+              style: GoogleFonts.firaCode(
+                fontSize: 10.5,
+                color: hint.withValues(alpha: 0.75),
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 2,
+            ),
+          ),
+        ],
+      ),
     );
   });
 }
@@ -438,6 +706,8 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                         Row(
                           children: [
                             Expanded(
+                              // Rule: full model name always — wraps to
+                              // the next line, never "…" truncated.
                               child: Text(
                                 model.name,
                                 style: GoogleFonts.plusJakartaSans(
@@ -445,8 +715,7 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                                   fontWeight: FontWeight.w700,
                                   color: Theme.of(context).colorScheme.onSurface,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                softWrap: true,
                               ),
                             ),
                             if (isActive)
@@ -480,6 +749,28 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                                         fontSize: 9,
                                         fontWeight: FontWeight.w800,
                                         color: Dt.accent)),
+                              ),
+                            // Not downloaded yet: quick download action here
+                            // (downloaded cards use the full-width bottom
+                            // row instead, so the name gets full width).
+                            if (!isDownloaded && !isCurrentlyDownloading)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8),
+                                child: IconButton(
+                                  tooltip: 'Download model',
+                                  onPressed: disableActions
+                                      ? null
+                                      : () =>
+                                          confirmDownload(context, model),
+                                  icon: const Icon(
+                                    LucideIcons.download,
+                                    size: 22,
+                                    color: Dt.accent,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                      minWidth: 32, minHeight: 32),
+                                ),
                               ),
                           ],
                         ),
@@ -519,17 +810,28 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                             ),
                             const SizedBox(width: 8),
                             if (isDownloaded)
-                              // Expanded (not Flexible): the dot label gets
-                              // a tight width so its ellipsis can trigger —
-                              // this row overflowed 2px on 393px screens.
+                              // Full-width row now (actions moved to the
+                              // bottom), so the fit dot has room.
                               Expanded(
                                   child:
                                       _ramFitDot(context, model)),
                           ],
                         ),
+                        if (isDownloaded) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              _ramFreeChip(context),
+                              _tierChip(context),
+                            ],
+                          ),
+                        ],
                         if (isDownloaded && _c.canLoadLocal) ...[
                           const SizedBox(height: 6),
                           _benchmarkRow(context, model, disableActions),
+                          _ramCostLine(context, model.filename),
                         ],
                         // Quant picker — only for catalog entries that
                         // ship variants, and only before anything is
@@ -574,28 +876,43 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                       ],
                     ),
                   ),
-                  if (!isCurrentlyDownloading && isDownloaded)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 12, top: 4),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isActive)
-                            TextButton(
+                  // Actions live in the full-width bottom row below, so the
+                  // model name gets the whole line (no more "qwen2.5-…"
+                  // truncation beside Load/Delete).
+                ],
+              ),
+              // ── Bottom action row: full-width Load/Unload + Delete ──
+              if (!isCurrentlyDownloading && isDownloaded) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: isActive
+                          ? OutlinedButton(
                               onPressed: disableActions
                                   ? null
                                   : () => _c.unloadModel(),
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppColors.warning,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface,
+                                side: BorderSide(
+                                    color: Theme.of(context)
+                                        .dividerColor
+                                        .withValues(alpha: 0.8)),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 6),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(12)),
+                                textStyle:
+                                    GoogleFonts.plusJakartaSans(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700),
                               ),
                               child: const Text('Unload'),
                             )
-                          else
-                            Tooltip(
+                          : Tooltip(
                               message: _c.canLoadLocal
                                   ? 'Load model'
                                   : 'On-device models are not supported on this platform — use Cloud mode',
@@ -603,54 +920,49 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                                 onPressed: (disableActions ||
                                         !_c.canLoadLocal)
                                     ? null
-                                    : () => _guardedLoad(model.filename),
+                                    : () =>
+                                        _guardedLoad(model.filename),
                                 style: FilledButton.styleFrom(
                                   backgroundColor: Dt.accent,
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 6),
-                                  minimumSize: Size.zero,
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
+                                      vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(12)),
+                                  textStyle:
+                                      GoogleFonts.plusJakartaSans(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700),
                                 ),
                                 child: const Text('Load'),
                               ),
                             ),
-                          const SizedBox(width: 4),
-                          IconButton(
-                            tooltip: 'Delete model',
-                            onPressed: disableActions
-                                ? null
-                                : () =>
-                                    confirmDeleteModel(context, model.filename),
-                            icon: Icon(
-                              LucideIcons.trash2,
-                              size: 20,
-                              color: AppColors.error.withValues(alpha: 0.6),
-                            ),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                                minWidth: 32, minHeight: 32),
-                          ),
-                        ],
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: AppColors.error
+                                .withValues(alpha: 0.3)),
                       ),
-                    )
-                  else if (!isCurrentlyDownloading && !isDownloaded)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 12, top: 4),
                       child: IconButton(
-                        tooltip: 'Download model',
+                        tooltip: 'Delete model',
                         onPressed: disableActions
                             ? null
-                            : () => confirmDownload(context, model),
-                        icon: const Icon(
-                          LucideIcons.download,
-                          size: 22,
-                          color: Dt.accent,
+                            : () => confirmDeleteModel(
+                                context, model.filename),
+                        icon: Icon(
+                          LucideIcons.trash2,
+                          size: 20,
+                          color:
+                              AppColors.error.withValues(alpha: 0.7),
                         ),
                       ),
                     ),
-                ],
-              ),
+                  ],
+                ),
+              ],
               if (isCurrentlyDownloading) ...[
                 const SizedBox(height: 16),
                 buildInlineDownloadProgress(context, model),

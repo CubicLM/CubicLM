@@ -69,6 +69,9 @@ class ModelController extends GetxController {
   final fileSizes = <String, int>{}.obs;
   final modelScope = 'dashboard'.obs;
   final localFilter = ''.obs;
+  /// Search text for the Local catalog sticky search box.
+  /// Applies inside every filter tab (name / filename / description).
+  final localSearchQuery = ''.obs;
   final importFileName = ''.obs;
   final importStatus = ''.obs;
   final importCopiedBytes = 0.obs;
@@ -131,20 +134,21 @@ class ModelController extends GetxController {
 
   List<AiModel> get filteredDisplayedModels {    final filter =
         localFilter.value.isEmpty ? defaultLocalFilter : localFilter.value;
+    final q = localSearchQuery.value.toLowerCase().trim();
     return displayedModels.where((model) {
-      switch (filter) {
-        case 'uncensored':
-          return isUncensoredModel(model);
-        case 'vision':
-          return isVisionModel(model);
-        case 'image':
-          return isImageModel(model);
-        case 'fits':
-          return fitsDevice(model);
-        case 'general':
-        default:
-          return isGeneralModel(model);
-      }
+      final matchesTab = switch (filter) {
+        'uncensored' => isUncensoredModel(model),
+        'vision' => isVisionModel(model),
+        'image' => isImageModel(model),
+        'fits' => fitsDevice(model),
+        'general' => isGeneralModel(model),
+        _ => isGeneralModel(model),
+      };
+      if (!matchesTab) return false;
+      if (q.isEmpty) return true;
+      return model.name.toLowerCase().contains(q) ||
+          model.filename.toLowerCase().contains(q) ||
+          model.description.toLowerCase().contains(q);
     }).toList();
   }
 

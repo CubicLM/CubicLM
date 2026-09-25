@@ -67,10 +67,17 @@ extension InferenceServiceLoading on InferenceService {
       }
     }
 
-    try {
+        try {
+      // RAM snapshot for the Dashboard's before/after line: every load
+      // path below records its own completion (or fails without one).
+      try {
+        if (Get.isRegistered<DeviceInfoService>()) {
+          Get.find<DeviceInfoService>().snapshotBeforeLoad(
+              modelName ?? modelPath.split('/').last);
+        }
+      } catch (_) {}
       final runtime = _runtimeFor(modelPath, modelRuntime);
-      final isLiteRt = runtime == 'litert';
-      final liteRtMode = _hive.getSetting<String>(
+      final isLiteRt = runtime == 'litert';      final liteRtMode = _hive.getSetting<String>(
             AppConstants.keyLiteRtPerformanceMode,
             defaultValue: AppConstants.defaultLiteRtPerformanceMode,
           ) ??
@@ -134,6 +141,11 @@ extension InferenceServiceLoading on InferenceService {
             await _hive.setSetting(
                 AppConstants.keyLocalModelRuntime, 'llama');
             refreshResidency();
+            try {
+              if (Get.isRegistered<DeviceInfoService>()) {
+                await Get.find<DeviceInfoService>().snapshotAfterLoad();
+              }
+            } catch (_) {}
             return 'Switched to $requestedName instantly (no reload).';
           }
           final switched = await _engine!.switchActiveModel(modelPath);
@@ -159,6 +171,11 @@ extension InferenceServiceLoading on InferenceService {
             try {
               await Get.find<AppLogService>()
                   .setBreadcrumb('model-load-done', requestedName);
+            } catch (_) {}
+            try {
+              if (Get.isRegistered<DeviceInfoService>()) {
+                await Get.find<DeviceInfoService>().snapshotAfterLoad();
+              }
             } catch (_) {}
             refreshResidency();
             return 'Switched to $requestedName instantly (no reload).';
@@ -352,6 +369,11 @@ extension InferenceServiceLoading on InferenceService {
       await _hive.setSetting('last_loaded_context_size', cappedCtx);
 
       refreshResidency();
+      try {
+        if (Get.isRegistered<DeviceInfoService>()) {
+          await Get.find<DeviceInfoService>().snapshotAfterLoad();
+        }
+      } catch (_) {}
 
       return result.message;
     } catch (e) {

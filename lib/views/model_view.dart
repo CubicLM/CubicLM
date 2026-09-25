@@ -89,87 +89,152 @@ class ModelView extends GetView<ModelController> {
   Widget _buildHubList(BuildContext context) {
     return Column(children: [
       Expanded(
-        child: RefreshIndicator(
-          onRefresh: () async {
-        if (controller.modelScope.value == 'local') {
-          await controller.refreshDownloaded();
-        }
-      },
-      color: Theme.of(context).primaryColor,
-      child: Obx(() => ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              if (controller.modelScope.value == 'dashboard') ...[
-                const ExploreDashboard(),
-              ] else if (controller.modelScope.value == 'local') ...[
-                _buildImportingProgress(context),
-                _buildLocalFilterChips(context),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        "${'model_local_models'.tr} (${controller.filteredDisplayedModels.length})",
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Theme.of(context).hintColor,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                    InkWell(
-                      onTap: controller.toggleSort,
-                      borderRadius: BorderRadius.circular(4),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 2),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.sort,
-                              size: 14,
-                              color: Theme.of(context).hintColor,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              controller.sortSmallestFirst.value
-                                  ? 'model_sort_size'.tr
-                                  : 'model_sort_name'.tr,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(context).hintColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                if (controller.filteredDisplayedModels.isEmpty)
-                  _buildEmptyLocalState(context)
-                else
-                  ...controller.filteredDisplayedModels
-                      .map((model) => buildModelCard(context, model)),
-              ] else if (controller.modelScope.value == 'online') ...[
-                _buildOnlineProviders(context),
-              ] else if (controller.modelScope.value == 'skills') ...[
-                _buildSkillsTab(context),
-              ] else if (controller.modelScope.value == 'mcp') ...[
-                _buildMcpTab(context),
-              ] else if (controller.modelScope.value == 'gallery') ...[
-                _buildGalleryTab(context),
+        child: Obx(() {
+          if (controller.modelScope.value == 'local') {
+            return _buildLocalTab(context);
+          }
+          return RefreshIndicator(
+            onRefresh: () async {},
+            color: Theme.of(context).primaryColor,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                if (controller.modelScope.value == 'dashboard') ...[
+                  const ExploreDashboard(),
+                ] else if (controller.modelScope.value == 'online') ...[
+                  _buildOnlineProviders(context),
+                ] else if (controller.modelScope.value == 'skills') ...[
+                  _buildSkillsTab(context),
+                ] else if (controller.modelScope.value == 'mcp') ...[
+                  _buildMcpTab(context),
+                ] else if (controller.modelScope.value == 'gallery') ...[
+                  _buildGalleryTab(context),
+                ],
               ],
+            ),
+          );
+        }),
+      )
+    ]);
+  }
+
+  /// Local catalog tab: filter chips + LOCAL MODELS header + search box
+  /// stay pinned on top — only the model cards scroll underneath.
+  Widget _buildLocalTab(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildImportingProgress(context),
+              _buildLocalFilterChips(context),
+              const SizedBox(height: 8),
+              _buildLocalHeaderRow(context),
+              const SizedBox(height: 8),
+              const _LocalSearchBox(),
             ],
-          )),
+          ),
         ),
-      )]);
+        const SizedBox(height: 12),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await controller.refreshDownloaded();
+            },
+            color: Theme.of(context).primaryColor,
+            child: Obx(() {
+              final items = controller.filteredDisplayedModels;
+              if (items.isEmpty) {
+                return ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding:
+                      const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  children: [_buildEmptyLocalState(context)],
+                );
+              }
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding:
+                    const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                children: items
+                    .map((model) => buildModelCard(context, model))
+                    .toList(),
+              );
+            }),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// LOCAL MODELS (n) + sort chooser. Tap opens a real chooser menu
+  /// (Size / Name) instead of instantly flipping the order.
+  Widget _buildLocalHeaderRow(BuildContext context) {
+    return Obx(() {
+      final bySize = controller.sortSmallestFirst.value;
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Flexible(
+            child: Text(
+              "${'model_local_models'.tr} (${controller.filteredDisplayedModels.length})",
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).hintColor,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Sort models',
+            onSelected: (v) =>
+                controller.sortSmallestFirst.value = (v == 'size'),
+            itemBuilder: (_) => [
+              CheckedPopupMenuItem(
+                value: 'size',
+                checked: bySize,
+                child: Text('model_sort_size'.tr),
+              ),
+              CheckedPopupMenuItem(
+                value: 'name',
+                checked: !bySize,
+                child: Text('model_sort_name'.tr),
+              ),
+            ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 4, vertical: 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.sort,
+                    size: 14,
+                    color: Theme.of(context).hintColor,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    bySize
+                        ? 'model_sort_size'.tr
+                        : 'model_sort_name'.tr,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).hintColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    });
   }
 
   Widget _buildScopeToggle(BuildContext context) {
@@ -307,8 +372,10 @@ class ModelView extends GetView<ModelController> {
     final filter = controller.localFilter.value.isEmpty
         ? controller.defaultLocalFilter
         : controller.localFilter.value;
-    final title =
-        'No ${filter == 'vision' ? 'vision' : filter == 'image' ? 'image generation' : filter} models found';
+    final q = controller.localSearchQuery.value.trim();
+    final title = q.isNotEmpty
+        ? 'No match for "$q"'
+        : 'No ${filter == 'vision' ? 'vision' : filter == 'image' ? 'image generation' : filter} models found';
     const subtitle = 'model_no_models_filtered';
 
     return Container(
@@ -490,33 +557,74 @@ class ModelView extends GetView<ModelController> {
           cloudModels.pinnedProviders.length;
           cloudModels.modelsByProvider.length;
           cloudModels.allProviders.length;
+          cloudModels.providerSearchQuery.value;
           final keyed = cloudModels.orderedProviders();
-          final unkeyed = cloudModels.unkeyedProviders;
+          final unkeyedAll = cloudModels.unkeyedProviders;
+          final query =
+              cloudModels.providerSearchQuery.value.toLowerCase().trim();
+          final unkeyed = query.isEmpty
+              ? unkeyedAll
+              : unkeyedAll
+                  .where((p) =>
+                      p.name.toLowerCase().contains(query) ||
+                      p.id.toLowerCase().contains(query) ||
+                      p.description.toLowerCase().contains(query))
+                  .toList();
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ...keyed.map((p) => buildProviderCard(context, p)),
-              if (unkeyed.isNotEmpty) ...[
+              if (unkeyedAll.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                Text(
-                  'ADD API KEY',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Theme.of(context).colorScheme.primary,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Set a key to unlock these providers',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ADD API KEY',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color:
+                                  Theme.of(context).colorScheme.primary,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Set a key to unlock these providers',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _ProviderSearchBox(cloudModels: cloudModels),
+                  ],
                 ),
                 const SizedBox(height: 8),
-                ...unkeyed.map((p) => buildAddKeyCard(context, p, cloudModels)),
+                if (unkeyed.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'No provider matches “${cloudModels.providerSearchQuery.value.trim()}”.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: Theme.of(context).hintColor,
+                      ),
+                    ),
+                  )
+                else
+                  ...unkeyed.map(
+                      (p) => buildAddKeyCard(context, p, cloudModels)),
               ],
             ],
           );
@@ -667,5 +775,133 @@ class ModelView extends GetView<ModelController> {
 
   Widget _buildGalleryTab(BuildContext context) {
     return const GalleryView();
+  }
+}
+
+/// Sticky Local-catalog search box (one per tab via the shared query —
+/// it filters inside whichever filter tab is active). Stateful so
+/// typing focus/text survive parent Obx rebuilds.
+class _LocalSearchBox extends StatefulWidget {
+  const _LocalSearchBox();
+
+  @override
+  State<_LocalSearchBox> createState() => _LocalSearchBoxState();
+}
+
+class _LocalSearchBoxState extends State<_LocalSearchBox> {
+  late final TextEditingController _ctrl;
+
+  ModelController get _mc {
+    try {
+      return Get.find<ModelController>();
+    } catch (_) {
+      throw StateError('ModelController not registered');
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    String initial = '';
+    try {
+      initial = _mc.localSearchQuery.value;
+    } catch (_) {}
+    _ctrl = TextEditingController(text: initial);
+    _ctrl.addListener(() {
+      try {
+        _mc.localSearchQuery.value = _ctrl.text;
+      } catch (_) {}
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _ctrl,
+      onChanged: (_) => setState(() {}),
+      style: GoogleFonts.plusJakartaSans(fontSize: 13),
+      decoration: InputDecoration(
+        hintText: 'Search local models…',
+        hintStyle: GoogleFonts.plusJakartaSans(fontSize: 13),
+        prefixIcon: const Icon(LucideIcons.search, size: 17),
+        suffixIcon: _ctrl.text.isEmpty
+            ? null
+            : IconButton(
+                icon: const Icon(LucideIcons.x, size: 16),
+                onPressed: () => _ctrl.clear(),
+              ),
+        border:
+            OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        isDense: true,
+      ),
+    );
+  }
+}
+
+/// Compact provider search box for the ADD API KEY header.
+/// Stateful so typing focus/text survive parent Obx rebuilds; the
+/// query itself lives in [CloudModelController.providerSearchQuery].
+class _ProviderSearchBox extends StatefulWidget {
+  final CloudModelController cloudModels;
+
+  const _ProviderSearchBox({required this.cloudModels});
+
+  @override
+  State<_ProviderSearchBox> createState() => _ProviderSearchBoxState();
+}
+
+class _ProviderSearchBoxState extends State<_ProviderSearchBox> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(
+        text: widget.cloudModels.providerSearchQuery.value);
+    _ctrl.addListener(() {
+      widget.cloudModels.providerSearchQuery.value = _ctrl.text;
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 150,
+      child: TextField(
+        controller: _ctrl,
+        onChanged: (_) => setState(() {}),
+        style: GoogleFonts.plusJakartaSans(fontSize: 12),
+        decoration: InputDecoration(
+          hintText: 'Search providers',
+          hintStyle: GoogleFonts.plusJakartaSans(fontSize: 12),
+          prefixIcon: const Icon(LucideIcons.search, size: 15),
+          suffixIcon: _ctrl.text.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(LucideIcons.x, size: 14),
+                  onPressed: () => _ctrl.clear(),
+                ),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12)),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          isDense: true,
+        ),
+      ),
+    );
   }
 }

@@ -391,7 +391,6 @@ class _OnboardingViewState extends State<OnboardingView> {
                     desc: 'onboarding_page1_desc'.tr,
                     isDark: isDark,
                     extra: _buildNameField(),
-                    scrollable: true,
                   ),
                   _OnboardPage(
                     icon: LucideIcons.cloud,
@@ -467,43 +466,47 @@ class _OnboardPage extends StatelessWidget {  final IconData icon;
   final String desc;
   final bool isDark;
   final Widget? extra;
-  // Page 1 carries the mandatory name field: allow scrolling on short
-  // screens instead of overflowing (other pages keep fixed layout —
-  // page 3 owns an inner scroll that must not nest).
-  final bool scrollable;
-  const _OnboardPage({required this.icon, required this.title, required this.desc, required this.isDark, this.extra, this.scrollable = false});
+  const _OnboardPage({required this.icon, required this.title, required this.desc, required this.isDark, this.extra});
 
   @override
   Widget build(BuildContext context) {
-    final body = Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [          Container(
-            width: 96,
-            height: 96,
-            decoration: BoxDecoration(
-              color: Dt.accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(28),
-            ),
-            child: Icon(icon, size: 44, color: Dt.accent),
-          ),
-          const SizedBox(height: 32),
-          Text(title,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.plusJakartaSans(
-                  fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5, height: 1.1)),
-          const SizedBox(height: 12),
-          Text(desc,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.plusJakartaSans(
-                  fontSize: 15, height: 1.5, fontWeight: FontWeight.w500, color: Theme.of(context).hintColor)),
-          if (extra != null) extra!,
-      ],
-    );
+    // Overflow-proof on short screens (e.g. 76px RenderFlex overflow):
+    // centers when content fits, scrolls when it doesn't. Compact
+    // sizes so all 4 pages fit without scrolling on most phones.
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: scrollable
-          ? SingleChildScrollView(child: body)
-          : body,
+      child: LayoutBuilder(
+        builder: (ctx, cons) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: cons.maxHeight),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 84,
+                  height: 84,
+                  decoration: BoxDecoration(
+                    color: Dt.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Icon(icon, size: 40, color: Dt.accent),
+                ),
+                const SizedBox(height: 24),
+                Text(title,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.5, height: 1.15)),
+                const SizedBox(height: 10),
+                Text(desc,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14, height: 1.5, fontWeight: FontWeight.w500, color: Theme.of(context).hintColor)),
+                if (extra != null) extra!,
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

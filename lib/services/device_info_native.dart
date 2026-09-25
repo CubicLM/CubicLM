@@ -15,11 +15,12 @@ SocFamily _detectSocFamily(String cpuinfo, String hardware) {
     return SocFamily.googleTensor;
   }
 
-  // Qualcomm Snapdragon
+  // Qualcomm Snapdragon (SM = modern, SDM/MSM = 2016-2019 era like
+  // SDM845 — the SM-only regex missed those and fell to unknown).
   if (hwLower.contains('qcom') ||
       hwLower.contains('qualcomm') ||
       hwLower.contains('snapdragon') ||
-      RegExp(r'\bsm\d{4,}').hasMatch(hwLower) ||
+      RegExp(r'\b(sm|sdm|msm|qcm|apq)\d{3,4}').hasMatch(hwLower) ||
       lower.contains('snapdragon')) {
     return SocFamily.snapdragon;
   }
@@ -148,6 +149,30 @@ Future<Map<String, dynamic>> getDeviceInfo() async {
           brand: brand,
           model: model,
         );
+
+        // Final safety net: the marketing name is built from lookup maps
+        // that already resolved (e.g. "Snapdragon 845") while the family
+        // regex above can still miss the same chip from raw props. When
+        // they disagree, the NAME wins — otherwise the UI shows the
+        // right chip name next to a wrong generic CPU icon.
+        if (socFamily == SocFamily.unknown) {
+          final pn = processor.toLowerCase();
+          if (pn.contains('snapdragon')) {
+            socFamily = SocFamily.snapdragon;
+          } else if (pn.contains('tensor')) {
+            socFamily = SocFamily.googleTensor;
+          } else if (pn.contains('dimensity') ||
+              pn.contains('helio') ||
+              pn.contains('mediatek')) {
+            socFamily = SocFamily.mediatek;
+          } else if (pn.contains('exynos')) {
+            socFamily = SocFamily.exynos;
+          } else if (pn.contains('kirin')) {
+            socFamily = SocFamily.hisilicon;
+          } else if (pn.contains('apple')) {
+            socFamily = SocFamily.apple;
+          }
+        }
 
         // Device specification via device_info_plus (one batched call).
         try {
@@ -323,10 +348,15 @@ String _buildProcessorName({
 
 String? _fuzzyQualcomm(String model) {
   // SM8xxx/SDM8xx → Snapdragon 8 series; SM7xxx → 7 series etc.
-  final match = RegExp(r'^(?:SM|SDM)([678])(\d{2,3})').firstMatch(model);
+  // Matches anywhere in the string: some props read
+  // "Qualcomm Technologies, Inc SM8150".
+  final match =
+      RegExp(r'(?:SM|SDM|MSM|QCM|APQ)([678])(\d{2,3})').firstMatch(model);
   if (match == null) return null;
   final series = match.group(1);
-  return 'Snapdragon $series series (${model.toLowerCase()})';
+  final code =
+      RegExp(r'(?:SM|SDM|MSM|QCM|APQ)\d{2,3}').firstMatch(model)![0]!;
+  return 'Snapdragon $series series (${code.toLowerCase()})';
 }
 
 String? _mediatekMarketing(String model) {

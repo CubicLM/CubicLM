@@ -551,17 +551,6 @@ class AppSettingsView extends GetView<SettingsController> {
               const SizedBox(height: 28),
               _sectionLabel(context, 'settings_app_info'.tr),
               _appleGroupedCard(context, isDark, children: [
-                _appleListTile(
-                  context,
-                  isDark,
-                  leading: Icon(LucideIcons.arrowDownToLine,
-                      size: 20, color: Theme.of(context).primaryColor),
-                  title: 'View Update',
-                  subtitle: 'Version, highlights & update settings',
-                  trailing: Icon(LucideIcons.chevronRight,
-                      size: 18, color: Theme.of(context).hintColor),
-                  onTap: () => Get.toNamed(AppRoutes.update),
-                ),
                 Padding(
                   padding: const EdgeInsets.all(20),
                   child: InkWell(
@@ -572,14 +561,8 @@ class AppSettingsView extends GetView<SettingsController> {
                           width: 50,
                           height: 50,
                           decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(15),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
                           clipBehavior: Clip.antiAlias,
                           child: Image.asset(
                             'assets/icons/CubicLM.png',
@@ -618,6 +601,25 @@ class AppSettingsView extends GetView<SettingsController> {
                       ),
                     ]),
                   ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Divider(
+                      height: 1,
+                      thickness: 0.5,
+                      color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                ),
+                _appleListTile(
+                  context,
+                  isDark,
+                  leading: Icon(LucideIcons.arrowDownToLine,
+                      size: 20, color: Theme.of(context).primaryColor),
+                  title: 'View Update',
+                  subtitle: 'Version, highlights & update settings',
+                  trailing: Icon(LucideIcons.chevronRight,
+                      size: 18, color: Theme.of(context).hintColor),
+                  onTap: () => Get.toNamed(AppRoutes.update),
+                  showDivider: false,
                 ),
               ]),
               const SizedBox(height: 50),

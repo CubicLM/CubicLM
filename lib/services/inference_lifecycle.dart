@@ -18,10 +18,15 @@ extension InferenceServiceLifecycle on InferenceService {
       await _server!.stop();
       _serverCtx = 0;
     }
-    isModelLoaded.value = false;
+        isModelLoaded.value = false;
     isVisionLoaded.value = false;
     loadedModelName.value = '';
-    loadingModelName.value = '';
+    // The freed RAM returns to the pool — drop the stale before/after.
+    try {
+      if (Get.isRegistered<DeviceInfoService>()) {
+        Get.find<DeviceInfoService>().clearLoadSnapshot();
+      }
+    } catch (_) {}    loadingModelName.value = '';
     loadedModelRuntime.value = '';
     loadedBackend.value = '';
     gpuLayersUsed.value = 0;
