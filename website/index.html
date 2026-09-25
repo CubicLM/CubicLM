@@ -69,6 +69,7 @@
       <a href="#download">Download</a>
       <a href="#about">About</a>
       <a href="#features">Features</a>
+      <a href="#new">New</a>
       <a href="#models">Models</a>
       <a href="#providers">Providers</a>
       <a href="#tech">Tech</a>
@@ -86,6 +87,7 @@
   <a href="#download">Download</a>
   <a href="#about">About</a>
   <a href="#features">Features</a>
+  <a href="#new">New</a>
   <a href="#models">Models</a>
   <a href="#providers">Providers</a>
   <a href="#tech">Tech</a>
@@ -389,6 +391,62 @@ href="https://github.com/CubicLM/CubicLM/releases/download/v1.17.0/cubiclm-v1.17
       <div class="feature-card-title">Desktop Power</div>
       <div class="feature-card-text">Keyboard-first on desktop: Ctrl+N new chat, Ctrl+F history search, Ctrl+1–4 tabs — plus a close guard that asks before quitting a running generation or download.</div>
       <div class="feature-card-tag">Shortcuts · Close Guard</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ NEW IN v1.17 ════ -->
+<section id="new" class="features-detail">
+  <div class="features-detail-label">v1.17.0</div>
+  <div class="features-detail-title">What's New</div>
+  <div class="features-detail-grid">
+    <div class="feature-card">
+      <div class="feature-card-icon"><i class="ri-dashboard-line"></i></div>
+      <div class="feature-card-title">Explore Dashboard</div>
+      <div class="feature-card-text">Explore opens on a Dashboard now: time-based greeting, Active Intelligence with live RAM/context percent rings, tier chip, refresh, a full explainer dialog, room-for-model math, a searchable downloaded-models frame, usage stats and one-tap shortcuts to every feature.</div>
+      <div class="feature-card-tag">Rings · Search · Shortcuts</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon"><i class="ri-user-line"></i></div>
+      <div class="feature-card-title">User Profile</div>
+      <div class="feature-card-text">First setup asks your name (the one mandatory step — everything else skips). Then: avatar picker with ring colors, 12 profession chips, member stats, a Profile page from Settings, and your avatar + name in the chat sidebar.</div>
+      <div class="feature-card-tag">Avatar · Name · Stats</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon"><i class="ri-sun-line"></i></div>
+      <div class="feature-card-title">Time Greetings</div>
+      <div class="feature-card-text">The empty chat screen greets you by name with 32 morning/afternoon/evening/night lines, animated as a light-sweep across the text — a CodePen-style shine that cycles while you think of what to ask.</div>
+      <div class="feature-card-tag">32 Lines · Shine Loop</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon"><i class="ri-cpu-line"></i></div>
+      <div class="feature-card-title">Smart Chip Advice</div>
+      <div class="feature-card-text">The app reads your actual SoC — Snapdragon 845 to 8 Elite, Dimensity, Exynos, Kirin, Tensor, Apple, AMD, Intel — names it, and tells you which quant to download and why (bandwidth math, in plain words), with vendor logos and a size cap matched to your RAM.</div>
+      <div class="feature-card-tag">Q4 Guidance · WHY Included</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon"><i class="ri-shield-check-line"></i></div>
+      <div class="feature-card-title">Crash-Proof Engine</div>
+      <div class="feature-card-text">Overlapping generations used to segfault the native engine on slow phones. v1.17 serializes every call end-to-end (gate + stop-join + clear guards), kills orphaned native loops, and turns leftovers into honest error messages instead of silent deaths.</div>
+      <div class="feature-card-tag">No More SIGSEGV</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon"><i class="ri-bar-chart-line"></i></div>
+      <div class="feature-card-title">RAM Before → After</div>
+      <div class="feature-card-text">Every model load now records free RAM before and after, auto-refreshes when loads finish, and shows the impact line right on the Dashboard ("6.1 → 5.4 GB free"). RAM info never hides — even with no model loaded.</div>
+      <div class="feature-card-tag">Load Impact · Always Visible</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon"><i class="ri-computer-line"></i></div>
+      <div class="feature-card-title">Windows Local AI</div>
+      <div class="feature-card-text">Windows runs local GGUF models through a bundled llama-server sidecar (CPU/Vulkan assets, download progress, stale-version pruning) with honest no-engine states where a feature genuinely needs Android.</div>
+      <div class="feature-card-tag">Sidecar · Vulkan · Honest UI</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon"><i class="ri-terminal-line"></i></div>
+      <div class="feature-card-title">Forensic System Logs</div>
+      <div class="feature-card-text">Every refusal and every generation now logs its numbers: guard inputs, tokens/wall-time/first-token per reply, timeout causes, and in-app native tombstones (signal, program counters, log tail) — most bugs diagnose from one paste.</div>
+      <div class="feature-card-tag">One-Paste Diagnosis</div>
     </div>
   </div>
 </section>
@@ -1041,8 +1099,16 @@ href="https://github.com/CubicLM/CubicLM/releases/download/v1.17.0/cubiclm-v1.17
       <div class="faq-a">Windows ships cloud chat with 23+ providers, Skills, MCP, and optional local GGUF via a llama-server sidecar (when bundled). LiteRT-LM and Stable Diffusion remain Android-first. A fuller native Windows engine is on the roadmap.</div>
     </div>
     <div class="faq-item">
+      <button class="faq-q">Which model and quant should my phone use?<i class="ri-add-line"></i></button>
+      <div class="faq-a">Open Explore → Dashboard: the chip card names your SoC and recommends a quant with the reason. Rule of thumb — old/mid phones: Q4_K_M only, ≤1B models; modern flagships: Q4_K_M up to 3B, BF16 only ≤1B; Google Tensor: Q4_0/Q5_K_M (Q4_K_M garbles on Tensor). Q4 decodes roughly 2–3x faster than BF16 on old CPUs.</div>
+    </div>
+    <div class="faq-item">
       <button class="faq-q">How much RAM and storage do I need?<i class="ri-add-line"></i></button>
       <div class="faq-a">The app itself is ~61 MB. Models range from 0.5 GB (Qwen3-0.6B, runs on 4 GB phones) to 8 GB (7B+ quants). 6 GB+ RAM is recommended for 7B models; keep free GBs for downloads.</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q">Why is the first answer slow on old phones?<i class="ri-add-line"></i></button>
+      <div class="faq-a">The first reply pays the prefill cost: the whole prompt (~300 tokens) runs on 1–2 phone CPU threads, about a minute on a Snapdragon 845-class chip. After that, decoding runs a few tokens per second. The Dashboard shows your benchmarked tok/s; smaller Q4 models prefill and decode noticeably faster.</div>
     </div>
     <div class="faq-item">
       <button class="faq-q">Is my data private?<i class="ri-add-line"></i></button>
