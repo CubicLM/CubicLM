@@ -173,9 +173,9 @@ Computational Universe for Building Intelligent Learning Machines
 <tr>
 <td align="center"><img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/windows/windows%20(2).png" width="120" /></td>
 <td><b>Windows</b><br/><sub>x64 · requires WebView2</sub></td>
-<td><code>cubiclm-v1.15.1-windows-x64.zip</code><br/><sub>unzip & run <code>cubiclm.exe</code></sub></td>
-<td align="right"><b>17 MB</b></td>
-<td align="center"><a href="https://github.com/CubicLM/CubicLM/releases/download/v1.15.1/cubiclm-v1.15.1-windows-x64.zip"><img src="https://img.shields.io/badge/⬇_GET-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download"/></a></td>
+<td><code>cubiclm-v1.17.1-windows-x64.zip</code><br/><sub>unzip & run <code>cubiclm.exe</code></sub></td>
+<td align="right"><b>26 MB</b></td>
+<td align="center"><a href="https://github.com/CubicLM/CubicLM/releases/download/v1.17.1/cubiclm-v1.17.1-windows-x64.zip"><img src="https://img.shields.io/badge/⬇_GET-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download"/></a></td>
 </tr>
 <tr>
 <td align="center"><img src="https://github.com/abir2afridi/abir2afridi/blob/main/lock.png" width="120" /></td>
