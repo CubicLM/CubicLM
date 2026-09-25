@@ -5,6 +5,31 @@ All notable changes to CubicLM are documented here. This is the **single source 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0+26] - 2026-09-25
+
+### Added
+- **Explore Dashboard scope (default landing)** - greeting + date, advanced Active Intelligence (RAM/context percent rings, tier chip, refresh, explainer dialog, room-for-model + quant + fastest-benchmark line, per-load RAM before→after line), downloaded-models framed box with search + Download CTA, usage stats, feature shortcuts.
+- **User profile** - mandatory name at first setup (rest skippable), avatar picker (emoji + ring color), profession chips, standalone Profile page (Settings header icon + chat-sidebar identity footer shows avatar + name).
+- **Time-based greetings (32)** - morning/afternoon/evening/night bank with CodePen shine-sweep animation on the chat empty state (single line, name only on the opener, segment-frozen).
+- **Smart chip advice** - marketing names incl. SDM845-era + SM8150-class chips, per-chip quant/size recommendations with plain-language WHY, vendor logos (Snapdragon/Tensor/MediaTek/Kirin/Exynos/AMD/Intel incl. Windows CPU-vendor detection) with CPU-icon fallback.
+- **RAM before→after tracking** - snapshot around every load, auto-refresh on load/unload, honest "Reading device memory" placeholder, dashboard self-heal when services register late.
+- **System Logs upgrades** - context-guard refusal inputs, per-generation outcome line (tokens/total/first-token/result), prefill-timeout warn, gate-wait note, previous-run death importance + status, in-app native tombstone reporter (signal/PCs/modules/log tail), JVM stack capture, send-tap breadcrumb.
+- **Windows local inference** - llama-server sidecar (CPU/Vulkan assets, progress, stale prune), honest no-engine states, imported-model Load fix.
+- **Local inference tuning** - GGUF accel override (Auto/CPU/Force GPU), per-model benchmark + best badge, large-model mode, semantic recall strictness, core-aware threads, fit-aware GPU offload, flash-attention off on weak devices, batch threads by free RAM, pre-generate RAM gate, tightened low-RAM envelope.
+- **Chat/composer batch** - TTS cleaner, inline composer-buttons section, tools horizontal scroll, suggestion-chip lifecycle, recall strictness control, arena pace, slide-deck/model-switcher/agent-IDE/browser splits.
+
+### Fixed
+- **On-device SIGSEGV during generation** - overlapping native decodes serialized (Dart gate, stop-join before ack, clearContext-under-decode guard, finish-awaits-stop, prefill abort flag, no background jobs on ERROR replies).
+- **"Context is full" false refusal** - guard read stale n_past while the engine resets per call; now counts post-reset usage (LiteRT/server still accumulate).
+- **Prefill timeout killing healthy slow prefills** - timeout now scales on the FULL prompt (system prompt included), 90s floor, 300s hard cap.
+- **Send-time native crashes** - decode batch no longer hardcoded 512 (RAM-scaled), KV-shift window clamped, turn-2 prefill death envelope.
+- **Onboarding overflow** with the name field; greeting segment mixing across rebuilds; brand assets missing from the bundle (explicit pubspec entry).
+- **i18n parity** (pers_* + nav_hub + onboarding name keys across all 15 locales), composer toggle Obx reads, slide-maker overflows.
+
+### Changed
+- **Explore restructure** - `downloaded` filter removed from Local (downloaded models live in the Dashboard frame); scope toggle gains Dashboard (default); imports land back on Dashboard.
+- **Org migration** to github.com/CubicLM/CubicLM (API, catalog, toolchains, docs, About); Personalize themes split; theme-token migration.
+
 ## [1.16.0+25] - 2026-09-17
 
 ### Added
