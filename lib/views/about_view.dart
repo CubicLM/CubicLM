@@ -97,13 +97,6 @@ class AboutView extends StatelessWidget {
                   height: 84,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(22),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: Image.asset('assets/icons/CubicLM.png',
