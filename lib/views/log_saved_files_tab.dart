@@ -280,7 +280,23 @@ class LogSavedFilesTabState extends State<LogSavedFilesTab> {
       } else {
         bytes = await File(f.path).readAsBytes();
       }
-      await ExportFile.shareBytes(bytes: bytes, fileName: f.name);
+      final ok =
+          await ExportFile.shareBytes(bytes: bytes, fileName: f.name);
+      if (!ok) {
+        // Share sheet unavailable/broken: save a copy instead so the
+        // file still leaves the app.
+        final saved = await ExportFile.saveToAppFolder(
+          bytes: bytes,
+          fileName: f.name,
+          category: 'logs',
+        );
+        AppSnackbar.showTop(
+            saved != null ? 'Share unavailable — saved instead' : 'Share failed',
+            saved ?? 'Could not share ${f.name}',
+            icon: LucideIcons.alertTriangle,
+            type: saved != null ? 'success' : 'error',
+            iconName: 'alert');
+      }
     } catch (e) {
       AppSnackbar.showTop('Share failed', '$e',
           icon: LucideIcons.alertTriangle,

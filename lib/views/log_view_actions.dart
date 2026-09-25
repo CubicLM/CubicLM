@@ -191,9 +191,19 @@ extension _LogViewActions on _LogViewState {
       fileName: fileName,
     );
     if (!ok) {
-      AppSnackbar.showTop('Share failed', 'Could not share $fileName',
+      // Share sheet unavailable/broken (seen on some release builds):
+      // fall back to a saved file so the logs still leave the device.
+      final saved = await ExportFile.saveToAppFolder(
+        bytes: bytes,
+        fileName: fileName,
+        mimeType: 'text/plain',
+        category: 'logs',
+      );
+      AppSnackbar.showTop(
+          saved != null ? 'Share unavailable — saved instead' : 'Share failed',
+          saved ?? 'Could not share $fileName',
           icon: LucideIcons.alertTriangle,
-          type: 'error',
+          type: saved != null ? 'success' : 'error',
           iconName: 'alert');
     }
   }

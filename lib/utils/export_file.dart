@@ -384,7 +384,21 @@ class ExportFile {
       await Share.shareXFiles([XFile(f.path)],
           text: text, subject: subject);
       return true;
-    } catch (_) {
+    } catch (e) {
+      // Never swallow silently: release-only share failures (R8, OEM
+      // share-sheet quirks) are otherwise indistinguishable from "it
+      // just didn't work". The row below is what future bug reports
+      // will quote instead of a bare snackbar.
+      try {
+        if (Get.isRegistered<AppLogService>()) {
+          Get.find<AppLogService>().error(
+            'Share failed: $fileName',
+            details:
+                'error=$e, bytes=${bytes.length}, platform=${Platform.operatingSystem}',
+            category: LogCategory.system,
+          );
+        }
+      } catch (_) {}
       return false;
     }
   }

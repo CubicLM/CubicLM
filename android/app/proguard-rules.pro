@@ -27,3 +27,11 @@
 # crashlytics
 -keep class com.google.firebase.crashlytics.** { *; }
 -dontwarn com.google.firebase.crashlytics.**
+
+# share_plus: file sharing goes through its FileProvider + intent
+# builder. Entry points are kept automatically, but pin the whole
+# package — a renamed/stripped helper here breaks Share.shareXFiles
+# ONLY in release (debug never minifies), surfacing as a bare
+# "Share failed" with no other symptom.
+-keep class dev.fluttercommunity.plus.share.** { *; }
+-keep class androidx.core.content.FileProvider { *; }
