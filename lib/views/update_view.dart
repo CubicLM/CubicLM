@@ -168,6 +168,7 @@ class UpdateView extends StatelessWidget {
         child: Obx(() {
           final available = svc.updateAvailable.value;
           final downloading = svc.isDownloading.value;
+          final checking = svc.isChecking.value;
           final staged = !available &&
               !downloading &&
               svc.stagedBlocked.value;
@@ -222,46 +223,62 @@ class UpdateView extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      downloading
-                          ? LucideIcons.loader
-                          : available
-                              ? LucideIcons.arrowDownToLine
-                              : staged
-                                  ? LucideIcons.hourglass
-                                  : LucideIcons.checkCircle2,
-                      size: 16,
-                      color: downloading
-                          ? Dt.accent
-                          : available
-                              ? AppColors.warning
-                              : staged
-                                  ? Theme.of(context).hintColor
-                                  : AppColors.success,
-                    ),
+                    if (checking)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      )
+                    else
+                      Icon(
+                        downloading
+                            ? LucideIcons.loader
+                            : available
+                                ? LucideIcons.arrowDownToLine
+                                : staged
+                                    ? LucideIcons.hourglass
+                                    : LucideIcons.checkCircle2,
+                        size: 16,
+                        color: downloading
+                            ? Dt.accent
+                            : available
+                                ? AppColors.warning
+                                : staged
+                                    ? Theme.of(context).hintColor
+                                    : AppColors.success,
+                      ),
                     const SizedBox(width: 6),
-                    Text(
-                      downloading
-                          ? 'Downloading… ${(svc.downloadProgress.value * 100).toInt()}%'
-                          : available
-                              ? 'Update available${latest.isEmpty ? '' : ': v$latest'}'
-                              : staged
-                                  ? 'Rolling out — your group unlocks soon'
-                                  : "You're up to date",
+                    Flexible(
+                      child: Text(
+                        checking
+                            ? svc.checkStepText.value.isEmpty
+                                ? 'Checking…'
+                                : svc.checkStepText.value
+                            : downloading
+                                ? 'Downloading… ${(svc.downloadProgress.value * 100).toInt()}%'
+                                : available
+                                    ? 'Update available${latest.isEmpty ? '' : ': v$latest'}'
+                                    : staged
+                                        ? 'Rolling out — your group unlocks soon'
+                                        : "You're up to date",
                       style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: downloading
+                          color: checking || downloading
                               ? Dt.accent
                               : available
                                   ? AppColors.warning
                                   : staged
                                       ? Theme.of(context).hintColor
                                       : AppColors.success),
-                    ),
+                    )),
                   ],
                 ),
               ),
+              if (checking) ...[
+                const SizedBox(height: 14),
+                _CheckStepper(phase: svc.checkPhase.value),
+              ],
               const SizedBox(height: 16),
               Center(
                 child: Text(
@@ -309,11 +326,17 @@ class UpdateView extends StatelessWidget {
                 ),
               if (canInstall) const SizedBox(height: 12),
               OutlinedButton.icon(
-                onPressed: downloading
+                onPressed: downloading || checking
                     ? null
                     : () => svc.check(force: true, silent: false),
-                icon: const Icon(LucideIcons.refreshCw, size: 18),
-                label: const Text('Check for updates'),
+                icon: checking
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2.2),
+                      )
+                    : const Icon(LucideIcons.refreshCw, size: 18),
+                label: Text(checking ? 'Checking…' : 'Check for updates'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Dt.accent,
                   side: BorderSide(
@@ -321,6 +344,18 @@ class UpdateView extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  svc.lastCheckLabel.value.isEmpty
+                      ? 'Not checked yet'
+                      : svc.lastCheckLabel.value,
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).hintColor),
                 ),
               ),
               if (downloading) ...[
@@ -339,6 +374,76 @@ class UpdateView extends StatelessWidget {
             ],
           );
         }),
+      ),
+    );
+  }
+}
+
+/// 3-step check pipeline indicator: Contact → Compare → Result.
+/// Steps light up as [UpdateService.checkPhase] advances; shown only
+/// while a check is running.
+class _CheckStepper extends StatelessWidget {
+  final int phase;
+  const _CheckStepper({required this.phase});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget step(String label, int index) {
+      final done = phase > index;
+      final active = phase == index;
+      final color = done
+          ? AppColors.success
+          : active
+              ? Dt.accent
+              : Theme.of(context).hintColor.withValues(alpha: 0.4);
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (active)
+            const SizedBox(
+              width: 13,
+              height: 13,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Icon(
+              done ? LucideIcons.checkCircle2 : LucideIcons.circle,
+              size: 14,
+              color: color,
+            ),
+          const SizedBox(width: 5),
+          Text(label,
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight:
+                      done || active ? FontWeight.w700 : FontWeight.w500,
+                  color: done || active
+                      ? Theme.of(context).colorScheme.onSurface
+                      : Theme.of(context).hintColor)),
+        ],
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Dt.accent.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          step('Contact', 1),
+          Icon(LucideIcons.chevronRight,
+              size: 13, color: Theme.of(context).hintColor),
+          step('Compare', 2),
+          Icon(LucideIcons.chevronRight,
+              size: 13, color: Theme.of(context).hintColor),
+          step('Result', 3),
+        ],
       ),
     );
   }

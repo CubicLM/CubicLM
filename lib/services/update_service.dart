@@ -57,6 +57,15 @@ class UpdateService extends GetxService {
 
   bool _checking = false;
 
+  /// Staged check feedback for the Update page. Phase: 0 idle,
+  /// 1 contacting GitHub, 2 comparing versions. [checkStepText] names
+  /// the live step; [lastCheckLabel] keeps the finished outcome
+  /// ('Last checked 14:32 · Up to date') until the next run.
+  final isChecking = false.obs;
+  final checkPhase = 0.obs;
+  final checkStepText = ''.obs;
+  final lastCheckLabel = ''.obs;
+
   /// The latest version string seen from GitHub (e.g. "1.2.0").
   final lastKnownVersion = ''.obs;
 
@@ -268,6 +277,8 @@ class UpdateService extends GetxService {
   Future<void> check({bool force = false, bool silent = true}) async {
     if (_checking) return;
     _checking = true;
+    isChecking.value = true;
+    checkPhase.value = 0;
     try {
       if (!force) {
         await Future.delayed(_initialDelay);
@@ -281,10 +292,16 @@ class UpdateService extends GetxService {
       }
 
       final current = await _getCurrentVersion();
-      if (current == null || current.isEmpty) return;
+      if (current == null || current.isEmpty) {
+        _finishCheck('Could not read app version');
+        return;
+      }
 
+      checkPhase.value = 1;
+      checkStepText.value = 'Contacting GitHub releases…';
       final release = await _fetchLatestRelease();
       if (release == null) {
+        _finishCheck('Failed — offline?');
         if (!silent) {
           AppSnackbar.showTop(
             'Could not check for updates',
@@ -300,6 +317,7 @@ class UpdateService extends GetxService {
 
       final rawTag = (release['tag_name'] as String?)?.trim() ?? '';
       if (rawTag.isEmpty) {
+        _finishCheck('Failed — empty feed');
         if (!silent) {
           AppSnackbar.showTop(
             'No releases found',
@@ -317,6 +335,8 @@ class UpdateService extends GetxService {
       await _setLastCheckMs(DateTime.now().millisecondsSinceEpoch);
 
       final latest = rawTag.startsWith('v') ? rawTag.substring(1) : rawTag;
+      checkPhase.value = 2;
+      checkStepText.value = 'Comparing with v$current…';
       final cmp = _compareVersions(latest, current);
       if (cmp > 0) {
         // Staged rollout first: buckets unlock 10% → 25% → 50% → 100%
@@ -326,6 +346,7 @@ class UpdateService extends GetxService {
             (force && !silent) ? true : await _stagedUnlock(release);
         if (!staged) {
           updateAvailable.value = false;
+          _finishCheck('Rolling out — unlocks soon');
           return;
         }
         lastKnownVersion.value = latest;
@@ -338,12 +359,14 @@ class UpdateService extends GetxService {
         if (!await _handleAutoDownload()) {
           _showUpdateSnackbar(rawTag);
         }
+        _finishCheck('v$latest found');
       } else {
         lastKnownVersion.value = latest;
         updateAvailable.value = false;
         _apkDownloadUrl = null;
         _checksumsUrl = null;
         await _setLastKnownVersion(latest);
+        _finishCheck('Up to date');
         if (!silent) {
           AppSnackbar.showTop(
             "You're up to date",
@@ -365,6 +388,7 @@ class UpdateService extends GetxService {
           );
         }
       } catch (_) {}
+      _finishCheck('Failed — offline?');
       if (!silent) {
         AppSnackbar.showTop(
           'Could not check for updates',
@@ -377,7 +401,21 @@ class UpdateService extends GetxService {
       }
     } finally {
       _checking = false;
+      isChecking.value = false;
+      checkPhase.value = 0;
+      checkStepText.value = '';
     }
+  }
+
+  /// Stamp a finished outcome (called on every terminal branch + catch).
+  /// The finally block clears the live phase; the label persists.
+  void _finishCheck(String outcome) {
+    try {
+      final now = DateTime.now();
+      final hh = now.hour.toString().padLeft(2, '0');
+      final mm = now.minute.toString().padLeft(2, '0');
+      lastCheckLabel.value = 'Last checked $hh:$mm · $outcome';
+    } catch (_) {}
   }
 
   /// Backwards-compatible alias for the spec's "manually triggers check".
