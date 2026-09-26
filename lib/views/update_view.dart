@@ -194,13 +194,6 @@ class UpdateView extends StatelessWidget {
                   height: 96,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(26),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: Image.asset(
@@ -227,7 +220,11 @@ class UpdateView extends StatelessWidget {
                       const SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Dt.accent),
+                        ),
                       )
                     else
                       Icon(
@@ -333,12 +330,18 @@ class UpdateView extends StatelessWidget {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2.2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Dt.accent),
+                        ),
                       )
                     : const Icon(LucideIcons.refreshCw, size: 18),
                 label: Text(checking ? 'Checking…' : 'Check for updates'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Dt.accent,
+                  disabledForegroundColor:
+                      Dt.accent.withValues(alpha: 0.8),
                   side: BorderSide(
                       color: Dt.accent.withValues(alpha: 0.4)),
                   padding: const EdgeInsets.symmetric(vertical: 14),

@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../controllers/settings_controller.dart';
 import '../core/colors.dart';
+import '../core/routes.dart';
 import '../services/update_service.dart';
 import '../shared/constants/platform_links.dart';
 import '../theme/design_tokens.dart';
@@ -162,26 +163,45 @@ class AboutView extends StatelessWidget {
                 final svc = Get.isRegistered<UpdateService>()
                     ? Get.find<UpdateService>()
                     : Get.put(UpdateService());
+                final bool checking = svc.isChecking.value;
+                final bool downloading = svc.isDownloading.value;
                 final bool canInstall = !kIsWeb &&
                     Platform.isAndroid &&
                     svc.updateAvailable.value &&
-                    !svc.isDownloading.value;
+                    !downloading;
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     OutlinedButton.icon(
-                      icon: Icon(
-                        canInstall
-                            ? LucideIcons.refreshCw
-                            : LucideIcons.download,
-                        size: 16,
-                      ),
+                      icon: checking
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Dt.accent),
+                              ),
+                            )
+                          : Icon(
+                              canInstall
+                                  ? LucideIcons.arrowDownToLine
+                                  : LucideIcons.refreshCw,
+                              size: 16,
+                            ),
                       label: Text(
-                        'Check for updates',
+                        checking
+                            ? (svc.checkStepText.value.isNotEmpty
+                                ? svc.checkStepText.value
+                                : 'Checking…')
+                            : 'Check for updates',
                         style: GoogleFonts.plusJakartaSans(
                             fontSize: 13, fontWeight: FontWeight.w700),
                       ),
                       style: OutlinedButton.styleFrom(
+                        foregroundColor: Dt.accent,
+                        disabledForegroundColor:
+                            Dt.accent.withValues(alpha: 0.8),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 18, vertical: 10),
                         side: BorderSide(
@@ -189,13 +209,45 @@ class AboutView extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: () async {
-                        final s = Get.isRegistered<UpdateService>()
-                            ? Get.find<UpdateService>()
-                            : Get.put(UpdateService());
-                        await s.check(force: true, silent: false);
-                      },
+                      // Single checker lives in View Update — redirect
+                      // there and kick off the check, since the user
+                      // explicitly asked for it.
+                      onPressed: (checking || downloading)
+                          ? null
+                          : () {
+                              Get.toNamed(AppRoutes.update);
+                              Future.delayed(
+                                  const Duration(milliseconds: 350),
+                                  () {
+                                try {
+                                  final s = Get.isRegistered<
+                                          UpdateService>()
+                                      ? Get.find<UpdateService>()
+                                      : Get.put(UpdateService());
+                                  if (!s.isChecking.value &&
+                                      !s.isDownloading.value) {
+                                    s.check(
+                                        force: true, silent: false);
+                                  }
+                                } catch (_) {}
+                              });
+                            },
                     ),
+                    if (checking) ...[
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: 180,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: const LinearProgressIndicator(
+                            minHeight: 4,
+                            backgroundColor: Colors.transparent,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Dt.accent),
+                          ),
+                        ),
+                      ),
+                    ],
                     if (canInstall) ...[
                       const SizedBox(height: 10),
                       ElevatedButton.icon(
@@ -218,7 +270,7 @@ class AboutView extends StatelessWidget {
                         onPressed: () => svc.downloadAndInstallAPK(),
                       ),
                     ],
-                    if (svc.isDownloading.value) ...[
+                    if (downloading) ...[
                       const SizedBox(height: 10),
                       Text(
                         'Downloading... ${(svc.downloadProgress.value * 100).toInt()}%',
@@ -226,6 +278,34 @@ class AboutView extends StatelessWidget {
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: Dt.accent),
+                      ),
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        width: 180,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: svc.downloadProgress.value > 0
+                                ? svc.downloadProgress.value
+                                : null,
+                            minHeight: 4,
+                            backgroundColor: Dt.accent.withValues(alpha: 0.15),
+                            valueColor:
+                                const AlwaysStoppedAnimation<Color>(Dt.accent),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (svc.lastCheckLabel.value.isNotEmpty &&
+                        !checking &&
+                        !downloading) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        svc.lastCheckLabel.value,
+                        style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context).hintColor),
                       ),
                     ],
                   ],
