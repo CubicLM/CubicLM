@@ -5,6 +5,15 @@ All notable changes to CubicLM are documented here. This is the **single source 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0+28] - 2026-09-26
+
+### Added
+- **Staged update feedback** - Check for updates now shows a live pipeline: spinner + step text, Contact → Compare → Result stepper, and a persistent "Last checked …" outcome caption (no more generic silence).
+
+### Fixed
+- **GetX empty-scope warnings** - card chips resolve the device service outside Obx, silencing boot-time improper-use noise in System Logs.
+- **Website "What's New" section** - v1.17 highlights, quant/speed FAQs, nav link.
+
 ## [1.17.1+27] - 2026-09-26
 
 ### Fixed
