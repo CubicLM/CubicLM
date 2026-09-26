@@ -110,6 +110,26 @@ void main() {
       expect(c.isPinned('groq'), isFalse);
     });
 
+    test('background auto-sync never shows UI without an overlay',
+        () async {
+      // Regression: onInit fires maybeAutoSync fire-and-forget; when the
+      // key check lands after a key is set, refreshModels falls back to
+      // defaults (no throw) and the success snackbar crashed LATE on the
+      // missing overlay ("failed after test completion" flake on CI).
+      // Calling it directly with a key set forces that path
+      // deterministically: it must settle cleanly either way.
+      final c = makeController();
+      final s = Get.find<SettingsController>();
+      c.allProviders.clear();
+      c.allProviders.assignAll([info('groq', 'Groq')]);
+      s.groqKey.value = 'k2';
+      await c.maybeAutoSync();
+      // Let the snackbar queue + any stragglers drain: any late crash
+      // fails this test right here instead of leaking into the next one.
+      await Future.delayed(const Duration(seconds: 2));
+      expect(c.isConfigured('groq'), isTrue);
+    });
+
     test('providerOrderIndex follows display order', () {
       final c = makeController();
       final s = Get.find<SettingsController>();

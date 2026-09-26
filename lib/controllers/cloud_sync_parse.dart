@@ -88,9 +88,19 @@ extension CloudModelControllerSyncParse on CloudModelController {
       await _hive.setSetting(
           CloudModelController._lastAutoSyncKey, DateTime.now().toIso8601String());
       if (synced > 0) {
-        AppSnackbar.showTop('Models auto-synced',
-            '$synced provider${synced == 1 ? '' : 's'} refreshed.',
-            logHistory: false);
+        // Background fire-and-forget path: there may be no overlay to
+        // show into (unit tests, pre-first-frame startup). A snackbar
+        // queued here configures the overlay ASYNCHRONOUSLY, so the
+        // crash lands LATE — after the caller already finished
+        // ("failed after test completion" flake on CI). Only show when
+        // UI actually exists.
+        try {
+          if (Get.overlayContext != null) {
+            AppSnackbar.showTop('Models auto-synced',
+                '$synced provider${synced == 1 ? '' : 's'} refreshed.',
+                logHistory: false);
+          }
+        } catch (_) {}
       }
     } catch (_) {}
   }
