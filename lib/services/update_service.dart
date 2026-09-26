@@ -298,7 +298,7 @@ class UpdateService extends GetxService {
       }
 
       checkPhase.value = 1;
-      checkStepText.value = 'Contacting GitHub releases…';
+      checkStepText.value = 'Checking for updates…';
       final release = await _fetchLatestRelease();
       if (release == null) {
         _finishCheck('Failed — offline?');
@@ -336,7 +336,7 @@ class UpdateService extends GetxService {
 
       final latest = rawTag.startsWith('v') ? rawTag.substring(1) : rawTag;
       checkPhase.value = 2;
-      checkStepText.value = 'Comparing with v$current…';
+      checkStepText.value = 'Comparing versions…';
       final cmp = _compareVersions(latest, current);
       if (cmp > 0) {
         // Staged rollout first: buckets unlock 10% → 25% → 50% → 100%
