@@ -272,17 +272,22 @@ Widget _benchBullet(String text) {
 
 /// Rounded free-RAM chip: live free memory next to the model, so the
 /// Load decision is one glance. Turns amber/red as free RAM shrinks.
+/// The service is resolved OUTSIDE Obx: when it is absent (boot, before
+/// deferred init) there is nothing reactive to watch, and an Obx with
+/// zero reads logs a GetX improper-use warning on every card.
 Widget _ramFreeChip(BuildContext context) {
+  DeviceInfoService? dev;
+  try {
+    dev =
+        Get.isRegistered<DeviceInfoService>() ? Get.find<DeviceInfoService>() : null;
+  } catch (_) {}
+  final d = dev;
+  if (d == null) return const SizedBox.shrink();
   return Obx(() {
-    double freeGb = 0;
-    String tier = '';
-    try {
-      if (Get.isRegistered<DeviceInfoService>()) {
-        final dev = Get.find<DeviceInfoService>();
-        freeGb = dev.availableRamGB.value;
-        tier = dev.deviceTier.value;
-      }
-    } catch (_) {}
+    // Unconditional Rx reads first — the early return below must never
+    // precede them, or the empty scope warning returns.
+    final freeGb = d.availableRamGB.value;
+    final tier = d.deviceTier.value;
     if (freeGb <= 0) return const SizedBox.shrink();
     // Status lives in the little dot (same language as the
     // "Fits in RAM" row) — the pill itself stays neutral app surface.
@@ -330,20 +335,22 @@ Widget _ramFreeChip(BuildContext context) {
 }
 
 /// Device-tier (ranking) chip: LOW / MID / HIGH / ULTRA from RAM.
+/// Service resolved outside Obx (see _ramFreeChip): no reactive source
+/// while unregistered means no Obx at all, instead of an empty one.
 Widget _tierChip(BuildContext context) {
+  DeviceInfoService? dev;
+  try {
+    dev =
+        Get.isRegistered<DeviceInfoService>() ? Get.find<DeviceInfoService>() : null;
+  } catch (_) {}
+  final d = dev;
+  if (d == null) return const SizedBox.shrink();
   return Obx(() {
-    String tier = '';
-    try {
-      if (Get.isRegistered<DeviceInfoService>()) {
-        tier = Get.find<DeviceInfoService>().deviceTier.value;
-      }
-    } catch (_) {}
+    final tier = d.deviceTier.value;
     if (tier.isEmpty) return const SizedBox.shrink();
     String desc = '';
     try {
-      if (Get.isRegistered<DeviceInfoService>()) {
-        desc = Get.find<DeviceInfoService>().tierDescription;
-      }
+      desc = d.tierDescription;
     } catch (_) {}
     // Neutral app-surface pill (no yellow wash) — matches the
     // dashboard tier label language.
@@ -373,23 +380,21 @@ Widget _tierChip(BuildContext context) {
 }
 
 /// "What did this model cost me" line: RAM delta of the last load.
-/// Shown only for the model that was loaded last.
+/// Shown only for the model that was loaded last. Service resolved
+/// outside Obx (see _ramFreeChip) so an unregistered service never
+/// builds an empty reactive scope.
 Widget _ramCostLine(BuildContext context, String filename) {
+  DeviceInfoService? dev;
+  try {
+    dev =
+        Get.isRegistered<DeviceInfoService>() ? Get.find<DeviceInfoService>() : null;
+  } catch (_) {}
+  final d = dev;
+  if (d == null) return const SizedBox.shrink();
   return Obx(() {
-    String last = '';
-    double before = 0;
-    double after = 0;
-    try {
-      if (!Get.isRegistered<DeviceInfoService>()) {
-        return const SizedBox.shrink();
-      }
-      final dev = Get.find<DeviceInfoService>();
-      last = dev.lastLoadModelName.value;
-      before = dev.ramBeforeLoadGb.value;
-      after = dev.ramAfterLoadGb.value;
-    } catch (_) {
-      return const SizedBox.shrink();
-    }
+    final last = d.lastLoadModelName.value;
+    final before = d.ramBeforeLoadGb.value;
+    final after = d.ramAfterLoadGb.value;
     if (last != filename || before <= 0 || after <= 0) {
       return const SizedBox.shrink();
     }
