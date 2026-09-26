@@ -141,8 +141,13 @@ class DeviceInfoService extends GetxService {
     final avail = (info['availableRamGB'] as num?)?.toDouble() ?? -1;
     if (avail > 0) availableRamGB.value = avail;
     isTensorSoC.value = (info['isTensorSoC'] as num? ?? 0.0) > 0.5;
+    // Native exchanges the family as an index; Dart-side families past
+    // index 8 (amd/intel, set by desktop vendor detection) round-trip
+    // through the same map — clamp to the enum length, not to 8, or
+    // every refresh resets them to unknown (logo + advice flicker).
     final rawIndex = (info['socFamily'] as num? ?? 8).toInt();
-    final clamped = rawIndex < 0 ? 0 : (rawIndex > 8 ? 8 : rawIndex);
+    final maxIndex = SocFamily.values.length - 1;
+    final clamped = rawIndex < 0 ? 0 : (rawIndex > maxIndex ? 8 : rawIndex);
     socFamily.value = SocFamily.values[clamped];
     socHardware.value = (info['socHardware'] as String?) ?? '';
     processorName.value = (info['processor'] as String?) ?? '';

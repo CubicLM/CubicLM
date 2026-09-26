@@ -16,6 +16,8 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
+import 'app_log_service.dart';
+
 /// Pinned llama.cpp release with `bin-win-{cpu,vulkan}-x64` assets.
 const localServerRelease = 'b6403';
 
@@ -103,7 +105,24 @@ class LocalServerService extends GetxService {
   int gpuLayers = 0;
   bool starting = false;
 
-  bool get isRunning => _proc != null && port > 0;
+  /// Set when the child process exits on its own (crash/OOM/kill).
+  /// [serverExitCode] + [serverStderrTail] diagnose it; [isRunning]
+  /// goes false so the next call reports "server died" instead of a
+  /// cryptic connection error.
+  bool _exited = false;
+  int? serverExitCode;
+  StreamSubscription? _stderrSub;
+  final List<String> _stderrTail = [];
+
+  /// True while a chat call was deliberately aborted (stop button):
+  /// the resulting ClientException is a clean stop, not an error.
+  bool _aborted = false;
+
+  /// Serializes chat calls: overlapping generates against one server
+  /// slot corrupt _chatClient tracking (abort kills the wrong call).
+  Completer<void>? _serverGate;
+
+  bool get isRunning => _proc != null && port > 0 && !_exited;
 
   /// Versioned variant dir: `<support>/llama_server/<release>-<cpu|vulkan>/`.
   Future<Directory> serverDir({required bool gpu}) async {
@@ -205,6 +224,44 @@ class LocalServerService extends GetxService {
       _proc = await Process.start(exe.path, args,
           workingDirectory: exe.parent.path,
           mode: ProcessStartMode.detachedWithStdio);
+      _exited = false;
+      serverExitCode = null;
+      _stderrTail.clear();
+      // Watch for unexpected death (crash/OOM): without this, a dead
+      // server looks "running" and every chat fails with a bare
+      // connection error instead of naming the cause.
+      await _stderrSub?.cancel();
+      _stderrSub = _proc!.stderr
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen(
+        (line) {
+          _stderrTail.add(line);
+          if (_stderrTail.length > 50) _stderrTail.removeAt(0);
+        },
+        onError: (_) {},
+        cancelOnError: false,
+      );
+      unawaited(_proc!.exitCode.then((code) {
+        _exited = true;
+        serverExitCode = code;
+        // Keep port/_proc for a meaningful error; isRunning is false.
+        try {
+          if (Get.isRegistered<AppLogService>()) {
+            final tail = _stderrTail.isEmpty
+                ? '(no stderr)'
+                : _stderrTail
+                    .sublist(_stderrTail.length > 8 ? _stderrTail.length - 8 : 0)
+                    .join('\n');
+            Get.find<AppLogService>().error(
+              'llama-server died (exit $code)',
+              details:
+                  'model=$loadedModelPath\nstderr tail:\n$tail',
+              category: LogCategory.model,
+            );
+          }
+        } catch (_) {}
+      }));
       final ok = await _waitHealthy(
           Duration(seconds: wantGpu ? 120 : 150));
       if (!ok) {
@@ -221,8 +278,15 @@ class LocalServerService extends GetxService {
   }
 
   Future<void> stop() async {
+    _aborted = true;
     _chatClient?.close();
     _chatClient = null;
+    await _stderrSub?.cancel();
+    _stderrSub = null;
+    _serverGate?.complete();
+    _serverGate = null;
+    _exited = false;
+    serverExitCode = null;
     final p = _proc;
     _proc = null;
     port = 0;
@@ -243,7 +307,8 @@ class LocalServerService extends GetxService {
 
   /// Streaming chat against the running server. Mirrors
   /// `POST /v1/chat/completions` (OpenAI SSE). Throws on HTTP errors;
-  /// returns the full assembled text.
+  /// returns the full assembled text. A deliberate abort (stop button)
+  /// resolves with the partial text instead of throwing.
   Future<String> chat({
     required List<Map<String, String>> messages,
     required double temperature,
@@ -251,9 +316,28 @@ class LocalServerService extends GetxService {
     required int maxTokens,
     required void Function(String token) onToken,
   }) async {
-    if (!isRunning) throw 'Local server is not running';
+    if (!isRunning) {
+      if (_exited) {
+        throw 'Local server died (exit ${serverExitCode ?? '?'}). Reload the model.';
+      }
+      throw 'Local server is not running';
+    }
+    // Serialize: overlapping calls corrupt _chatClient tracking, so a
+    // stop/abort can kill the wrong generation mid-stream.
+    var waited = 0;
+    while (_serverGate != null) {
+      if (waited >= 45) {
+        throw 'Local server is busy finishing the previous reply — wait a moment and send again.';
+      }
+      try {
+        await _serverGate!.future.timeout(const Duration(seconds: 2));
+      } catch (_) {}
+      waited += 2;
+    }
+    _serverGate = Completer<void>();
     final client = http.Client();
     _chatClient = client;
+    _aborted = false;
     final out = StringBuffer();
     try {
       final req = http.Request(
@@ -281,15 +365,23 @@ class LocalServerService extends GetxService {
         onToken(delta);
       }
       return out.toString();
+    } catch (e) {
+      // Stop-button abort kills the socket mid-stream: that is a clean
+      // stop with partial text, not a failure row.
+      if (_aborted) return out.toString();
+      rethrow;
     } finally {
       if (identical(_chatClient, client)) _chatClient = null;
       client.close();
+      _serverGate?.complete();
+      _serverGate = null;
     }
   }
 
   /// Aborts an in-flight [chat] call (stop button).
   void abortChat() {
     try {
+      _aborted = true;
       _chatClient?.close();
     } catch (_) {}
     _chatClient = null;
