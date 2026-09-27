@@ -14,6 +14,7 @@ import '../cubicweb/browser_view.dart';
 import '../runtime/runtime_setup_view.dart';
 import '../slide_deck_view.dart';
 import '../terminal/terminal_view.dart';
+import '../translator_view.dart';
 
 /// Explore Toolkit tab cards.
 /// Extracted from views/model_view.dart (one responsibility per file).
@@ -33,6 +34,13 @@ class _ToolSpec {
 }
 
 List<_ToolSpec> _toolSpecs() => [
+      _ToolSpec(
+        icon: LucideIcons.languages,
+        title: 'CubicTranslator',
+        description:
+            'Google-Translate-style offline translator on your local model (Qwen2.5-0.5B recommended) — 20 languages, auto-detect, streaming, nothing leaves the phone.',
+        open: () => const TranslatorView(),
+      ),
       _ToolSpec(
         icon: LucideIcons.bot,
         title: 'Agent Workspace',

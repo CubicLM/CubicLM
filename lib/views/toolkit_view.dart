@@ -122,6 +122,8 @@ class _ToolkitViewState extends State<ToolkitView> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _toolkitInfoRow('CubicTranslator',
+                  'Offline translator on your local model — 20 languages with auto-detect and streaming.'),
               _toolkitInfoRow('Battle Arena',
                   'Race cloud models on one prompt and compare answers side by side.'),
               _toolkitInfoRow('Slide Maker',

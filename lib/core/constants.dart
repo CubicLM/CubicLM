@@ -472,6 +472,26 @@ When the user asks for a complete file or program (for example a game in a singl
       'template': 'chatml',
     },
     {
+      'name': 'Qwen2.5 0.5B Instruct (Q4_K_M)',
+      'filename': 'qwen2.5-0.5b-instruct-q4_k_m.gguf',
+      'url':
+          'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf',
+      'size': '0.40 GB',
+      'description':
+          'Smallest all-language translator — ~400 MB, runs on any phone',
+      'template': 'chatml',
+    },
+    {
+      'name': 'Qwen2.5 1.5B Instruct (Q4_K_M)',
+      'filename': 'qwen2.5-1.5b-instruct-q4_k_m.gguf',
+      'url':
+          'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
+      'size': '0.99 GB',
+      'description':
+          'Best translation quality under 1 GB — accurate multi-language',
+      'template': 'chatml',
+    },
+    {
       'name': 'DreamShaper 8 LCM (SD 1.5)',
       'filename': 'DreamShaper8_LCM.safetensors',
       'url':
