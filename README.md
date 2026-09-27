@@ -24,13 +24,6 @@ Computational Universe for Building Intelligent Learning Machines
 
 <br/>
 
-[![Platform-Android](https://img.shields.io/badge/Android-Full%20Support-3DDC84?style=for-the-badge&logo=android&logoColor=white&labelColor=0d1117)](https://github.com/CubicLM/CubicLM/releases/tag/v1.18.0)
-[![Platform-Windows](https://img.shields.io/badge/Windows-Cloud%20Mode-0078D4?style=for-the-badge&logo=windows&logoColor=white&labelColor=0d1117)](https://github.com/CubicLM/CubicLM/releases/tag/v1.18.0)
-[![Platform-Web](https://img.shields.io/badge/Web-Planned-6b7280?style=for-the-badge&logo=googlechrome&logoColor=white&labelColor=0d1117)](#-universal-multi-platform)
-[![Website](https://img.shields.io/badge/Website-Live-FF4D00?style=for-the-badge&logo=vercel&logoColor=white&labelColor=0d1117)](https://cubiclm.vercel.app)
-
-<br/>
-
 <!-- Tech Stack Pills -->
 <a href="#-tech-stack"><img src="https://img.shields.io/badge/Flutter-3.x-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter"/></a>
 <a href="#-tech-stack"><img src="https://img.shields.io/badge/Dart-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart"/></a>
