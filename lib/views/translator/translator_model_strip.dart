@@ -6,6 +6,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../controllers/translator_controller.dart';
 import '../../core/colors.dart';
 import '../../theme/design_tokens.dart';
+import '../../widgets/model_switcher_sheet.dart';
 import 'translator_model_notice.dart';
 
 /// Loaded-model strip, or a compact no-model banner guiding to the Hub.
@@ -41,17 +42,40 @@ class TranslatorModelStrip extends StatelessWidget {
                     shape: BoxShape.circle),
               ),
               const SizedBox(width: 8),
+              // Same switcher as the chat textbox: tap the model
+              // name to open Switch Model.
               Expanded(
-                child: Text(
-                  c.loadedModelName.isEmpty
-                      ? 'Local model ready'
-                      : c.loadedModelName,
-                  style: GoogleFonts.firaCode(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant),
+                child: InkWell(
+                  onTap: () =>
+                      showModelSwitcherSheet(context),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            c.loadedModelName.isEmpty
+                                ? 'Local model ready'
+                                : c.loadedModelName,
+                            style: GoogleFonts.firaCode(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(LucideIcons.chevronDown,
+                            size: 14,
+                            color:
+                                Theme.of(context).hintColor),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               IconButton(
@@ -118,7 +142,7 @@ class TranslatorModelStrip extends StatelessWidget {
                       ),
                     ],
                   ),
-                  Text('Load Qwen2.5-0.5B (~400 MB) for fast offline translation.',
+                  Text('Load Qwen2.5-1.5B (~1 GB) for accurate offline translation.',
                       style: GoogleFonts.plusJakartaSans(
                           fontSize: 12,
                           height: 1.4,

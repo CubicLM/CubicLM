@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../controllers/translator_controller.dart';
 import '../../theme/design_tokens.dart';
+import 'translator_script_font.dart';
 
 /// Streaming translation output + copy.
 class TranslatorOutputCard extends StatelessWidget {
@@ -62,10 +63,18 @@ class TranslatorOutputCard extends StatelessWidget {
                       ? 'Translating…'
                       : 'Translation will appear here.')
                   : out,
-              style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  height: 1.55,
-                  color: out.isEmpty ? hint : null),
+              // Script-aware font: PlusJakartaSans has no Bengali /
+              // Arabic / CJK glyphs (tofu boxes) — Noto covers them.
+              style: out.isEmpty
+                  ? GoogleFonts.plusJakartaSans(
+                      fontSize: 14, height: 1.55, color: hint)
+                  : translatorTextStyle(
+                      context,
+                      langId: c.targetId.value,
+                      text: out,
+                      fontSize: 15,
+                      height: 1.6,
+                    ),
             ),
           ],
         ),

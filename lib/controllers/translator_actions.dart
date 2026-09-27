@@ -52,6 +52,12 @@ extension TranslatorControllerActions on TranslatorController {
       Get.find<ModelController>().modelScope.value = 'local';
     } catch (_) {}
     try {
+      // Translator opens as a pushed route on top of home — pop back
+      // to home first, otherwise the tab switch happens invisibly
+      // underneath and the user never reaches the marketplace.
+      Get.until((route) => route.isFirst);
+    } catch (_) {}
+    try {
       Get.find<HomeController>().changeTab(1);
     } catch (_) {}
   }
@@ -71,7 +77,7 @@ extension TranslatorControllerActions on TranslatorController {
 
     if (!modelReady) {
       error.value =
-          'No local model loaded. Load one below (Qwen2.5-0.5B recommended).';
+          'No local model loaded. Load one below (Qwen2.5-1.5B recommended).';
       return;
     }
 

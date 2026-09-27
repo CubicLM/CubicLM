@@ -291,14 +291,16 @@ class ActiveModelHeader extends StatelessWidget {
         icon = inference.isGpuAccelerated.value
             ? Icons.bolt_rounded
             : Icons.memory_rounded;
-        accent = AppColors.success;
+        // Active = app accent (terracotta), not green — matches Load
+        // buttons, BEST chip, selected tabs across the app.
+        accent = Dt.accent;
       } else if (localImage.isModelLoaded.value) {
         label = _stripExtension(localImage.loadedModelName.value);
         subtitle = localImage.isUsingGpu.value
             ? '⚡ GPU Image Synthesis'
             : '🖥 CPU Image Synthesis';
         icon = Icons.image_rounded;
-        accent = AppColors.success;
+        accent = Dt.accent;
       } else {
         label = 'No model loaded';
         subtitle = 'Pick one below to start chatting';
@@ -340,6 +342,7 @@ class ActiveModelHeader extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
+                  // Rule: full model name always — wraps, never "…".
                   Text(
                     label,
                     style: GoogleFonts.plusJakartaSans(
@@ -349,8 +352,7 @@ class ActiveModelHeader extends StatelessWidget {
                           ? AppColors.textPrimary
                           : Dt.textPrimary,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    softWrap: true,
                   ),
                   Text(
                     subtitle,
@@ -550,6 +552,8 @@ class ModelRow extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Rule: full model name always — wraps,
+                            // never "…" truncated.
                             Text(
                               _stripExtension(title),
                               style: GoogleFonts.plusJakartaSans(
@@ -559,8 +563,7 @@ class ModelRow extends StatelessWidget {
                                     ? AppColors.textPrimary
                                     : Dt.textPrimary,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
                             ),
                             if (subtitle.isNotEmpty) ...[
                               const SizedBox(height: 2),
@@ -610,7 +613,7 @@ class ModelRow extends StatelessWidget {
                         )
                       else if (isActive)
                         const Icon(Icons.check_circle_rounded,
-                            size: 20, color: AppColors.success)
+                            size: 20, color: Dt.accent)
                       else
                         Icon(Icons.radio_button_unchecked_rounded,
                             size: 20,

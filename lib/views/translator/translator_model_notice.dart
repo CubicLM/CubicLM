@@ -83,7 +83,6 @@ void showTranslatorModelNotice(
                 strong: true),
             bullet(
                 'Use an all-language model: import any GGUF from Explore → Downloaded models (import / Add URL), or download one from the Explore → Local marketplace:'),
-            modelRow('Qwen2.5 0.5B Instruct (Q4_K_M)', '~400 MB'),
             modelRow('Qwen2.5 1.5B Instruct (Q4_K_M)', '~1 GB'),
             modelRow('Gemma 2 2B Instruct (Q4_K_M)', '~1.7 GB'),
           ],

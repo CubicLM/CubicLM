@@ -897,7 +897,12 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenera
     jclass callbackClass = env->GetObjectClass(token_callback);
     jmethodID invokeMethod = env->GetMethodID(callbackClass, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;");
 
-    // Generation loop
+    // Generation loop.
+    // Multi-byte chars (Bengali = 3 bytes/char) routinely split across
+    // two BPE tokens. Sanitizing each piece alone would bake U+FFFD
+    // into the stream forever — so accumulate and emit complete UTF-8
+    // sequences only (mirrors LlamaIosWrapper.mm).
+    std::string partial_token;
     LOGI("Starting generation loop: max_tokens=%lld", max_tokens);
     for (int i = 0; i < max_tokens && !g_stop_flag; i++) {
         // Never let the decode position reach n_ctx: slide the window
@@ -925,18 +930,19 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenera
         // Decode token to string
         char buffer[256];
         int32_t length = llama_token_to_piece(g_vocab, new_token_id, buffer, sizeof(buffer), 0, true);
-        std::string piece;
-        
         if (length > 0) {
-            piece = sanitizeUTF8(buffer, length);
-        } else {
-            piece = "";
+            partial_token += std::string(buffer, length);
         }
-        
-        // Call Kotlin callback
-        jstring token_str = env->NewStringUTF(piece.c_str());
-        env->CallObjectMethod(g_token_callback, invokeMethod, token_str);
-        env->DeleteLocalRef(token_str);
+
+        // Emit complete UTF-8 sequences only
+        if (!partial_token.empty() &&
+            isValidUTF8(partial_token.c_str(), partial_token.size())) {
+            // Call Kotlin callback
+            jstring token_str = env->NewStringUTF(partial_token.c_str());
+            env->CallObjectMethod(g_token_callback, invokeMethod, token_str);
+            env->DeleteLocalRef(token_str);
+            partial_token.clear();
+        }
 
         // Prepare next batch
         batch.n_tokens = 0;
@@ -957,6 +963,16 @@ Java_com_write4me_llama_1flutter_1android_LlamaFlutterAndroidPlugin_nativeGenera
         if ((i & 63) == 0) g_crash_past = g_n_past;
     }
     LOGI("Generation loop finished.");
+
+    // Emit any remaining partial token (mirrors LlamaIosWrapper.mm)
+    if (!partial_token.empty() && !g_stop_flag) {
+        std::string safe = sanitizeUTF8(partial_token.c_str(), partial_token.size());
+        if (!safe.empty()) {
+            jstring token_str = env->NewStringUTF(safe.c_str());
+            env->CallObjectMethod(g_token_callback, invokeMethod, token_str);
+            env->DeleteLocalRef(token_str);
+        }
+    }
 
     if (g_token_callback != nullptr) {
         env->DeleteGlobalRef(g_token_callback);

@@ -154,7 +154,7 @@ class LocalModelListState extends State<LocalModelList> {
                         badgeColor: models.isLiteRtModel(model)
                             ? AppColors.secondary
                             : isResident
-                                ? AppColors.success
+                                ? Dt.accent
                                 : null,
                         isDark: isDark,
                         // Any load while one is in flight is dropped by

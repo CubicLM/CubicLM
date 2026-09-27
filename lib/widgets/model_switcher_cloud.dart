@@ -241,7 +241,7 @@ class CloudModelListState extends State<CloudModelList> {
               children: [
                 if (isActiveSection)
                   const Icon(Icons.check_circle_rounded,
-                      size: 18, color: AppColors.success),
+                      size: 18, color: Dt.accent),
                 const SizedBox(width: 6),
                 Icon(
                   Icons.expand_more_rounded,
