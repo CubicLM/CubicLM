@@ -327,6 +327,7 @@ class _LoopingResponsePreviewState extends State<_LoopingResponsePreview> {
 
     return Container(
       width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 118),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: bgBubble,

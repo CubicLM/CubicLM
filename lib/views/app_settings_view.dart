@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/settings_controller.dart';
-import '../core/constants.dart';
 import '../services/memory_service.dart';
 import '../core/routes.dart';
 import '../core/colors.dart';
@@ -224,16 +223,6 @@ class AppSettingsView extends GetView<SettingsController> {
                   subtitle: 'settings_personalize_desc'.tr,
                   trailing: const Icon(LucideIcons.chevronRight, size: 20),
                   onTap: () => Get.toNamed(AppRoutes.personalization),
-                ),
-                _appleListTile(
-                  context,
-                  isDark,
-                  leading: Icon(LucideIcons.sparkles,
-                      size: 20, color: Theme.of(context).primaryColor),
-                  title: 'chat_response_style'.tr,
-                  subtitle: _chatResponseStyleSubtitle(controller.chatResponseStyle.value),
-                  trailing: const Icon(LucideIcons.chevronRight, size: 20),
-                  onTap: () => Get.to(() => const ChatResponseStylePickerView()),
                 ),
                 for (final mode in [
                   ThemeMode.light,
@@ -940,20 +929,6 @@ class AppSettingsView extends GetView<SettingsController> {
       : m == ThemeMode.dark
           ? 'theme_dark'.tr
           : 'theme_system'.tr;
-
-  String _chatResponseStyleSubtitle(String id) {
-    switch (id) {
-      case AppConstants.responseStyleBlurry:
-        return '2. Blurry Sentence Streaming';
-      case AppConstants.responseStyleBlurryWord:
-        return '3. Blurry Word Streaming';
-      case AppConstants.responseStyleInstant:
-        return '4. Instant Full Response';
-      case AppConstants.responseStyleDefault:
-      default:
-        return '1. Real-time Typing (Primary Default)';
-    }
-  }
 
   IconData _themeModeIcon(ThemeMode m) => m == ThemeMode.light
       ? LucideIcons.sun
