@@ -263,8 +263,8 @@ void main() {
       Get.put(InferenceService());
       Get.put(CloudService());
       final memoryService = MemoryService();
-      await memoryService.init();
       Get.put(memoryService);
+      unawaited(memoryService.init().then((_) {}, onError: (_) {}));
       Get.put(UsageTrackerService());
       Get.put(StatsService());
       unawaited(Get.find<StatsService>().init().then((_) {}, onError: (_) {}));

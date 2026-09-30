@@ -563,6 +563,23 @@ class AboutView extends StatelessWidget {
                     color: isDark ? AppColors.textMuted : Dt.textMuted),
               ),
             ),
+            const SizedBox(height: 12),
+            // Trademark disclaimer (Play Store safety: provider/model
+            // names shown in the app belong to their owners).
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  'All product names, logos, and brands are property of their respective owners.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      height: 1.5,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? AppColors.textMuted : Dt.textMuted),
+                ),
+              ),
+            ),
             const SizedBox(height: 32),
           ],
         ),

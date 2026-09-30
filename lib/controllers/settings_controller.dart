@@ -263,6 +263,10 @@ class SettingsController extends GetxController {
   final dynamicColorEnabled = true.obs;
   final glassIntensity = 0.7.obs;
   final selectedFontFamily = 'Plus Jakarta Sans'.obs;
+  final bootAnimation = 'cube3d'.obs; // 'cube3d' or 'liquid_wave'
+  // Chat empty-state CubicLM branding: 'shimmer' (current default),
+  // 'cube3d' or 'liquid_wave'. Independent from bootAnimation.
+  final chatAnimation = 'shimmer'.obs;
 
   // Smart RAM & Performance
   final autoAdjustThreads = true.obs;

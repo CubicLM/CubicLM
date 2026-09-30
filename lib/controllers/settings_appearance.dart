@@ -59,6 +59,18 @@ extension SettingsControllerAppearance on SettingsController {
     await _hive.setSetting(AppConstants.keySelectedFont, family);
   }
 
+  Future<void> setBootAnimation(String anim) async {
+    bootAnimation.value = anim;
+    await _hive.setSetting(AppConstants.keyBootAnimation, anim);
+  }
+
+  /// Persist the Chat empty-state branding animation
+  /// ('shimmer' | 'cube3d' | 'liquid_wave'). Independent from boot.
+  Future<void> setChatAnimation(String anim) async {
+    chatAnimation.value = anim;
+    await _hive.setSetting(AppConstants.keyChatAnimation, anim);
+  }
+
   /// Persist a thinking-orb animation choice ('random' | OrbState name).
   Future<void> setOrbAnim(String slot, String value) async {
     switch (slot) {

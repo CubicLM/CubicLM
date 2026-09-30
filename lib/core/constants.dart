@@ -217,6 +217,8 @@ class AppConstants {
 
   // Onboarding
   static const String keyOnboardingDone = 'onboarding_done_v1';
+  static const String keyBootAnimation = 'boot_animation';
+  static const String keyChatAnimation = 'chat_animation';
 
   // User profile (Hub tab; name is mandatory at first setup)
   static const String keyUserName = 'user_name';

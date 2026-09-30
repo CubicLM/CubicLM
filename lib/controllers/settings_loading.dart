@@ -113,6 +113,8 @@ extension SettingsControllerLoading on SettingsController {
     customCloudModel.value =
         _hive.getSetting(AppConstants.keyCustomCloudModel) ?? '';
     _loadCustomCloudProfiles();
+    bootAnimation.value = _hive.getSetting(AppConstants.keyBootAnimation, defaultValue: 'cube3d') ?? 'cube3d';
+    chatAnimation.value = _hive.getSetting(AppConstants.keyChatAnimation, defaultValue: 'shimmer') ?? 'shimmer';
     globalSystemPrompt.value = _hive.getSetting(
             AppConstants.keyGlobalSystemPrompt,
             defaultValue: AppConstants.systemPrompt) ??

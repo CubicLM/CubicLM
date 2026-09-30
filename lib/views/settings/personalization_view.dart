@@ -7,6 +7,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../controllers/settings_controller.dart';
 import '../../theme/design_tokens.dart';
 import '../../core/colors.dart';
+import 'boot_animation_picker.dart';
 
 
 part 'personalize_signature.dart';
@@ -290,6 +291,40 @@ class PersonalizationView extends GetView<SettingsController> {
                 ),
               ]),
               const SizedBox(height: 24),
+              _sectionLabel(context, 'Boot Animation'),
+              _appleGroupedCard(context, isDark, children: [
+                _appleListTile(
+                  context,
+                  isDark,
+                  leading: Icon(LucideIcons.clapperboard, size: 20, color: Theme.of(context).primaryColor),
+                  title: 'Boot animation',
+                  subtitle: controller.bootAnimation.value == 'liquid_wave'
+                      ? 'Current: Liquid Wave Dot — tap to preview'
+                      : 'Current: 3D Tech Cube — tap to preview',
+                  showDivider: false,
+                  trailing: Icon(LucideIcons.chevronRight,
+                      size: 18, color: Theme.of(context).hintColor),
+                  onTap: () =>
+                      Get.to(() => const BootAnimationPickerView()),
+                ),
+              ]),
+              const SizedBox(height: 24),
+              _sectionLabel(context, 'Chat animation'),
+              _appleGroupedCard(context, isDark, children: [
+                _appleListTile(
+                  context,
+                  isDark,
+                  leading: Icon(LucideIcons.messageSquare, size: 20, color: Theme.of(context).primaryColor),
+                  title: 'Chat animation',
+                  subtitle: _chatAnimName(controller.chatAnimation.value),
+                  showDivider: false,
+                  trailing: Icon(LucideIcons.chevronRight,
+                      size: 18, color: Theme.of(context).hintColor),
+                  onTap: () => Get.to(
+                      () => const BootAnimationPickerView(mode: 'chat')),
+                ),
+              ]),
+              const SizedBox(height: 24),
               _sectionLabel(context, 'pers_typography'.tr),
               _buildFontBox(context, isDark, fonts),
               const SizedBox(height: 28),
@@ -299,6 +334,19 @@ class PersonalizationView extends GetView<SettingsController> {
             ],
           )),
     );
+  }
+
+  /// Display name for the Chat animation setting (subtitle of the tile).
+  String _chatAnimName(String id) {
+    switch (id) {
+      case 'cube3d':
+        return 'Current: 3D Tech Cube — tap to preview';
+      case 'liquid_wave':
+        return 'Current: Liquid Wave Dot — tap to preview';
+      case 'shimmer':
+      default:
+        return 'Current: Shimmer name — tap to preview';
+    }
   }
 
   Widget _dynamicPalettePreview(BuildContext context, bool isDark) {

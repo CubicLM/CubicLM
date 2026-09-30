@@ -11,7 +11,9 @@ import '../../controllers/settings_controller.dart';
 import '../../core/colors.dart';
 import '../../theme/design_tokens.dart';
 import '../../utils/greetings.dart';
-import 'chat_widgets.dart';
+import '../settings/chat_anims/chat_cube_animation.dart';
+import '../settings/chat_anims/chat_liquid_animation.dart';
+import '../settings/chat_anims/chat_shimmer_animation.dart';
 
 /// Empty state + suggestion cards.
 /// Extracted from views/chat_view.dart.
@@ -45,14 +47,20 @@ Widget emptyState(BuildContext context, bool isDark) {
       child: SingleChildScrollView(
     padding: const EdgeInsets.all(32),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Image.asset(
-        'assets/icons/CubicLM.png',
-        width: 64,
-        height: 64,
-        fit: BoxFit.contain,
-      ),
-      const SizedBox(height: 16),
-      AnimatedAppName(isDark: isDark),
+      // Branding animation picked in Personalize → Chat animation.
+      // Each option lives in its own file under settings/chat_anims/.
+      Obx(() {
+        final sel = Get.find<SettingsController>().chatAnimation.value;
+        switch (sel) {
+          case 'cube3d':
+            return const ChatCubeAnimation();
+          case 'liquid_wave':
+            return const ChatLiquidAnimation();
+          case 'shimmer':
+          default:
+            return ChatShimmerAnimation(isDark: isDark);
+        }
+      }),
       const SizedBox(height: 20),
       Obx(() {
         String name = '';
