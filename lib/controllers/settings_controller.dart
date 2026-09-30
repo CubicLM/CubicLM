@@ -267,6 +267,19 @@ class SettingsController extends GetxController {
   // Chat empty-state CubicLM branding: 'shimmer' (current default),
   // 'cube3d' or 'liquid_wave'. Independent from bootAnimation.
   final chatAnimation = 'shimmer'.obs;
+  final chatResponseStyle = AppConstants.responseStyleDefault.obs;
+
+  // 3D Cube Customization Properties
+  final cubeTextColor = Colors.white.obs;
+  final cubeTextFont = 'Plus Jakarta Sans'.obs;
+  final cubeFaceColors = <Color>[
+    const Color(0xFFFF7A00), // 0: Front
+    const Color(0xFFB8860B), // 1: Back
+    const Color(0xFFFFD950), // 2: Top
+    const Color(0xFF664A00), // 3: Bottom
+    const Color(0xFFE8A317), // 4: Right
+    const Color(0xFF7A5900), // 5: Left
+  ].obs;
 
   // Smart RAM & Performance
   final autoAdjustThreads = true.obs;

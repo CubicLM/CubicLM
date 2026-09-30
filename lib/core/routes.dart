@@ -12,6 +12,8 @@ import '../views/onboarding_view.dart';
 import '../views/update_view.dart';
 import '../views/update_settings_view.dart';
 import '../views/settings/personalization_view.dart';
+import '../views/settings/cube_editor_view.dart';
+import '../views/settings/chat_response_style_picker.dart';
 
 abstract class AppRoutes {
   static const splash = '/splash';
@@ -22,6 +24,8 @@ abstract class AppRoutes {
   static const update = '/update';
   static const updateSettings = '/update-settings';
   static const personalization = '/personalization';
+  static const cubeEditor = '/cube-editor';
+  static const chatResponseStyle = '/chat-response-style';
 }
 
 class AppPages {
@@ -70,6 +74,14 @@ class AppPages {
     GetPage(
       name: AppRoutes.personalization,
       page: () => const PersonalizationView(),
+    ),
+    GetPage(
+      name: AppRoutes.cubeEditor,
+      page: () => const CubeEditorView(),
+    ),
+    GetPage(
+      name: AppRoutes.chatResponseStyle,
+      page: () => const ChatResponseStylePickerView(),
     ),
   ];
 }

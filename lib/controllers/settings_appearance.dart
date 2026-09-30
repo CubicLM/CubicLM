@@ -71,6 +71,48 @@ extension SettingsControllerAppearance on SettingsController {
     await _hive.setSetting(AppConstants.keyChatAnimation, anim);
   }
 
+  /// Persist the Chat response style choice
+  /// ('default' | 'blurry' | 'instant').
+  Future<void> setChatResponseStyle(String style) async {
+    chatResponseStyle.value = style;
+    await _hive.setSetting(AppConstants.keyChatResponseStyle, style);
+  }
+
+  Future<void> setCubeTextColor(Color color) async {
+    cubeTextColor.value = color;
+    await _hive.setSetting(AppConstants.keyCubeTextColor, color.toARGB32());
+  }
+
+  Future<void> setCubeTextFont(String font) async {
+    cubeTextFont.value = font;
+    await _hive.setSetting(AppConstants.keyCubeTextFont, font);
+  }
+
+  Future<void> setCubeFaceColor(int index, Color color) async {
+    if (index >= 0 && index < cubeFaceColors.length) {
+      cubeFaceColors[index] = color;
+      await _hive.setSetting(
+          AppConstants.keyCubeFaceColors,
+          cubeFaceColors.map((c) => c.toARGB32()).toList());
+    }
+  }
+
+  Future<void> resetCubeColors() async {
+    cubeFaceColors.assignAll([
+      const Color(0xFFFF7A00),
+      const Color(0xFFB8860B),
+      const Color(0xFFFFD950),
+      const Color(0xFF664A00),
+      const Color(0xFFE8A317),
+      const Color(0xFF7A5900),
+    ]);
+    cubeTextColor.value = Colors.white;
+    cubeTextFont.value = 'Plus Jakarta Sans';
+    await _hive.deleteSetting(AppConstants.keyCubeTextColor);
+    await _hive.deleteSetting(AppConstants.keyCubeTextFont);
+    await _hive.deleteSetting(AppConstants.keyCubeFaceColors);
+  }
+
   /// Persist a thinking-orb animation choice ('random' | OrbState name).
   Future<void> setOrbAnim(String slot, String value) async {
     switch (slot) {

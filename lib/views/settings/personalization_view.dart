@@ -5,9 +5,11 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../controllers/settings_controller.dart';
+import '../../core/constants.dart';
 import '../../theme/design_tokens.dart';
 import '../../core/colors.dart';
 import 'boot_animation_picker.dart';
+import 'chat_response_style_picker.dart';
 
 
 part 'personalize_signature.dart';
@@ -325,6 +327,22 @@ class PersonalizationView extends GetView<SettingsController> {
                 ),
               ]),
               const SizedBox(height: 24),
+              _sectionLabel(context, 'chat_response_style'.tr),
+              _appleGroupedCard(context, isDark, children: [
+                _appleListTile(
+                  context,
+                  isDark,
+                  leading: Icon(LucideIcons.sparkles, size: 20, color: Theme.of(context).primaryColor),
+                  title: 'chat_response_style'.tr,
+                  subtitle: _chatResponseStyleSubtitle(controller.chatResponseStyle.value),
+                  showDivider: false,
+                  trailing: Icon(LucideIcons.chevronRight,
+                      size: 18, color: Theme.of(context).hintColor),
+                  onTap: () => Get.to(
+                      () => const ChatResponseStylePickerView()),
+                ),
+              ]),
+              const SizedBox(height: 24),
               _sectionLabel(context, 'pers_typography'.tr),
               _buildFontBox(context, isDark, fonts),
               const SizedBox(height: 28),
@@ -346,6 +364,20 @@ class PersonalizationView extends GetView<SettingsController> {
       case 'shimmer':
       default:
         return 'Current: Shimmer name — tap to preview';
+    }
+  }
+
+  String _chatResponseStyleSubtitle(String id) {
+    switch (id) {
+      case AppConstants.responseStyleBlurry:
+        return 'Current: 2. Blurry Sentence Streaming — tap to preview';
+      case AppConstants.responseStyleBlurryWord:
+        return 'Current: 3. Blurry Word Streaming — tap to preview';
+      case AppConstants.responseStyleInstant:
+        return 'Current: 4. Instant Full Response — tap to preview';
+      case AppConstants.responseStyleDefault:
+      default:
+        return 'Current: 1. Real-time Typing (Primary Default) — tap to preview';
     }
   }
 

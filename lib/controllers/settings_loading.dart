@@ -115,6 +115,25 @@ extension SettingsControllerLoading on SettingsController {
     _loadCustomCloudProfiles();
     bootAnimation.value = _hive.getSetting(AppConstants.keyBootAnimation, defaultValue: 'cube3d') ?? 'cube3d';
     chatAnimation.value = _hive.getSetting(AppConstants.keyChatAnimation, defaultValue: 'shimmer') ?? 'shimmer';
+    chatResponseStyle.value = _hive.getSetting(AppConstants.keyChatResponseStyle,
+            defaultValue: AppConstants.responseStyleDefault) ??
+        AppConstants.responseStyleDefault;
+    final savedColor = _hive.getSetting<int>(AppConstants.keyCubeTextColor);
+    if (savedColor != null) {
+      cubeTextColor.value = Color(savedColor);
+    }
+    final savedFont = _hive.getSetting<String>(AppConstants.keyCubeTextFont);
+    if (savedFont != null && savedFont.isNotEmpty) {
+      cubeTextFont.value = savedFont;
+    }
+    final savedFaces = _hive.getSetting<List>(AppConstants.keyCubeFaceColors);
+    if (savedFaces != null && savedFaces.length >= 6) {
+      for (var i = 0; i < 6; i++) {
+        if (savedFaces[i] is int) {
+          cubeFaceColors[i] = Color(savedFaces[i] as int);
+        }
+      }
+    }
     globalSystemPrompt.value = _hive.getSetting(
             AppConstants.keyGlobalSystemPrompt,
             defaultValue: AppConstants.systemPrompt) ??
@@ -397,9 +416,9 @@ extension SettingsControllerLoading on SettingsController {
     isBoldTheme.value = _hive.getSetting<bool>(AppConstants.keyIsBoldTheme,
             defaultValue: false) ??
         false;
-    final savedColor = _hive.getSetting<int>(AppConstants.keyCustomAccentColor);
-    if (savedColor != null) {
-      customAccentColor.value = Color(savedColor);
+    final savedAccentColor = _hive.getSetting<int>(AppConstants.keyCustomAccentColor);
+    if (savedAccentColor != null) {
+      customAccentColor.value = Color(savedAccentColor);
     }
     dynamicColorEnabled.value = _hive.getSetting<bool>(AppConstants.keyDynamicColorEnabled,
             defaultValue: true) ??

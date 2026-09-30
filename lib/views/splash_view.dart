@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../core/routes.dart';
 import '../core/constants.dart';
 import '../services/hive_service.dart';
+import '../controllers/settings_controller.dart';
 import '../theme/design_tokens.dart';
 
 /// Boot Animation Splash View supporting both 'cube3d' and 'liquid_wave' selections.
@@ -114,120 +115,132 @@ class _Cube3DSplash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = isDark ? Colors.white : Dt.textPrimary;
+    final settings = Get.isRegistered<SettingsController>()
+        ? Get.find<SettingsController>()
+        : null;
 
-    final rotY = (1.0 - Curves.easeOutCubic.transform((progress / 0.75).clamp(0.0, 1.0))) *
-            math.pi *
-            2.0 +
-        (math.pi / 5.0);
-    final rotX = math.sin(progress * math.pi) * 0.35 + (math.pi / 6.0);
-    final rotZ = math.sin(progress * math.pi * 0.5) * 0.15;
+    return Obx(() {
+      final faceColors = settings?.cubeFaceColors ??
+          [
+            const Color(0xFFFF7A00),
+            const Color(0xFFB8860B),
+            const Color(0xFFFFD950),
+            const Color(0xFF664A00),
+            const Color(0xFFE8A317),
+            const Color(0xFF7A5900),
+          ];
+      final textColor =
+          settings?.cubeTextColor.value ?? (isDark ? Colors.white : Dt.textPrimary);
+      final textFont = settings?.cubeTextFont.value ?? 'Plus Jakarta Sans';
 
-    final textP = ((progress - 0.25) / 0.40).clamp(0.0, 1.0);
-    final textOpacity = Curves.easeOut.transform(textP);
-    final textTx = _lerp(-20.0, 0.0, Curves.easeOutCubic.transform(textP));
+      final rotY = (1.0 -
+                  Curves.easeOutCubic.transform(
+                      (progress / 0.75).clamp(0.0, 1.0))) *
+              math.pi *
+              2.0 +
+          (math.pi / 5.0);
+      final rotX = math.sin(progress * math.pi) * 0.35 + (math.pi / 6.0);
+      final rotZ = math.sin(progress * math.pi * 0.5) * 0.15;
 
-    final shimmerP = ((progress - 0.45) / 0.50).clamp(0.0, 1.0);
-    final subOpacity =
-        Curves.easeOut.transform(((progress - 0.55) / 0.30).clamp(0.0, 1.0));
+      final textP = ((progress - 0.25) / 0.40).clamp(0.0, 1.0);
+      final textOpacity = Curves.easeOut.transform(textP);
+      final textTx = _lerp(-20.0, 0.0, Curves.easeOutCubic.transform(textP));
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 64,
-              height: 64,
-              child: CustomPaint(
-                painter: Real3DCubePainter(
-                  angleX: rotX,
-                  angleY: rotY,
-                  angleZ: rotZ,
-                  cubeSize: 22.0,
-                  primaryColor: const Color(0xFFFFD950),
-                  darkColor: const Color(0xFFB8860B),
-                  accentColor: const Color(0xFFFF7A00),
-                ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Opacity(
-              opacity: textOpacity,
-              child: Transform.translate(
-                offset: Offset(textTx, 0),
-                child: ShimmerBrandText(
-                  shimmerProgress: shimmerP,
-                  textColor: textColor,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        Opacity(
-          opacity: subOpacity,
-          child: Column(
+      final shimmerP = ((progress - 0.45) / 0.50).clamp(0.0, 1.0);
+      final subOpacity =
+          Curves.easeOut.transform(((progress - 0.55) / 0.30).clamp(0.0, 1.0));
+
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Think • Create • Explore',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 2.2,
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.5)
-                      : Dt.textSecondary.withValues(alpha: 0.7),
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: CustomPaint(
+                  painter: Real3DCubePainter(
+                    angleX: rotX,
+                    angleY: rotY,
+                    angleZ: rotZ,
+                    cubeSize: 22.0,
+                    faceColors: faceColors,
+                  ),
                 ),
               ),
-              const SizedBox(height: 10),
-              Container(
-                width: 44 *
-                    Curves.easeOut
-                        .transform(((progress - 0.60) / 0.30).clamp(0.0, 1.0)),
-                height: 2,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(1),
-                  gradient: const LinearGradient(
-                    colors: [
-                      Colors.transparent,
-                      Color(0xFFFFD950),
-                      Colors.transparent,
-                    ],
+              const SizedBox(width: 14),
+              Opacity(
+                opacity: textOpacity,
+                child: Transform.translate(
+                  offset: Offset(textTx, 0),
+                  child: CustomShimmerBrandText(
+                    shimmerProgress: shimmerP,
+                    textColor: textColor,
+                    fontFamily: textFont,
                   ),
                 ),
               ),
             ],
           ),
-        ),
-      ],
-    );
+          const SizedBox(height: 24),
+          Opacity(
+            opacity: subOpacity,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Think • Create • Explore',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 2.2,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.5)
+                        : Dt.textSecondary.withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: 44 *
+                      Curves.easeOut.transform(
+                          ((progress - 0.60) / 0.30).clamp(0.0, 1.0)),
+                  height: 2,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(1),
+                    gradient: const LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        Color(0xFFFFD950),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    });
   }
 
   double _lerp(double a, double b, double t) => a + (b - a) * t.clamp(0.0, 1.0);
 }
 
-/// Holographic 3D cube painter — public so the Boot animation picker
-/// can render live looping previews (splash behavior unchanged).
 class Real3DCubePainter extends CustomPainter {
   final double angleX;
   final double angleY;
   final double angleZ;
   final double cubeSize;
-  final Color primaryColor;
-  final Color darkColor;
-  final Color accentColor;
+  final List<Color> faceColors;
 
   Real3DCubePainter({
     required this.angleX,
     required this.angleY,
     required this.angleZ,
     required this.cubeSize,
-    required this.primaryColor,
-    required this.darkColor,
-    required this.accentColor,
+    required this.faceColors,
   });
 
   @override
@@ -278,16 +291,20 @@ class Real3DCubePainter extends CustomPainter {
       projected.add(Offset(cx + x3, cy + y3));
     }
 
+    final c0 = faceColors.isNotEmpty ? faceColors[0] : const Color(0xFFFF7A00);
+    final c1 = faceColors.length > 1 ? faceColors[1] : const Color(0xFFB8860B);
+    final c2 = faceColors.length > 2 ? faceColors[2] : const Color(0xFFFFD950);
+    final c3 = faceColors.length > 3 ? faceColors[3] : const Color(0xFF664A00);
+    final c4 = faceColors.length > 4 ? faceColors[4] : const Color(0xFFE8A317);
+    final c5 = faceColors.length > 5 ? faceColors[5] : const Color(0xFF7A5900);
+
     final faces = [
-      _CubeFace(indices: [4, 5, 6, 7], color1: primaryColor, color2: accentColor),
-      _CubeFace(indices: [1, 0, 3, 2], color1: darkColor, color2: primaryColor),
-      _CubeFace(
-          indices: [0, 1, 5, 4],
-          color1: primaryColor,
-          color2: const Color(0xFFFFEA7A)),
-      _CubeFace(indices: [7, 6, 2, 3], color1: darkColor, color2: darkColor),
-      _CubeFace(indices: [5, 1, 2, 6], color1: accentColor, color2: darkColor),
-      _CubeFace(indices: [0, 4, 7, 3], color1: darkColor, color2: primaryColor),
+      _CubeFace(indices: [4, 5, 6, 7], color1: c0, color2: c0.withValues(alpha: 0.7)),
+      _CubeFace(indices: [1, 0, 3, 2], color1: c1, color2: c1.withValues(alpha: 0.7)),
+      _CubeFace(indices: [0, 1, 5, 4], color1: c2, color2: c2.withValues(alpha: 0.7)),
+      _CubeFace(indices: [7, 6, 2, 3], color1: c3, color2: c3.withValues(alpha: 0.7)),
+      _CubeFace(indices: [5, 1, 2, 6], color1: c4, color2: c4.withValues(alpha: 0.7)),
+      _CubeFace(indices: [0, 4, 7, 3], color1: c5, color2: c5.withValues(alpha: 0.7)),
     ];
 
     for (final face in faces) {
@@ -311,7 +328,7 @@ class Real3DCubePainter extends CustomPainter {
       ..strokeWidth = 1.0;
 
     final auraPaint = Paint()
-      ..color = primaryColor.withValues(alpha: 0.22)
+      ..color = c2.withValues(alpha: 0.22)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14);
     canvas.drawCircle(Offset(cx, cy), s * 1.4, auraPaint);
 
@@ -358,7 +375,8 @@ class Real3DCubePainter extends CustomPainter {
     return oldDelegate.angleX != angleX ||
         oldDelegate.angleY != angleY ||
         oldDelegate.angleZ != angleZ ||
-        oldDelegate.cubeSize != cubeSize;
+        oldDelegate.cubeSize != cubeSize ||
+        oldDelegate.faceColors != faceColors;
   }
 }
 
@@ -372,13 +390,17 @@ class _CubeFace {
       {required this.indices, required this.color1, required this.color2});
 }
 
-/// Shimmering CubicLM brand text — public for picker previews.
-class ShimmerBrandText extends StatelessWidget {
+class CustomShimmerBrandText extends StatelessWidget {
   final double shimmerProgress;
   final Color textColor;
+  final String fontFamily;
 
-  const ShimmerBrandText(
-      {super.key, required this.shimmerProgress, required this.textColor});
+  const CustomShimmerBrandText({
+    super.key,
+    required this.shimmerProgress,
+    required this.textColor,
+    this.fontFamily = 'Plus Jakarta Sans',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -413,7 +435,8 @@ class ShimmerBrandText extends StatelessWidget {
       blendMode: BlendMode.srcIn,
       child: Text(
         'CubicLM',
-        style: GoogleFonts.plusJakartaSans(
+        style: GoogleFonts.getFont(
+          fontFamily,
           fontSize: 42,
           fontWeight: FontWeight.w900,
           letterSpacing: -1.5,
@@ -424,6 +447,9 @@ class ShimmerBrandText extends StatelessWidget {
     );
   }
 }
+
+// Backwards compatibility alias
+typedef ShimmerBrandText = CustomShimmerBrandText;
 
 // ==========================================
 // ANIMATION 2: LIQUID WAVE DOT
@@ -723,8 +749,6 @@ class _DotState {
   });
 }
 
-/// Liquid-wave fill painter — public so the Boot animation picker
-/// can render live looping previews (splash behavior unchanged).
 class LiquidWavePainter extends CustomPainter {
   final double waveProgress;
   final double animValue;

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/settings_controller.dart';
+import '../core/constants.dart';
 import '../services/memory_service.dart';
 import '../core/routes.dart';
 import '../core/colors.dart';
@@ -18,6 +19,7 @@ import 'settings_view.dart';
 import 'setup_recommendations_view.dart';
 import 'settings/dev_tools_view.dart';
 import 'settings/data_view.dart';
+import 'settings/chat_response_style_picker.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_ui.dart';
@@ -222,6 +224,16 @@ class AppSettingsView extends GetView<SettingsController> {
                   subtitle: 'settings_personalize_desc'.tr,
                   trailing: const Icon(LucideIcons.chevronRight, size: 20),
                   onTap: () => Get.toNamed(AppRoutes.personalization),
+                ),
+                _appleListTile(
+                  context,
+                  isDark,
+                  leading: Icon(LucideIcons.sparkles,
+                      size: 20, color: Theme.of(context).primaryColor),
+                  title: 'chat_response_style'.tr,
+                  subtitle: _chatResponseStyleSubtitle(controller.chatResponseStyle.value),
+                  trailing: const Icon(LucideIcons.chevronRight, size: 20),
+                  onTap: () => Get.to(() => const ChatResponseStylePickerView()),
                 ),
                 for (final mode in [
                   ThemeMode.light,
@@ -760,6 +772,11 @@ class AppSettingsView extends GetView<SettingsController> {
             keywords: 'theme color font typography appearance',
             tab: 0,
             open: () => Get.toNamed(AppRoutes.personalization)),
+        _SettingSearchEntry(
+            title: 'Chat response style',
+            keywords: 'typing stream response style blurry instant animation',
+            tab: 0,
+            open: () => Get.to(() => const ChatResponseStylePickerView())),
         const _SettingSearchEntry(
             title: 'Theme mode', keywords: 'dark light system', tab: 0),
         _SettingSearchEntry(
@@ -923,6 +940,20 @@ class AppSettingsView extends GetView<SettingsController> {
       : m == ThemeMode.dark
           ? 'theme_dark'.tr
           : 'theme_system'.tr;
+
+  String _chatResponseStyleSubtitle(String id) {
+    switch (id) {
+      case AppConstants.responseStyleBlurry:
+        return '2. Blurry Sentence Streaming';
+      case AppConstants.responseStyleBlurryWord:
+        return '3. Blurry Word Streaming';
+      case AppConstants.responseStyleInstant:
+        return '4. Instant Full Response';
+      case AppConstants.responseStyleDefault:
+      default:
+        return '1. Real-time Typing (Primary Default)';
+    }
+  }
 
   IconData _themeModeIcon(ThemeMode m) => m == ThemeMode.light
       ? LucideIcons.sun

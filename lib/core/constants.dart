@@ -218,7 +218,15 @@ class AppConstants {
   // Onboarding
   static const String keyOnboardingDone = 'onboarding_done_v1';
   static const String keyBootAnimation = 'boot_animation';
+  static const String keyCubeTextColor = 'cube_text_color';
+  static const String keyCubeTextFont = 'cube_text_font';
+  static const String keyCubeFaceColors = 'cube_face_colors';
   static const String keyChatAnimation = 'chat_animation';
+  static const String keyChatResponseStyle = 'chat_response_style';
+  static const String responseStyleDefault = 'default';
+  static const String responseStyleBlurry = 'blurry';
+  static const String responseStyleBlurryWord = 'blurry_word';
+  static const String responseStyleInstant = 'instant';
 
   // User profile (Hub tab; name is mandatory at first setup)
   static const String keyUserName = 'user_name';

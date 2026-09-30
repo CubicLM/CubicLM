@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Cold-start window: the launcher icon is dark-navy on transparent,
+     so on the near-black window it was invisible (pure "black screen"
+     for seconds). A light disc behind the icon keeps it visible in
+     both day and night themes. Item width/height needs API 23+;
+     minSdk is 28. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/launch_background" />
+    <item
+        android:width="120dp"
+        android:height="120dp"
+        android:gravity="center">
+        <shape android:shape="oval">
+            <solid android:color="#F4EEE3" />
+        </shape>
+    </item>
     <item android:gravity="center">
         <bitmap android:src="@mipmap/ic_launcher" />
     </item>

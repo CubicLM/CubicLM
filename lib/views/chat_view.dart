@@ -10,6 +10,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../controllers/chat_controller.dart';
 import '../controllers/settings_controller.dart';
+import '../core/constants.dart';
+import '../utils/sentence_splitter.dart';
 import '../services/inference_service.dart';
 import '../services/local_image_service.dart';
 import '../ffi/sd_ffi_bindings.dart';
@@ -477,7 +479,8 @@ class ChatView extends GetView<ChatController> {
   Widget _streamBubble(BuildContext context, bool isDark) {
     final attType = controller.streamingAttachmentType.value;
     final isImageGen = controller.imageGenTotal.value > 0;
-    
+    final responseStyle = Get.find<SettingsController>().chatResponseStyle.value;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Align(
@@ -501,6 +504,20 @@ class ChatView extends GetView<ChatController> {
                     final hasThought = thought.trim().isNotEmpty;
                     final hasAnswer = hasPrintable(answer);
 
+                    if (responseStyle == AppConstants.responseStyleInstant) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (hasThought)
+                            ThoughtDisclosure(
+                                thought: thought,
+                                isThinking: isThinking,
+                                styleSheet: _thoughtMdCached(context, isDark)),
+                          _typingHint(context, isDark, attachmentType: attType),
+                        ],
+                      );
+                    }
+
                     if (!hasThought && !hasAnswer) {
                       return _typingHint(context, isDark, attachmentType: attType);
                     }
@@ -519,24 +536,8 @@ class ChatView extends GetView<ChatController> {
                               children: [
                                 Expanded(
                                     child: RepaintBoundary(
-                                        child: answer.length > 1500
-                                            ? SelectableText(answer,
-                                                style: _streamMdCached(context, isDark)
-                                                    .p)
-                                            : MarkdownBody(
-                                                data: answer,
-                                                selectable: false,
-                                                styleSheet:
-                                                    _streamMdCached(context, isDark),
-                                                builders: {
-                                                  'latex': LatexElementBuilder(
-                                                    textStyle:
-                                                        _streamMdCached(context, isDark)
-                                                            .p,
-                                                  ),
-                                                },
-                                                extensionSet: _eliteMdExtensionSet,
-                                              ))),
+                                        child: _buildStreamingAnswerText(
+                                            context, isDark, answer, responseStyle))),
                                 BlinkingCursor(color: Theme.of(context).primaryColor),
                               ]),
                       ],
@@ -602,6 +603,115 @@ class ChatView extends GetView<ChatController> {
         ),
       ),
     );
+  }
+
+  Widget _buildStreamingAnswerText(
+      BuildContext context, bool isDark, String answer, String responseStyle) {
+    if (responseStyle == AppConstants.responseStyleBlurry) {
+      final split = splitSentences(answer);
+      final completed = split.completedText;
+      final inProgress = split.inProgressText;
+
+      if (inProgress.isEmpty) {
+        return MarkdownBody(
+          data: completed,
+          selectable: false,
+          styleSheet: _streamMdCached(context, isDark),
+          builders: {
+            'latex': LatexElementBuilder(
+              textStyle: _streamMdCached(context, isDark).p,
+            ),
+          },
+          extensionSet: _eliteMdExtensionSet,
+        );
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (completed.isNotEmpty)
+            MarkdownBody(
+              data: completed,
+              selectable: false,
+              styleSheet: _streamMdCached(context, isDark),
+              builders: {
+                'latex': LatexElementBuilder(
+                  textStyle: _streamMdCached(context, isDark).p,
+                ),
+              },
+              extensionSet: _eliteMdExtensionSet,
+            ),
+          ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 3.5, sigmaY: 3.5),
+            child: Text(
+              inProgress,
+              style: _streamMdCached(context, isDark).p,
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (responseStyle == AppConstants.responseStyleBlurryWord) {
+      final split = splitWords(answer);
+      final completed = split.completedText;
+      final inProgress = split.inProgressText;
+
+      if (inProgress.isEmpty) {
+        return MarkdownBody(
+          data: completed,
+          selectable: false,
+          styleSheet: _streamMdCached(context, isDark),
+          builders: {
+            'latex': LatexElementBuilder(
+              textStyle: _streamMdCached(context, isDark).p,
+            ),
+          },
+          extensionSet: _eliteMdExtensionSet,
+        );
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (completed.isNotEmpty)
+            MarkdownBody(
+              data: completed,
+              selectable: false,
+              styleSheet: _streamMdCached(context, isDark),
+              builders: {
+                'latex': LatexElementBuilder(
+                  textStyle: _streamMdCached(context, isDark).p,
+                ),
+              },
+              extensionSet: _eliteMdExtensionSet,
+            ),
+          ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 3.5, sigmaY: 3.5),
+            child: Text(
+              inProgress,
+              style: _streamMdCached(context, isDark).p,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return answer.length > 1500
+        ? SelectableText(answer, style: _streamMdCached(context, isDark).p)
+        : MarkdownBody(
+            data: answer,
+            selectable: false,
+            styleSheet: _streamMdCached(context, isDark),
+            builders: {
+              'latex': LatexElementBuilder(
+                textStyle: _streamMdCached(context, isDark).p,
+              ),
+            },
+            extensionSet: _eliteMdExtensionSet,
+          );
   }
 
   static final Map<int, MarkdownStyleSheet> _streamMdCache = {};

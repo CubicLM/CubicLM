@@ -43,6 +43,16 @@ class AppTranslations extends Translations {
     'settings_app_info': 'APP INFO',
     'settings_personalize': 'Personalize',
     'settings_personalize_desc': 'Themes, colors & typography',
+    'chat_response_style': 'Chat Response Style',
+    'chat_response_style_desc': 'Choose AI response typing and streaming effect',
+    'chat_resp_default': '1. Real-time Typing (Primary Default)',
+    'chat_resp_default_desc': 'Primary APK style: Streams text token-by-token in real time',
+    'chat_resp_blurry': '2. Blurry Sentence Streaming',
+    'chat_resp_blurry_desc': 'Current sentence stays blurry until completed',
+    'chat_resp_blurry_word': '3. Blurry Word Streaming',
+    'chat_resp_blurry_word_desc': 'Current active word in the row stays blurry until completed',
+    'chat_resp_instant': '4. Instant Full Response',
+    'chat_resp_instant_desc': 'Shows complete response at once with no typing animation',
 
     // Personalization
     'pers_dynamic_color': 'DYNAMIC COLOR',

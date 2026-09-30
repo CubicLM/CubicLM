@@ -133,14 +133,14 @@ void main() {
     appLog.info('App started', category: LogCategory.system);
 
     // Support phones and tablets in portrait or landscape.
+    // Fire-and-forget: safe any time after binding, must not sit in
+    // the critical path before runApp.
     if (!kIsWeb) {
-      try {
-        await SystemChrome.setPreferredOrientations([
-          DeviceOrientation.portraitUp,
-          DeviceOrientation.landscapeLeft,
-          DeviceOrientation.landscapeRight,
-        ]).timeout(const Duration(seconds: 2));
-      } catch (_) {}
+      unawaited(SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]).timeout(const Duration(seconds: 2)).then((_) {}, onError: (_) {}));
     }
 
     // ── Helpers ──
@@ -157,32 +157,42 @@ void main() {
 
     // ── CRITICAL PATH: Hive must be ready before SettingsController, but must NEVER block runApp >6s ──
     // Use short timeouts + memory fallback so native launch_background is removed quickly.
-    bool hiveIsFallback = false;
-    try {
-      await withTimeout(Hive.initFlutter(), 'Hive.initFlutter',
-          timeout: const Duration(seconds: 4));
-    } catch (e) {
-      appLog.error('Hive.initFlutter failed — trying recovery',
-          details: e.toString(), category: LogCategory.system);
+    // Hive.initFlutter and SecureKeyStore.init are INDEPENDENT (only
+    // HiveService.init needs both) — run them concurrently so wall time
+    // is max(), not sum(). On sick KeyStores (code-7 storms seen on
+    // Redmi K20 Pro) the sequential version cost up to 8s of black.
+    Future<void> initHiveFiles() async {
       try {
-        await Hive.deleteFromDisk();
-        await Hive.initFlutter().timeout(const Duration(seconds: 3));
-      } catch (_) {}
+        await withTimeout(Hive.initFlutter(), 'Hive.initFlutter',
+            timeout: const Duration(seconds: 4));
+      } catch (e) {
+        appLog.error('Hive.initFlutter failed — trying recovery',
+            details: e.toString(), category: LogCategory.system);
+        try {
+          await Hive.deleteFromDisk();
+          await Hive.initFlutter().timeout(const Duration(seconds: 3));
+        } catch (_) {}
+      }
     }
 
     // ── Secure storage for API keys (needed before HiveService for encryption) ──
-    try {
-      await withTimeout(Get.putAsync(() => SecureKeyStore().init()),
-          'SecureKeyStore',
-          timeout: const Duration(seconds: 4));
-    } catch (e) {
-      appLog.error('SecureKeyStore init failed — API keys stay in memory',
-          details: e.toString(), category: LogCategory.system);
-      if (!Get.isRegistered<SecureKeyStore>()) {
-        Get.put(SecureKeyStore(), permanent: true);
-        unawaited(Get.find<SecureKeyStore>().init());
+    Future<void> initKeyStore() async {
+      try {
+        await withTimeout(Get.putAsync(() => SecureKeyStore().init()),
+            'SecureKeyStore',
+            timeout: const Duration(seconds: 4));
+      } catch (e) {
+        appLog.error('SecureKeyStore init failed — API keys stay in memory',
+            details: e.toString(), category: LogCategory.system);
+        if (!Get.isRegistered<SecureKeyStore>()) {
+          Get.put(SecureKeyStore(), permanent: true);
+          unawaited(Get.find<SecureKeyStore>().init());
+        }
       }
     }
+
+    await Future.wait([initHiveFiles(), initKeyStore()]);
+    bool hiveIsFallback = false;
 
     // ── Hive with encrypted storage ──
     SecureKeyStore? secureKeyStore;

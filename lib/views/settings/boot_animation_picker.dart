@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../controllers/settings_controller.dart';
 import '../../theme/design_tokens.dart';
+import '../../core/routes.dart';
 import 'boot_anims/boot_cube_animation.dart';
 import 'boot_anims/boot_liquid_animation.dart';
 import 'chat_anims/chat_cube_animation.dart';
@@ -51,17 +52,26 @@ class BootAnimationPickerView extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          Obx(() => Text(
-                _isChat
-                    ? 'Changes the CubicLM animation on the Chat page (boot stays ${_name(settings.bootAnimation.value)}).'
-                    : 'Watch them loop, then tap your favourite.',
-                style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    color: Theme.of(context).hintColor),
-              )),
+          Obx(() {
+            // Touch first: boot-mode text reads no observable otherwise
+            // → GetX empty-scope error. Chat mode reads chatAnimation.
+            final _ = _isChat
+                ? settings.chatAnimation.value
+                : settings.bootAnimation.value;
+            return Text(
+              _isChat
+                  ? 'Changes the CubicLM animation on the Chat page (boot stays ${_name(settings.bootAnimation.value)}).'
+                  : 'Watch them loop, then tap your favourite.',
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  color: Theme.of(context).hintColor),
+            );
+          }),
           const SizedBox(height: 16),
+          // 400 → 420: the cube frame's Customize button needs
+          // ~40px under the subtitle (was a 17px overflow).
           SizedBox(
-            height: 400,
+            height: 420,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: ids.length,
@@ -223,6 +233,23 @@ class _AnimFrame extends StatelessWidget {
                       fontSize: 11.5,
                       color: Theme.of(context).hintColor)),
             ),
+            if (id == 'cube3d') ...[
+              const SizedBox(height: 6),
+              SizedBox(
+                width: 210,
+                child: OutlinedButton.icon(
+                  onPressed: () => Get.toNamed(AppRoutes.cubeEditor),
+                  icon: const Icon(LucideIcons.sliders, size: 13),
+                  label: const Text('Customize 3D Cube'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       );
