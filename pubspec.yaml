@@ -119,4 +119,5 @@ flutter:
     - assets/icons/
     - assets/skills/
     - assets/device_soc/
+    - assets/android_version/
     - assets/adblock_hosts.txt

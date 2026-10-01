@@ -8,6 +8,7 @@ import android.app.PendingIntent
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.util.Log
@@ -15,7 +16,9 @@ import android.os.Build
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.os.BatteryManager
 import android.os.PowerManager
+import android.os.StatFs
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.OpenableColumns
@@ -66,6 +69,497 @@ class MainActivity : FlutterFragmentActivity() {
                 if (!text.isNullOrBlank()) pendingSharedText = text
             }
         } catch (_: Exception) {
+        }
+    }
+
+    /// getprop dump, parsed once per systemInfo call (fast, no root).
+    private fun getPropAll(): Map<String, String> {
+        return try {
+            val out = HashMap<String, String>()
+            val p = Runtime.getRuntime().exec("getprop")
+            val r = p.inputStream.bufferedReader().readText()
+            p.waitFor()
+            val re = Regex("""\[(.+?)]: \[(.*?)]""")
+            for (m in re.findAll(r)) {
+                out[m.groupValues[1]] = m.groupValues[2]
+            }
+            out
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    /// Full System-tab bundle for CubicDevice Info. Best effort throughout:
+    /// unknowns come back as "—"/-1 and the UI renders them honestly.
+    private fun collectSystemInfo(): Map<String, Any> {
+        val props = getPropAll()
+        fun prop(vararg keys: String): String {
+            for (k in keys) {
+                val v = props[k]
+                if (!v.isNullOrEmpty()) return v
+            }
+            return "—"
+        }
+
+        // MIUI: "V125"-style build tag, empty on non-MIUI.
+        val miui = props["ro.miui.ui.version.name"] ?: ""
+        // Bootloader: Build field + verified-boot lock state.
+        val vbs = props["ro.boot.verifiedbootstate"] ?: ""
+        val lock = when (vbs) {
+            "green" -> "Locked"
+            "orange", "yellow" -> "Unlocked"
+            "red" -> "Failed"
+            else -> "Unknown"
+        }
+        val bootloader = try {
+            "${android.os.Build.BOOTLOADER} ($lock)"
+        } catch (_: Exception) {
+            "($lock)"
+        }
+        // Baseband radio version.
+        val baseband = try {
+            android.os.Build.getRadioVersion() ?: "—"
+        } catch (_: Exception) {
+            "—"
+        }
+        // ART version.
+        val javaVm = try {
+            System.getProperty("java.vm.version") ?: "—"
+        } catch (_: Exception) {
+            "—"
+        }
+        // OpenGL ES via ActivityManager (no permission needed).
+        val gles = try {
+            val am = getSystemService(ACTIVITY_SERVICE)
+                as? android.app.ActivityManager
+            val v = am?.deviceConfigurationInfo
+                ?.reqGlEsVersion ?: 0
+            if (v == 0) "—"
+            else "${v shr 16}.${v and 0xFFFF}"
+        } catch (_: Exception) {
+            "—"
+        }
+        // Root: su binaries + known manager packages ("No Apps Detected").
+        val suPaths = listOf(
+            "/system/bin/su", "/system/xbin/su", "/sbin/su",
+            "/su/bin/su", "/system/app/Superuser.apk",
+        )
+        val suFound = suPaths.any {
+            try {
+                java.io.File(it).exists()
+            } catch (_: Exception) {
+                false
+            }
+        }
+        val rootPkgs = listOf(
+            "com.topjohnwu.magisk" to "Magisk",
+            "eu.chainfire.supersu" to "SuperSU",
+            "com.koushikdutta.superuser" to "Superuser",
+            "com.kingroot.kinguser" to "KingRoot",
+        )
+        val foundPkgs = rootPkgs.mapNotNull { (pkg, label) ->
+            try {
+                packageManager.getPackageInfo(pkg, 0)
+                label
+            } catch (_: Exception) {
+                null
+            }
+        }
+        val rootApps = buildList {
+            if (suFound) add("su binary")
+            addAll(foundPkgs)
+        }.distinct().joinToString(", ").ifEmpty {
+            "No Apps Detected"
+        }
+        // SELinux enforcing state.
+        val selinux = try {
+            when (
+                java.io.File("/sys/fs/selinux/enforce")
+                    .readText().trim()
+            ) {
+                "1" -> "Enforcing"
+                "0" -> "Permissive"
+                else -> "Unable to determine"
+            }
+        } catch (_: Exception) {
+            "Unable to determine"
+        }
+        // Google Play Services version.
+        val gms = try {
+            val pi = packageManager.getPackageInfo(
+                "com.google.android.gms", 0,
+            )
+            val code = if (android.os.Build.VERSION.SDK_INT >= 28) {
+                pi.longVersionCode.toString()
+            } else {
+                @Suppress("DEPRECATION")
+                pi.versionCode.toString()
+            }
+            "${pi.versionName} ($code)"
+        } catch (_: Exception) {
+            "—"
+        }
+        // Vulkan support + version from system features.
+        var vulkan = "Not Supported"
+        try {
+            val feats = packageManager.systemAvailableFeatures
+            for (f in feats) {
+                if (f?.name ==
+                    android.content.pm.PackageManager
+                        .FEATURE_VULKAN_HARDWARE_VERSION
+                ) {
+                    val v = f.version
+                    val major = (v shr 22) and 0x3FF
+                    val minor = (v shr 12) and 0x3FF
+                    vulkan = "Supported ($major.$minor)"
+                    break
+                }
+            }
+        } catch (_: Exception) {
+        }
+        fun onOff(v: String?) =
+            if (v == "true") "Supported" else "Not Supported"
+        // Widevine DRM via MediaDrm (no permission needed).
+        var drmVendor = "—"
+        var drmDesc = "—"
+        var drmVersion = "—"
+        var drmAlgos = "—"
+        var drmSec = "—"
+        var drmHdcp = "—"
+        try {
+            val uuid = java.util.UUID.fromString(
+                "edef8ba9-79d6-4ace-a3c8-27dcd51d21ed",
+            )
+            val drm = android.media.MediaDrm(uuid)
+            try {
+                drmVendor = drm.getPropertyString("vendor")
+                drmDesc = drm.getPropertyString("description")
+                drmVersion = drm.getPropertyString("version")
+                drmAlgos = drm.getPropertyString("algorithms")
+                drmSec = drm.getPropertyString("securityLevel")
+                // getMaxHDCPSupported() via reflection: direct symbol
+                // access fails to resolve on this toolchain; the
+                // method itself is public API since 28.
+                val hdcpRaw: Int = try {
+                    val m = android.media.MediaDrm::class.java
+                        .getMethod("getMaxHDCPSupported")
+                    (m.invoke(drm) as? Int) ?: -1
+                } catch (_: Exception) {
+                    -1
+                }
+                drmHdcp = when (hdcpRaw) {
+                    5 -> "2.3"
+                    4 -> "2.2"
+                    3 -> "2.1"
+                    2 -> "2.0"
+                    1 -> "1.x"
+                    else -> "—"
+                }
+            } finally {
+                try {
+                    drm.release()
+                } catch (_: Exception) {
+                }
+            }
+        } catch (_: Exception) {
+        }
+        // SDK extension versions (API 30+).
+        var sdkExt = -1
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                sdkExt = android.os.ext.SdkExtensions
+                    .getExtensionVersion(
+                        android.os.Build.VERSION_CODES.R,
+                    )
+            }
+        } catch (_: Exception) {
+        }
+        // Timezone id + display name.
+        val tz = try {
+            java.util.TimeZone.getDefault()
+        } catch (_: Exception) {
+            null
+        }
+        return mapOf(
+            "miui" to miui,
+            "bootloader" to bootloader,
+            "baseband" to baseband,
+            "javaVm" to javaVm,
+            "gles" to gles,
+            "rootApps" to rootApps,
+            "selinux" to selinux,
+            "gms" to gms,
+            "vulkan" to vulkan,
+            "treble" to onOff(props["ro.treble.enabled"]),
+            "seamless" to onOff(props["ro.build.ab_update"]),
+            "dynamic" to onOff(props["ro.boot.dynamic_partitions"]),
+            "sdkExt" to sdkExt,
+            "tzId" to (tz?.id ?: "—"),
+            "tzName" to try {
+                tz?.getDisplayName() ?: "—"
+            } catch (_: Exception) {
+                "—"
+            },
+            "drmVendor" to drmVendor,
+            "drmDesc" to drmDesc,
+            "drmVersion" to drmVersion,
+            "drmAlgos" to drmAlgos,
+            "drmSec" to drmSec,
+            "drmHdcp" to drmHdcp,
+        )
+    }
+
+    /// Live battery snapshot: current, status, plug, counters.
+    /// currentUa is SIGNED micro-amps (negative = discharging).
+    private fun collectBattLive(): Map<String, Any> {
+        var currentUa = -1L
+        var counterMah = -1
+        var plugged = "Battery"
+        var status = "Discharging"
+        var level = -1
+        var charging = false
+        var voltageMv = -1
+        var tempC = -1.0
+        try {
+            val bm = getSystemService(BATTERY_SERVICE)
+                as? android.os.BatteryManager
+            try {
+                currentUa = bm?.getIntProperty(
+                    android.os.BatteryManager
+                        .BATTERY_PROPERTY_CURRENT_NOW,
+                )?.toLong() ?: -1L
+            } catch (_: Exception) {
+            }
+            try {
+                val cc = bm?.getIntProperty(
+                    android.os.BatteryManager
+                        .BATTERY_PROPERTY_CHARGE_COUNTER,
+                ) ?: -1
+                if (cc > 0) counterMah = cc / 1000
+            } catch (_: Exception) {
+            }
+            val st = registerReceiver(
+                null,
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+            )
+            if (st != null) {
+                val s = st.getIntExtra(
+                    android.os.BatteryManager.EXTRA_STATUS, -1,
+                )
+                status = when (s) {
+                    android.os.BatteryManager.BATTERY_STATUS_CHARGING ->
+                        "Charging"
+                    android.os.BatteryManager.BATTERY_STATUS_FULL ->
+                        "Charged"
+                    android.os.BatteryManager.BATTERY_STATUS_NOT_CHARGING ->
+                        "Not charging"
+                    else -> "Discharging"
+                }
+                charging = s == android.os.BatteryManager
+                    .BATTERY_STATUS_CHARGING ||
+                    s == android.os.BatteryManager
+                        .BATTERY_STATUS_FULL
+                level = (st.getIntExtra(
+                    android.os.BatteryManager.EXTRA_LEVEL, -1,
+                ))
+                plugged = when (
+                    st.getIntExtra(
+                        android.os.BatteryManager.EXTRA_PLUGGED, -1,
+                    )
+                ) {
+                    android.os.BatteryManager
+                        .BATTERY_PLUGGED_AC -> "AC"
+                    android.os.BatteryManager
+                        .BATTERY_PLUGGED_USB -> "USB"
+                    android.os.BatteryManager
+                        .BATTERY_PLUGGED_WIRELESS -> "Wireless"
+                    else -> "Battery"
+                }
+                voltageMv = st.getIntExtra(
+                    android.os.BatteryManager.EXTRA_VOLTAGE, -1,
+                )
+                tempC = st.getIntExtra(
+                    android.os.BatteryManager.EXTRA_TEMPERATURE, -1,
+                ) / 10.0
+            }
+        } catch (_: Exception) {
+        }
+        // Design + current full-charge capacities (sysfs, no root).
+        var designMah = -1
+        var fullMah = -1
+        try {
+            designMah = java.io.File(
+                "/sys/class/power_supply/battery/charge_full_design",
+            ).readText().trim().toLong().div(1000).toInt()
+        } catch (_: Exception) {
+        }
+        try {
+            fullMah = java.io.File(
+                "/sys/class/power_supply/battery/charge_full",
+            ).readText().trim().toLong().div(1000).toInt()
+        } catch (_: Exception) {
+        }
+        return mapOf(
+            "currentUa" to currentUa,
+            "counterMah" to counterMah,
+            "plugged" to plugged,
+            "status" to status,
+            "level" to level,
+            "charging" to charging,
+            "voltageMv" to voltageMv,
+            "tempC" to tempC,
+            "designMah" to designMah,
+            "fullMah" to fullMah,
+        )
+    }
+
+    private fun readKhz(path: String): Int {
+        return try {
+            (java.io.File(path).readText().trim().toLong() / 1000L)
+                .toInt()
+        } catch (_: Exception) {
+            -1
+        }
+    }
+
+    /// CPU tab bundle: per-core min/max MHz, scaling governor, and an
+    /// EGL pbuffer probe for renderer/vendor/version strings.
+    private fun collectCpuInfo(): Map<String, Any> {
+        val cores = try {
+            Runtime.getRuntime().availableProcessors()
+        } catch (_: Exception) {
+            0
+        }
+        val maxF = ArrayList<Int>(cores)
+        val minF = ArrayList<Int>(cores)
+        for (i in 0 until cores) {
+            maxF.add(
+                readKhz(
+                    "/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_max_freq",
+                ),
+            )
+            minF.add(
+                readKhz(
+                    "/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_min_freq",
+                ),
+            )
+        }
+        var governor = "—"
+        try {
+            governor = java.io.File(
+                "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
+            ).readText().trim().ifEmpty { "—" }
+        } catch (_: Exception) {
+        }
+        var eglRenderer = "—"
+        var eglVendor = "—"
+        var eglVersion = "—"
+        try {
+            val dpy = android.opengl.EGL14.eglGetDisplay(
+                android.opengl.EGL14.EGL_DEFAULT_DISPLAY,
+            )
+            val ver = IntArray(2)
+            if (android.opengl.EGL14.eglInitialize(dpy, ver, 0, ver, 1)) {
+                val cfgAttr = intArrayOf(
+                    android.opengl.EGL14.EGL_RENDERABLE_TYPE,
+                    android.opengl.EGL14.EGL_OPENGL_ES2_BIT,
+                    android.opengl.EGL14.EGL_SURFACE_TYPE,
+                    android.opengl.EGL14.EGL_PBUFFER_BIT,
+                    android.opengl.EGL14.EGL_RED_SIZE, 8,
+                    android.opengl.EGL14.EGL_GREEN_SIZE, 8,
+                    android.opengl.EGL14.EGL_BLUE_SIZE, 8,
+                    android.opengl.EGL14.EGL_NONE,
+                )
+                val configs = arrayOfNulls<android.opengl.EGLConfig>(1)
+                val n = IntArray(1)
+                android.opengl.EGL14.eglChooseConfig(
+                    dpy, cfgAttr, 0, configs, 0, 1, n, 0,
+                )
+                if (n[0] > 0 && configs[0] != null) {
+                    val surfAttr = intArrayOf(
+                        android.opengl.EGL14.EGL_WIDTH, 64,
+                        android.opengl.EGL14.EGL_HEIGHT, 64,
+                        android.opengl.EGL14.EGL_NONE,
+                    )
+                    val surf = android.opengl.EGL14
+                        .eglCreatePbufferSurface(
+                            dpy, configs[0], surfAttr, 0,
+                        )
+                    val ctxAttr = intArrayOf(
+                        android.opengl.EGL14.EGL_CONTEXT_CLIENT_VERSION,
+                        2,
+                        android.opengl.EGL14.EGL_NONE,
+                    )
+                    val ctx = android.opengl.EGL14.eglCreateContext(
+                        dpy, configs[0],
+                        android.opengl.EGL14.EGL_NO_CONTEXT,
+                        ctxAttr, 0,
+                    )
+                    if (android.opengl.EGL14.eglMakeCurrent(
+                            dpy, surf, surf, ctx,
+                        )
+                    ) {
+                        eglRenderer = android.opengl.GLES20
+                            .glGetString(
+                                android.opengl.GLES20.GL_RENDERER,
+                            ) ?: "—"
+                        eglVendor = android.opengl.GLES20
+                            .glGetString(
+                                android.opengl.GLES20.GL_VENDOR,
+                            ) ?: "—"
+                        eglVersion = android.opengl.GLES20
+                            .glGetString(
+                                android.opengl.GLES20.GL_VERSION,
+                            ) ?: "—"
+                    }
+                    android.opengl.EGL14.eglMakeCurrent(
+                        dpy,
+                        android.opengl.EGL14.EGL_NO_SURFACE,
+                        android.opengl.EGL14.EGL_NO_SURFACE,
+                        android.opengl.EGL14.EGL_NO_CONTEXT,
+                    )
+                    android.opengl.EGL14
+                        .eglDestroySurface(dpy, surf)
+                    android.opengl.EGL14
+                        .eglDestroyContext(dpy, ctx)
+                }
+                android.opengl.EGL14.eglTerminate(dpy)
+            }
+        } catch (_: Exception) {
+        }
+        return mapOf(
+            "maxFreqs" to maxF,
+            "minFreqs" to minF,
+            "governor" to governor,
+            "eglRenderer" to eglRenderer,
+            "eglVendor" to eglVendor,
+            "eglVersion" to eglVersion,
+        )
+    }
+
+    /// Active network transport for CubicDevice Info (WIFI/CELLULAR/
+    /// ETHERNET/CONNECTED/NONE). Best effort, never throws.
+    private fun activeNetworkType(): String {
+        return try {
+            val cm = getSystemService(CONNECTIVITY_SERVICE)
+                as? android.net.ConnectivityManager
+                ?: return "NONE"
+            val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+                ?: return "NONE"
+            when {
+                caps.hasTransport(
+                    android.net.NetworkCapabilities.TRANSPORT_WIFI,
+                ) -> "WIFI"
+                caps.hasTransport(
+                    android.net.NetworkCapabilities.TRANSPORT_CELLULAR,
+                ) -> "CELLULAR"
+                caps.hasTransport(
+                    android.net.NetworkCapabilities.TRANSPORT_ETHERNET,
+                ) -> "ETHERNET"
+                else -> "CONNECTED"
+            }
+        } catch (_: Exception) {
+            "NONE"
         }
     }
 
@@ -541,7 +1035,285 @@ class MainActivity : FlutterFragmentActivity() {
                 "openDeveloperOptions" -> {
                     result.success(openDeveloperOptionsPage())
                 }
+                "batteryLevel" -> {
+                    try {
+                        val bm = getSystemService(BATTERY_SERVICE) as? BatteryManager
+                        result.success(bm?.getIntProperty(
+                            BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1)
+                    } catch (e: Exception) {
+                        result.error("BATTERY_FAILED", e.message, null)
+                    }
+                }
+                "batteryCharging" -> {
+                    try {
+                        val st = registerReceiver(
+                            null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+                        val s = st?.getIntExtra(
+                            BatteryManager.EXTRA_STATUS, -1) ?: -1
+                        result.success(s == BatteryManager.BATTERY_STATUS_CHARGING ||
+                            s == BatteryManager.BATTERY_STATUS_FULL)
+                    } catch (e: Exception) {
+                        result.error("BATTERY_FAILED", e.message, null)
+                    }
+                }
                 else -> result.notImplemented()
+            }
+        }
+
+        // Internal storage stats (Dart: StorageStatusBar on Explore → Local).
+        // Channel "com.cubiclm.app/storage": getStorageStats -> {totalBytes, freeBytes}.
+        val storageChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.cubiclm.app/storage",
+        )
+        storageChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getStorageStats" -> {
+                    try {
+                        val stat = StatFs(filesDir.path)
+                        val total = stat.blockCountLong * stat.blockSizeLong
+                        val free = stat.availableBlocksLong * stat.blockSizeLong
+                        result.success(mapOf("totalBytes" to total, "freeBytes" to free))
+                    } catch (e: Exception) {
+                        result.error("STATFS_FAILED", e.message, null)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        // Device telemetry for CubicDevice Info (Dart: DeviceExtraService).
+        // Channel "com.cubiclm.app/device": cpuFreqsMHz -> [Int] (-1
+        // unknown), sensorCount -> Int, appCount -> Int (best effort on
+        // API 30+ without QUERY_ALL_PACKAGES), battVoltageMv -> Int,
+        // battTempC -> Double, battHealth/battTech -> String,
+        // uptimeMs -> Long, kernelVersion -> String, networkType ->
+        // WIFI|CELLULAR|ETHERNET|NONE.
+        val deviceChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.cubiclm.app/device",
+        )
+        deviceChannel.setMethodCallHandler { call, result ->
+            try {
+                when (call.method) {
+                    "cpuFreqsMHz" -> {
+                        val cores = Runtime.getRuntime().availableProcessors()
+                        val out = ArrayList<Int>(cores)
+                        for (i in 0 until cores) {
+                            val mhz = try {
+                                java.io.File(
+                                    "/sys/devices/system/cpu/cpu$i/cpufreq/scaling_cur_freq",
+                                ).readText().trim().toLong() / 1000L
+                            } catch (_: Exception) {
+                                -1L
+                            }
+                            out.add(mhz.toInt())
+                        }
+                        result.success(out)
+                    }
+                    "sensorCount" -> {
+                        val sm = getSystemService(SENSOR_SERVICE)
+                            as? android.hardware.SensorManager
+                        result.success(
+                            sm?.getSensorList(
+                                android.hardware.Sensor.TYPE_ALL,
+                            )?.size ?: -1,
+                        )
+                    }
+                    "appCount" -> {
+                        result.success(
+                            packageManager.getInstalledApplications(0).size,
+                        )
+                    }
+                    "battVoltageMv", "battTempC", "battHealth", "battTech" -> {
+                        val st = registerReceiver(
+                            null,
+                            IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+                        )
+                        when (call.method) {
+                            "battVoltageMv" -> result.success(
+                                st?.getIntExtra(
+                                    BatteryManager.EXTRA_VOLTAGE, -1,
+                                ) ?: -1,
+                            )
+                            "battTempC" -> result.success(
+                                (st?.getIntExtra(
+                                    BatteryManager.EXTRA_TEMPERATURE, -1,
+                                ) ?: -1) / 10.0,
+                            )
+                            "battHealth" -> {
+                                val h = st?.getIntExtra(
+                                    BatteryManager.EXTRA_HEALTH, -1,
+                                ) ?: -1
+                                result.success(
+                                    when (h) {
+                                        BatteryManager.BATTERY_HEALTH_GOOD -> "Good"
+                                        BatteryManager.BATTERY_HEALTH_OVERHEAT -> "Overheat"
+                                        BatteryManager.BATTERY_HEALTH_DEAD -> "Dead"
+                                        BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE -> "Over voltage"
+                                        BatteryManager.BATTERY_HEALTH_COLD -> "Cold"
+                                        BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE -> "Failure"
+                                        else -> "Unknown"
+                                    },
+                                )
+                            }
+                            else -> result.success(
+                                st?.getStringExtra(
+                                    BatteryManager.EXTRA_TECHNOLOGY,
+                                ) ?: "—",
+                            )
+                        }
+                    }
+                    "uptimeMs" -> result.success(
+                        android.os.SystemClock.elapsedRealtime(),
+                    )
+                    "kernelVersion" -> {
+                        result.success(
+                            try {
+                                java.io.File("/proc/version").readText()
+                                    .substringBefore("\n").trim()
+                            } catch (_: Exception) {
+                                "—"
+                            },
+                        )
+                    }
+                    "networkType" -> {
+                        result.success(activeNetworkType())
+                    }
+                    // System tab bundle for CubicDevice Info (one round-trip).
+                    "systemInfo" -> {
+                        result.success(collectSystemInfo())
+                    }
+                    // CPU tab bundle: per-core min/max kHz, governor,
+                    // EGL renderer/vendor/version (no permission needed).
+                    "cpuInfo" -> {
+                        result.success(collectCpuInfo())
+                    }
+                    // Battery live snapshot for the graph + capacities.
+                    "battLive" -> {
+                        result.success(collectBattLive())
+                    }
+                    // Device tab fields for CubicDevice Info. The three
+                    // telephony lookups need READ_PHONE_STATE — on
+                    // SecurityException they return "PERMISSION" and the
+                    // UI shows a Grant Permission button instead.
+                    "deviceName" -> {
+                        result.success(
+                            try {
+                                android.provider.Settings.Global.getString(
+                                    contentResolver,
+                                    android.provider.Settings.Global
+                                        .DEVICE_NAME,
+                                ) ?: android.os.Build.MODEL
+                            } catch (_: Exception) {
+                                android.os.Build.MODEL
+                            },
+                        )
+                    }
+                    "androidId" -> {
+                        result.success(
+                            try {
+                                android.provider.Settings.Secure.getString(
+                                    contentResolver,
+                                    android.provider.Settings.Secure
+                                        .ANDROID_ID,
+                                ) ?: "—"
+                            } catch (_: Exception) {
+                                "—"
+                            },
+                        )
+                    }
+                    "phoneType", "mobileNet" -> {
+                        try {
+                            val tm = getSystemService(
+                                TELEPHONY_SERVICE,
+                            ) as? android.telephony.TelephonyManager
+                            if (call.method == "phoneType") {
+                                result.success(
+                                    when (tm?.phoneType) {
+                                        android.telephony.TelephonyManager
+                                            .PHONE_TYPE_GSM ->
+                                            "Smartphone · GSM"
+                                        android.telephony.TelephonyManager
+                                            .PHONE_TYPE_CDMA ->
+                                            "Smartphone · CDMA"
+                                        android.telephony.TelephonyManager
+                                            .PHONE_TYPE_SIP ->
+                                            "SIP phone"
+                                        android.telephony.TelephonyManager
+                                            .PHONE_TYPE_NONE ->
+                                            "No voice radio"
+                                        else -> "Unknown"
+                                    },
+                                )
+                            } else {
+                                val nt = tm?.dataNetworkType
+                                    ?: android.telephony.TelephonyManager
+                                        .NETWORK_TYPE_UNKNOWN
+                                result.success(
+                                    when (nt) {
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_NR -> "5G"
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_LTE -> "LTE (4G)"
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_HSPAP,
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_HSPA,
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_HSDPA,
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_HSUPA,
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_UMTS,
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_EVDO_0,
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_EVDO_A,
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_EVDO_B,
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_EHRPD -> "3G"
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_GPRS,
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_EDGE,
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_CDMA,
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_1xRTT,
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_IDEN -> "2G"
+                                        android.telephony.TelephonyManager
+                                            .NETWORK_TYPE_UNKNOWN ->
+                                            "No service"
+                                        else -> "Unknown"
+                                    },
+                                )
+                            }
+                        } catch (e: SecurityException) {
+                            result.success("PERMISSION")
+                        } catch (e: Exception) {
+                            result.error("DEVICE_FAILED", e.message, null)
+                        }
+                    }
+                    "esim" -> {
+                        result.success(
+                            if (packageManager.hasSystemFeature(
+                                    android.content.pm.PackageManager
+                                        .FEATURE_TELEPHONY_EUICC,
+                                )
+                            ) {
+                                "Supported"
+                            } else {
+                                "Not Supported"
+                            },
+                        )
+                    }
+                    else -> result.notImplemented()
+                }
+            } catch (e: Exception) {
+                result.error("DEVICE_FAILED", e.message, null)
             }
         }
 

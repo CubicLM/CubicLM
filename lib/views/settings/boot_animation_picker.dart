@@ -8,6 +8,7 @@ import '../../theme/design_tokens.dart';
 import '../../core/routes.dart';
 import 'boot_anims/boot_cube_animation.dart';
 import 'boot_anims/boot_liquid_animation.dart';
+import 'boot_anims/boot_shimmer_animation.dart';
 import 'chat_anims/chat_cube_animation.dart';
 import 'chat_anims/chat_liquid_animation.dart';
 import 'chat_anims/chat_shimmer_animation.dart';
@@ -33,7 +34,7 @@ class BootAnimationPickerView extends StatelessWidget {
         return 'Liquid Wave Dot';
       case 'shimmer':
       default:
-        return 'Shimmer name';
+        return 'CubicLM Shimmer';
     }
   }
 
@@ -42,7 +43,7 @@ class BootAnimationPickerView extends StatelessWidget {
     final settings = Get.find<SettingsController>();
     final ids = _isChat
         ? const ['shimmer', 'cube3d', 'liquid_wave']
-        : const ['cube3d', 'liquid_wave'];
+        : const ['shimmer', 'cube3d', 'liquid_wave'];
     return Scaffold(
       appBar: AppBar(
         title: Text(_isChat ? 'Chat animation' : 'Boot animation',
@@ -68,26 +69,30 @@ class BootAnimationPickerView extends StatelessWidget {
             );
           }),
           const SizedBox(height: 16),
-          // 400 → 420: the cube frame's Customize button needs
-          // ~40px under the subtitle (was a 17px overflow).
-          SizedBox(
-            height: 420,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: ids.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(width: 14),
-              itemBuilder: (context, i) {
-                final id = ids[i];
-                return _AnimFrame(
-                  id: id,
-                  title: _name(id),
-                  subtitle: _subtitle(id),
-                  preview:
-                      _previewFor(context, id, _isChat),
-                );
-              },
+          // Vertical 2-per-row grid (no more left-right swipe).
+          // shrinkWrap + never-scroll: the outer ListView scrolls.
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: ids.length,
+            gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 18,
+              // Cell ≈ 173 wide → ~360 tall (frame + labels + btn).
+              childAspectRatio: 0.48,
             ),
+            itemBuilder: (context, i) {
+              final id = ids[i];
+              return _AnimFrame(
+                id: id,
+                title: _name(id),
+                subtitle: _subtitle(id),
+                preview:
+                    _previewFor(context, id, _isChat),
+              );
+            },
           ),
         ],
       ),
@@ -102,7 +107,7 @@ class BootAnimationPickerView extends StatelessWidget {
         return 'Bouncing dot, sloshing liquid';
       case 'shimmer':
       default:
-        return 'Current look — logo + shimmer';
+        return 'Logo + sweeping shimmer';
     }
   }
 
@@ -117,7 +122,7 @@ class BootAnimationPickerView extends StatelessWidget {
           return const ChatLiquidAnimation();
         case 'shimmer':
         default:
-          // Frame is 210px wide; shimmer name is 44px — scale to fit.
+          // Frame is narrow; full shimmer is 44px text — scale to fit.
           return Builder(builder: (ctx) {
             final isDark =
                 Theme.of(ctx).brightness == Brightness.dark;
@@ -136,6 +141,8 @@ class BootAnimationPickerView extends StatelessWidget {
     switch (id) {
       case 'liquid_wave':
         return const BootLiquidAnimation();
+      case 'shimmer':
+        return const BootShimmerAnimation();
       case 'cube3d':
       default:
         return const BootCubeAnimation();
@@ -184,8 +191,8 @@ class _AnimFrame extends StatelessWidget {
             Stack(
               children: [
                 Container(
-                  width: 210,
-                  height: 320,
+                  width: double.infinity,
+                  height: 280,
                   decoration: BoxDecoration(
                     color: frameBg,
                     borderRadius: BorderRadius.circular(24),
@@ -218,25 +225,21 @@ class _AnimFrame extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            SizedBox(
-              width: 210,
-              child: Text(title,
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14, fontWeight: FontWeight.w800)),
-            ),
-            SizedBox(
-              width: 210,
-              child: Text(subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11.5,
-                      color: Theme.of(context).hintColor)),
-            ),
+            Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14, fontWeight: FontWeight.w800)),
+            Text(subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11.5,
+                    color: Theme.of(context).hintColor)),
             if (id == 'cube3d') ...[
               const SizedBox(height: 6),
               SizedBox(
-                width: 210,
+                width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => Get.toNamed(AppRoutes.cubeEditor),
                   icon: const Icon(LucideIcons.sliders, size: 13),

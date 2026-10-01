@@ -122,6 +122,8 @@ class _ToolkitViewState extends State<ToolkitView> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _toolkitInfoRow('CubicDevice Info',
+                  'Live device telemetry — RAM, CPU cores, storage, battery, sensors and network.'),
               _toolkitInfoRow('CubicTranslator',
                   'Offline translator on your local model — 20 languages with auto-detect and streaming.'),
               _toolkitInfoRow('Battle Arena',

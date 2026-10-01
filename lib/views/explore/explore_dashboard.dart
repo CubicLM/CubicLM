@@ -21,10 +21,13 @@ import '../../models/ai_model.dart';
 import '../../services/chip_advice.dart';
 import '../../services/device_info_service.dart';
 import '../../services/inference_service.dart';
+import '../../services/power_info_service.dart';
 import '../../services/soc_family.dart';
+import '../../services/storage_info_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/soc_brand_icon.dart';
 import '../hub/hub_widgets.dart';
+import '../device_info_view.dart';
 import 'add_model_sheet.dart';
 import 'local_model_card.dart';
 
@@ -345,25 +348,15 @@ class _ExploreDashboardState extends State<ExploreDashboard> {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              HubRing(
-                fraction: ramFrac,
-                center: totalRam > 0 ? '${(ramFrac * 100).round()}%' : '—',
-                label: totalRam > 0
-                    ? 'RAM · ${availRam.toStringAsFixed(1)} free'
-                    : 'RAM',
-                color: ramFrac > 0.85 ? AppColors.warning : primary,
-              ),
-              HubRing(
-                fraction: ctxFrac,
-                center: ctxTotal > 0 ? '${(ctxFrac * 100).round()}%' : '—',
-                label: ctxTotal > 0 ? 'Context · $ctxUsed used' : 'Context',
-                color: ctxFrac > 0.9 ? AppColors.warning : primary,
-              ),
-            ],
+          const SizedBox(height: 6),
+          _RingsZone(
+            ramFrac: ramFrac,
+            ctxFrac: ctxFrac,
+            availRam: availRam,
+            totalRam: totalRam,
+            ctxUsed: ctxUsed,
+            ctxTotal: ctxTotal,
+            primary: primary,
           ),
           const SizedBox(height: 14),
           Container(
@@ -526,6 +519,32 @@ class _ExploreDashboardState extends State<ExploreDashboard> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          // Deep link: full device telemetry in Toolkit → Device Info.
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () =>
+                  Get.to(() => const DeviceInfoView()),
+              icon: const Icon(LucideIcons.activity, size: 15),
+              label: Text('View details',
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor:
+                    Theme.of(context).colorScheme.onSurface,
+                side: BorderSide(
+                    color: Theme.of(context)
+                        .dividerColor
+                        .withValues(alpha: 0.8)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
           ),
         ],
       ),
@@ -1002,6 +1021,237 @@ class _DownloadedFrameState extends State<_DownloadedFrame> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Rings zone: RAM + Context + Storage + Battery.
+///
+/// Grid toggle (top-right): 2x2 grid shows all four at once; carousel
+/// mode shows 2 per page with left-right swipe + dots. Storage and
+/// battery load once via platform channels (cached); RAM/Context come
+/// from the parent synchronously.
+class _RingsZone extends StatefulWidget {
+  final double ramFrac;
+  final double ctxFrac;
+  final double availRam;
+  final double totalRam;
+  final int ctxUsed;
+  final int ctxTotal;
+  final Color primary;
+
+  const _RingsZone({
+    required this.ramFrac,
+    required this.ctxFrac,
+    required this.availRam,
+    required this.totalRam,
+    required this.ctxUsed,
+    required this.ctxTotal,
+    required this.primary,
+  });
+
+  @override
+  State<_RingsZone> createState() => _RingsZoneState();
+}
+
+class _ExtraRings {
+  final double storageFrac;
+  final String storageLabel;
+  final bool storageReady;
+  final int batteryLevel; // -1 = unknown
+  final bool batteryCharging;
+  const _ExtraRings({
+    required this.storageFrac,
+    required this.storageLabel,
+    required this.storageReady,
+    required this.batteryLevel,
+    required this.batteryCharging,
+  });
+}
+
+class _RingsZoneState extends State<_RingsZone> {
+  bool _grid = true; // 2x2 grid vs 2-per-page carousel
+  int _page = 0;
+  late final PageController _pageCtrl;
+  late final Future<_ExtraRings> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageCtrl = PageController();
+    _future = _load();
+  }
+
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<_ExtraRings> _load() async {
+    double sFrac = 0;
+    var sLabel = 'Storage';
+    var sReady = false;
+    try {
+      final s = await StorageInfoService.getStats();
+      if (s != null && s.totalBytes > 0) {
+        sFrac = s.usedFraction.clamp(0.0, 1.0);
+        sLabel =
+            'Storage · ${(s.freeBytes / 1000000000).toStringAsFixed(1)} free';
+        sReady = true;
+      }
+    } catch (_) {}
+    var level = -1;
+    var charging = false;
+    try {
+      final b = await PowerInfoService.getBattery();
+      if (b != null) {
+        level = b.level;
+        charging = b.charging;
+      }
+    } catch (_) {}
+    return _ExtraRings(
+      storageFrac: sFrac,
+      storageLabel: sLabel,
+      storageReady: sReady,
+      batteryLevel: level,
+      batteryCharging: charging,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_ExtraRings>(
+      future: _future,
+      builder: (context, snap) {
+        final ex = snap.data;
+        final ramRing = HubRing(
+          fraction: widget.ramFrac,
+          center: widget.totalRam > 0
+              ? '${(widget.ramFrac * 100).round()}%'
+              : '—',
+          label: widget.totalRam > 0
+              ? 'RAM · ${widget.availRam.toStringAsFixed(1)} free'
+              : 'RAM',
+          color: widget.ramFrac > 0.85
+              ? AppColors.warning
+              : widget.primary,
+        );
+        final ctxRing = HubRing(
+          fraction: widget.ctxFrac,
+          center: widget.ctxTotal > 0
+              ? '${(widget.ctxFrac * 100).round()}%'
+              : '—',
+          label: widget.ctxTotal > 0
+              ? 'Context · ${widget.ctxUsed} used'
+              : 'Context',
+          color: widget.ctxFrac > 0.9
+              ? AppColors.warning
+              : widget.primary,
+        );
+        final sFrac = ex?.storageFrac ?? 0;
+        final stoRing = HubRing(
+          fraction: sFrac,
+          center: (ex?.storageReady ?? false)
+              ? '${(sFrac * 100).round()}%'
+              : '—',
+          label: ex?.storageLabel ?? 'Storage',
+          color: sFrac > 0.9
+              ? AppColors.error
+              : sFrac > 0.75
+                  ? AppColors.warning
+                  : widget.primary,
+        );
+        final batLevel = ex?.batteryLevel ?? -1;
+        final batRing = HubRing(
+          fraction: batLevel >= 0 ? batLevel / 100 : 0,
+          center: batLevel >= 0 ? '$batLevel%' : '—',
+          label: batLevel >= 0
+              ? ((ex?.batteryCharging ?? false)
+                  ? 'Battery · charging'
+                  : 'Battery')
+              : 'Battery',
+          color: batLevel >= 0 && batLevel <= 20
+              ? AppColors.warning
+              : widget.primary,
+        );
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                InkWell(
+                  onTap: () => setState(() => _grid = !_grid),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      _grid
+                          ? Icons.view_carousel_rounded
+                          : Icons.grid_view_rounded,
+                      size: 15,
+                      color: Theme.of(context).hintColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_grid) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [ramRing, ctxRing],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [stoRing, batRing],
+              ),
+            ] else ...[
+              SizedBox(
+                height: 132,
+                child: PageView(
+                  controller: _pageCtrl,
+                  onPageChanged: (i) => setState(() => _page = i),
+                  children: [
+                    Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment.spaceEvenly,
+                      children: [ramRing, ctxRing],
+                    ),
+                    Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment.spaceEvenly,
+                      children: [stoRing, batRing],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 0; i < 2; i++)
+                    Container(
+                      width: 6,
+                      height: 6,
+                      margin:
+                          const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _page == i
+                            ? widget.primary
+                            : Theme.of(context)
+                                .hintColor
+                                .withValues(alpha: 0.3),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

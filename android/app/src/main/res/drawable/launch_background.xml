@@ -3,7 +3,14 @@
      dark-navy icon centered — visible immediately, no disc, no black. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/launch_background" />
-    <item android:gravity="center">
-        <bitmap android:src="@mipmap/ic_launcher" />
+    <!-- 96dp logo (bitmap intrinsic is 48dp): item bounds + fill gravity
+         scale it up. Width/height on item needs API 23+; minSdk is 28. -->
+    <item
+        android:width="96dp"
+        android:height="96dp"
+        android:gravity="center">
+        <bitmap
+            android:src="@mipmap/ic_launcher"
+            android:gravity="fill" />
     </item>
 </layer-list>

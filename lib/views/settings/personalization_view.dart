@@ -300,9 +300,7 @@ class PersonalizationView extends GetView<SettingsController> {
                   isDark,
                   leading: Icon(LucideIcons.clapperboard, size: 20, color: Theme.of(context).primaryColor),
                   title: 'Boot animation',
-                  subtitle: controller.bootAnimation.value == 'liquid_wave'
-                      ? 'Current: Liquid Wave Dot — tap to preview'
-                      : 'Current: 3D Tech Cube — tap to preview',
+                  subtitle: _bootAnimName(controller.bootAnimation.value),
                   showDivider: false,
                   trailing: Icon(LucideIcons.chevronRight,
                       size: 18, color: Theme.of(context).hintColor),
@@ -354,6 +352,19 @@ class PersonalizationView extends GetView<SettingsController> {
     );
   }
 
+  /// Display name for the Boot animation setting (subtitle of the tile).
+  String _bootAnimName(String id) {
+    switch (id) {
+      case 'liquid_wave':
+        return 'Current: Liquid Wave Dot — tap to preview';
+      case 'shimmer':
+        return 'Current: CubicLM Shimmer — tap to preview';
+      case 'cube3d':
+      default:
+        return 'Current: 3D Tech Cube — tap to preview';
+    }
+  }
+
   /// Display name for the Chat animation setting (subtitle of the tile).
   String _chatAnimName(String id) {
     switch (id) {
@@ -363,7 +374,7 @@ class PersonalizationView extends GetView<SettingsController> {
         return 'Current: Liquid Wave Dot — tap to preview';
       case 'shimmer':
       default:
-        return 'Current: Shimmer name — tap to preview';
+        return 'Current: CubicLM Shimmer — tap to preview';
     }
   }
 

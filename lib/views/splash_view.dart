@@ -9,7 +9,8 @@ import '../services/hive_service.dart';
 import '../controllers/settings_controller.dart';
 import '../theme/design_tokens.dart';
 
-/// Boot Animation Splash View supporting both 'cube3d' and 'liquid_wave' selections.
+/// Boot Animation Splash View supporting 'cube3d', 'liquid_wave'
+/// and 'shimmer' selections.
 class SplashView extends StatefulWidget {
   const SplashView({super.key});
 
@@ -93,6 +94,8 @@ class _SplashViewState extends State<SplashView>
 
               if (_bootAnimType == 'liquid_wave') {
                 return _LiquidWaveSplash(progress: p, isDark: isDark);
+              } else if (_bootAnimType == 'shimmer') {
+                return _ShimmerSplash(progress: p, isDark: isDark);
               } else {
                 return _Cube3DSplash(progress: p, isDark: isDark);
               }
@@ -450,6 +453,60 @@ class CustomShimmerBrandText extends StatelessWidget {
 
 // Backwards compatibility alias
 typedef ShimmerBrandText = CustomShimmerBrandText;
+
+// ==========================================
+// ANIMATION 3: CUBICLM SHIMMER (logo + sweeping shimmer text)
+// ==========================================
+class _ShimmerSplash extends StatelessWidget {
+  final double progress;
+  final bool isDark;
+
+  const _ShimmerSplash({required this.progress, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final logoIn =
+        Curves.easeOutCubic.transform((progress / 0.25).clamp(0.0, 1.0));
+    final tagIn = Curves.easeOut
+        .transform(((progress - 0.70) / 0.20).clamp(0.0, 1.0));
+    final textColor = isDark ? Colors.white : Dt.textPrimary;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Opacity(
+          opacity: logoIn,
+          child: Transform.scale(
+            scale: 0.8 + 0.2 * logoIn,
+            child: Image.asset(
+              'assets/icons/CubicLM.png',
+              width: 96,
+              height: 96,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        ShimmerBrandText(
+            shimmerProgress: progress, textColor: textColor),
+        const SizedBox(height: 28),
+        Opacity(
+          opacity: tagIn,
+          child: Text(
+            'Think • Create • Explore',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 2.0,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.5)
+                  : Dt.textSecondary.withValues(alpha: 0.7),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 // ==========================================
 // ANIMATION 2: LIQUID WAVE DOT

@@ -15,6 +15,7 @@ import 'explore/explore_dashboard.dart';
 import 'explore/local_model_card.dart';
 import 'explore/provider_cards.dart';
 import 'gallery_view.dart';
+import 'storage_status_bar.dart';
 import '../widgets/app_ui.dart';
 
 class ModelView extends GetView<ModelController> {
@@ -129,6 +130,8 @@ class ModelView extends GetView<ModelController> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildImportingProgress(context),
+              const StorageStatusBar(),
+              const SizedBox(height: 8),
               _buildLocalFilterChips(context),
               const SizedBox(height: 8),
               _buildLocalHeaderRow(context),
