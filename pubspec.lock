@@ -217,6 +217,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.9"
+  cupertino_ui:
+    dependency: transitive
+    description:
+      name: cupertino_ui
+      sha256: c23816577a1280cff409e989541767887011f8f1d8c1863a794ed308af46f2a9
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.1"
   dart_mcp:
     dependency: "direct main"
     description:
@@ -277,10 +285,10 @@ packages:
     dependency: "direct main"
     description:
       name: dynamic_color
-      sha256: "43a5a6679649a7731ab860334a5812f2067c2d9ce6452cf069c5e0c25336c17c"
+      sha256: "869b3bce0100eb519768ecd71c0111f0b5ea679f5f62e1f59c49d80067e730c5"
       url: "https://pub.dev"
     source: hosted
-    version: "1.8.1"
+    version: "2.1.0"
   fake_async:
     dependency: transitive
     description:
@@ -557,6 +565,11 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.1"
+  flutter_localizations:
+    dependency: transitive
+    description: flutter
+    source: sdk
+    version: "0.0.0"
   flutter_markdown:
     dependency: "direct main"
     description:
@@ -965,6 +978,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.13.0"
+  material_ui:
+    dependency: transitive
+    description:
+      name: material_ui
+      sha256: "134ab2f0843545c4e661e4ba2753fe1bcf0753cb690d5a9ee4870638a40411e9"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.4.0"
   meta:
     dependency: transitive
     description:
