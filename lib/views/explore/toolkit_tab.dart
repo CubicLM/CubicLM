@@ -12,7 +12,6 @@ import '../cubicapp_builder_view.dart';
 import '../cubicdata/datasheet_home_view.dart';
 import '../cubicweb/browser_view.dart';
 import '../runtime/runtime_setup_view.dart';
-import '../device_info_view.dart';
 import '../slide_deck_view.dart';
 import '../terminal/terminal_view.dart';
 import '../translator_view.dart';
@@ -35,13 +34,6 @@ class _ToolSpec {
 }
 
 List<_ToolSpec> _toolSpecs() => [
-      _ToolSpec(
-        icon: LucideIcons.activity,
-        title: 'CubicDevice Info',
-        description:
-            'Live hardware dashboard — RAM graph, per-core CPU, storage, battery, display, sensors, network.',
-        open: () => const DeviceInfoView(),
-      ),
       _ToolSpec(
         icon: LucideIcons.languages,
         title: 'CubicTranslator',

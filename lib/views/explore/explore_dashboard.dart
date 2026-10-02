@@ -26,6 +26,7 @@ import '../../services/soc_family.dart';
 import '../../services/storage_info_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/soc_brand_icon.dart';
+import '../context_window_view.dart';
 import '../hub/hub_widgets.dart';
 import '../device_info_view.dart';
 import 'add_model_sheet.dart';
@@ -224,10 +225,14 @@ class _ExploreDashboardState extends State<ExploreDashboard> {
                     icon: LucideIcons.download)),
             const SizedBox(width: 10),
             Expanded(
-                child: HubStatTile(
-                    value: ctxTotal > 0 ? '$ctxTotal' : '—',
-                    caption: 'Context window',
-                    icon: LucideIcons.brainCircuit)),
+                child: InkWell(
+                    onTap: () =>
+                        Get.to(() => const ContextWindowView()),
+                    borderRadius: BorderRadius.circular(16),
+                    child: HubStatTile(
+                        value: ctxTotal > 0 ? '$ctxTotal' : '—',
+                        caption: 'Context window',
+                        icon: LucideIcons.brainCircuit))),
           ]),
           const SizedBox(height: 20),
           const HubSectionTitle('Features'),

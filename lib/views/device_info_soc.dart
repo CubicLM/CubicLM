@@ -154,15 +154,7 @@ const _socTable = [
         SocCluster(4, 'Cortex-A55', '1.80'),
       ],
       '5 nm Samsung'),
-  SocSpec(
-      ['zuma'],
-      'Google Tensor G3',
-      [
-        SocCluster(1, 'Cortex-X3', '2.91'),
-        SocCluster(4, 'Cortex-A715', '2.37'),
-        SocCluster(4, 'Cortex-A510', '1.70'),
-      ],
-      '4 nm Samsung'),
+  // NOTE: zumapro must precede zuma — 'zumapro'.contains('zuma').
   SocSpec(
       ['zumapro'],
       'Google Tensor G4',
@@ -170,6 +162,15 @@ const _socTable = [
         SocCluster(1, 'Cortex-X4', '3.10'),
         SocCluster(3, 'Cortex-A720', '2.60'),
         SocCluster(4, 'Cortex-A520', '1.92'),
+      ],
+      '4 nm Samsung'),
+  SocSpec(
+      ['zuma'],
+      'Google Tensor G3',
+      [
+        SocCluster(1, 'Cortex-X3', '2.91'),
+        SocCluster(4, 'Cortex-A715', '2.37'),
+        SocCluster(4, 'Cortex-A510', '1.70'),
       ],
       '4 nm Samsung'),
   SocSpec(
@@ -200,6 +201,36 @@ const _socTable = [
       ],
       '5 nm TSMC'),
 ];
+
+/// RAM type/speed per chip (public specs, conservative list).
+/// Unknown chips return null and the UI shows the measured total only.
+const _ramTable = {
+  'sm8150': 'LPDDR4X 2133 MHz',
+  'sm8450': 'LPDDR5 3200 MHz',
+  'sm8475': 'LPDDR5 3200 MHz',
+  'sm8550': 'LPDDR5X 4200 MHz',
+  'sm8650': 'LPDDR5X 4800 MHz',
+  'sm8750': 'LPDDR5X 5333 MHz',
+  'sm7325': 'LPDDR5 3200 MHz',
+  'sm6375': 'LPDDR4X 2133 MHz',
+  'sm6225': 'LPDDR4X 2133 MHz',
+  'mt6983': 'LPDDR5X 3750 MHz',
+  'mt6833': 'LPDDR4X 2133 MHz',
+  'gs201': 'LPDDR5 3200 MHz',
+  'zumapro': 'LPDDR5X 4200 MHz',
+  'zuma': 'LPDDR5X 4200 MHz',
+  'exynos2100': 'LPDDR5 2750 MHz',
+  's5e9925': 'LPDDR5 3200 MHz',
+};
+
+String? ramFor(String hardware) {
+  final h = hardware.toLowerCase();
+  if (h.isEmpty) return null;
+  for (final e in _ramTable.entries) {
+    if (h.contains(e.key)) return e.value;
+  }
+  return null;
+}
 
 /// Returns the marketing spec when [hardware] matches, else null
 /// (caller falls back to measured data only).

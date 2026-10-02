@@ -10,6 +10,7 @@ import '../../core/colors.dart';
 import '../../services/inference_service.dart';
 import '../../services/notification_history_service.dart';
 import '../../theme/design_tokens.dart';
+import '../context_window_view.dart';
 import '../notification_history_view.dart';
 import 'chat_format.dart';
 
@@ -358,14 +359,20 @@ Widget contextBar(BuildContext context, bool isDark) {
     final accent = data.isLocal
         ? (data.warn ? AppColors.warning : AppColors.primary)
         : Dt.accent;
-    return _buildModernBar(
-      context,
-      isDark,
-      icon: data.isLocal ? Icons.memory_rounded : Icons.cloud_done_rounded,
-      label: data.label,
-      value: data.value,
-      progress: data.isLocal ? data.progress : null,
-      accent: accent,
+    // Tap opens the full Context Window page (Local/Online tabs).
+    return InkWell(
+      onTap: () => Get.to(() => ContextWindowView(
+          initialTab: data.isLocal ? 0 : 1)),
+      borderRadius: BorderRadius.circular(16),
+      child: _buildModernBar(
+        context,
+        isDark,
+        icon: data.isLocal ? Icons.memory_rounded : Icons.cloud_done_rounded,
+        label: data.label,
+        value: data.value,
+        progress: data.isLocal ? data.progress : null,
+        accent: accent,
+      ),
     );
   });
 }

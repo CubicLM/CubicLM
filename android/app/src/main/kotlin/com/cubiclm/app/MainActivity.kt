@@ -5,11 +5,14 @@ import android.app.AlertDialog
 import android.app.AlarmManager
 import android.app.DownloadManager
 import android.app.PendingIntent
+import android.app.usage.NetworkStats
+import android.app.usage.NetworkStatsManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageInstaller
+import android.hardware.camera2.CameraCharacteristics as CamChars
 import android.net.Uri
 import android.util.Log
 import android.os.Build
@@ -411,6 +414,1388 @@ class MainActivity : FlutterFragmentActivity() {
             "designMah" to designMah,
             "fullMah" to fullMah,
         )
+    }
+
+    /// Validated-internet + metered flags for the Connectivity tab.
+    private fun collectNetExtra(): Map<String, Any> {
+        var validated = false
+        var metered = false
+        var captive = false
+        try {
+            val cm = getSystemService(CONNECTIVITY_SERVICE)
+                as? android.net.ConnectivityManager
+            val net = cm?.activeNetwork
+            val caps = if (net != null) {
+                cm.getNetworkCapabilities(net)
+            } else {
+                null
+            }
+            if (caps != null) {
+                validated = caps.hasCapability(
+                    android.net.NetworkCapabilities
+                        .NET_CAPABILITY_VALIDATED,
+                )
+                captive = caps.hasCapability(
+                    android.net.NetworkCapabilities
+                        .NET_CAPABILITY_CAPTIVE_PORTAL,
+                )
+            }
+            try {
+                metered = cm?.isActiveNetworkMetered() ?: false
+            } catch (_: Exception) {
+            }
+        } catch (_: Exception) {
+        }
+        return mapOf(
+            "validated" to validated,
+            "metered" to metered,
+            "captive" to captive,
+        )
+    }
+
+    /// Display tab bundle. Everything here is permission-free
+    /// (Display APIs + Settings.System reads).
+    private fun collectDisplayInfo(): Map<String, Any?> {
+        var wPx = -1
+        var hPx = -1
+        var densityDpi = -1
+        var fontScale = -1.0f
+        var xdpi = -1f
+        var ydpi = -1f
+        var refreshNow = -1f
+        val refreshAll = ArrayList<Double>()
+        var hdr = false
+        val hdrCaps = ArrayList<String>()
+        var wideGamut = false
+        var builtIn = true
+        try {
+            val disp = if (
+                android.os.Build.VERSION.SDK_INT >= 30
+            ) {
+                display
+            } else {
+                @Suppress("DEPRECATION")
+                windowManager.defaultDisplay
+            }
+            if (disp != null) {
+                try {
+                    val pt = android.graphics.Point()
+                    @Suppress("DEPRECATION")
+                    disp.getRealSize(pt)
+                    wPx = pt.x
+                    hPx = pt.y
+                } catch (_: Exception) {
+                }
+                try {
+                    refreshNow = disp.refreshRate
+                } catch (_: Exception) {
+                }
+                try {
+                    for (m in disp.supportedModes) {
+                        refreshAll.add(
+                            m.refreshRate.toDouble(),
+                        )
+                    }
+                } catch (_: Exception) {
+                }
+                try {
+                    hdr = disp.isHdr
+                } catch (_: Exception) {
+                }
+                try {
+                    val hc = disp.hdrCapabilities
+                    if (hc != null) {
+                        for (t in hc.supportedHdrTypes) {
+                            when (t) {
+                                android.view.Display.HdrCapabilities
+                                    .HDR_TYPE_DOLBY_VISION ->
+                                    hdrCaps.add("Dolby Vision")
+                                android.view.Display.HdrCapabilities
+                                    .HDR_TYPE_HDR10 ->
+                                    hdrCaps.add("HDR10")
+                                android.view.Display.HdrCapabilities
+                                    .HDR_TYPE_HLG ->
+                                    hdrCaps.add("HLG")
+                                android.view.Display.HdrCapabilities
+                                    .HDR_TYPE_HDR10_PLUS ->
+                                    hdrCaps.add("HDR10+")
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
+                }
+                try {
+                    wideGamut = disp.isWideColorGamut
+                } catch (_: Exception) {
+                }
+                try {
+                    // No getType() API exists: display 0 is the
+                    // built-in panel on phones.
+                    builtIn = disp.displayId ==
+                        android.view.Display.DEFAULT_DISPLAY
+                } catch (_: Exception) {
+                }
+            }
+        } catch (_: Exception) {
+        }
+        try {
+            val dm = resources.displayMetrics
+            densityDpi = dm.densityDpi
+            xdpi = dm.xdpi
+            ydpi = dm.ydpi
+            fontScale = resources.configuration.fontScale
+        } catch (_: Exception) {
+        }
+        var bright = -1
+        var brightMode: String? = null
+        var timeoutMs = -1L
+        try {
+            val cr = contentResolver
+            bright = android.provider.Settings.System.getInt(
+                cr,
+                android.provider.Settings.System.SCREEN_BRIGHTNESS,
+                -1,
+            )
+            val mode = android.provider.Settings.System.getInt(
+                cr,
+                android.provider.Settings.System
+                    .SCREEN_BRIGHTNESS_MODE,
+                -1,
+            )
+            brightMode = when (mode) {
+                android.provider.Settings.System
+                    .SCREEN_BRIGHTNESS_MODE_AUTOMATIC ->
+                    "Automatic"
+                android.provider.Settings.System
+                    .SCREEN_BRIGHTNESS_MODE_MANUAL ->
+                    "Manual"
+                else -> null
+            }
+            timeoutMs = android.provider.Settings.System.getLong(
+                cr,
+                android.provider.Settings.System.SCREEN_OFF_TIMEOUT,
+                -1L,
+            )
+        } catch (_: Exception) {
+        }
+        var orient = "—"
+        try {
+            orient = when (
+                resources.configuration.orientation
+            ) {
+                android.content.res.Configuration
+                    .ORIENTATION_PORTRAIT -> "Portrait"
+                android.content.res.Configuration
+                    .ORIENTATION_LANDSCAPE -> "Landscape"
+                android.content.res.Configuration
+                    .ORIENTATION_SQUARE -> "Square"
+                else -> "—"
+            }
+        } catch (_: Exception) {
+        }
+        return mapOf(
+            "wPx" to wPx,
+            "hPx" to hPx,
+            "densityDpi" to densityDpi,
+            "fontScale" to fontScale.toDouble(),
+            "xdpi" to xdpi.toDouble(),
+            "ydpi" to ydpi.toDouble(),
+            "refreshNow" to refreshNow.toDouble(),
+            "refreshAll" to refreshAll.distinct().sorted(),
+            "hdr" to hdr,
+            "hdrCaps" to hdrCaps,
+            "wideGamut" to wideGamut,
+            "builtIn" to builtIn,
+            "brightness" to bright,
+            "brightnessMode" to brightMode,
+            "timeoutMs" to timeoutMs,
+            "orientation" to orient,
+        )
+    }
+
+    /// Thermal zones 0..199 (stops after 8 consecutive missing) +
+    /// PowerManager thermal status (API 29+). Millidegrees → °C.
+    private fun collectThermalInfo(): Map<String, Any> {
+        val sensors = ArrayList<Map<String, Any>>()
+        var missing = 0
+        for (i in 0 until 200) {
+            val base = "/sys/class/thermal/thermal_zone$i"
+            try {
+                val type = java.io.File("$base/type")
+                    .readText().trim()
+                val raw = java.io.File("$base/temp")
+                    .readText().trim().toLong()
+                if (type.isEmpty()) {
+                    missing++
+                } else {
+                    missing = 0
+                    val row = HashMap<String, Any>()
+                    row["name"] = type
+                    row["tempC"] = raw / 1000.0
+                    sensors.add(row)
+                }
+            } catch (_: Exception) {
+                missing++
+            }
+            if (missing >= 8) break
+        }
+        var status = -1
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                val pm = getSystemService(POWER_SERVICE)
+                    as? android.os.PowerManager
+                status = pm?.currentThermalStatus
+                    ?: -1
+            }
+        } catch (_: Exception) {
+        }
+        return mapOf("status" to status, "sensors" to sensors)
+    }
+
+    /// Manifest components of one visible package for the Apps
+    /// detail sheet (permissions/activities/services/receivers/
+    /// providers as plain string lists).
+    private fun collectAppDetail(pkg: String): Map<String, Any> {
+        val pm = packageManager
+        @Suppress("DEPRECATION")
+        val pi = pm.getPackageInfo(
+            pkg,
+            android.content.pm.PackageManager.GET_ACTIVITIES or
+                android.content.pm.PackageManager.GET_SERVICES or
+                android.content.pm.PackageManager.GET_RECEIVERS or
+                android.content.pm.PackageManager.GET_PROVIDERS or
+                android.content.pm.PackageManager.GET_PERMISSIONS,
+        )
+        fun strs(arr: Array<out String>?): List<String> {
+            return arr?.toList() ?: emptyList()
+        }
+        return mapOf(
+            "permissions" to strs(pi.requestedPermissions),
+            "activities" to
+                (pi.activities?.map { it.name } ?: emptyList()),
+            "services" to
+                (pi.services?.map { it.name } ?: emptyList()),
+            "receivers" to
+                (pi.receivers?.map { it.name } ?: emptyList()),
+            "providers" to
+                (pi.providers?.map { it.authority } ?: emptyList()),
+        )
+    }
+
+    private fun openAppSettings(pkg: String): Boolean {
+        return try {
+            val intent = android.content.Intent(
+                android.provider.Settings
+                    .ACTION_APPLICATION_DETAILS_SETTINGS,
+                android.net.Uri.parse("package:$pkg"),
+            )
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun launchApp(pkg: String): Boolean {
+        return try {
+            val intent = packageManager.getLaunchIntentForPackage(pkg)
+                ?: return false
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /// Copies base.apk (+splits) to external-files/ExtractedAPKs for
+    /// sharing. Returns the absolute path of the main copy.
+    private fun extractApk(pkg: String): String {
+        val pi = packageManager.getPackageInfo(pkg, 0)
+        val ai = pi.applicationInfo ?: throw IllegalStateException(
+            "no app info",
+        )
+        val outDir = java.io.File(
+            getExternalFilesDir(null), "ExtractedAPKs",
+        )
+        if (!outDir.exists()) outDir.mkdirs()
+        val safeLabel = (packageManager.getApplicationLabel(ai)
+            ?.toString() ?: pkg)
+            .replace(Regex("[^A-Za-z0-9._-]+"), "_")
+            .take(48)
+        fun copyApk(src: String?, name: String): java.io.File? {
+            if (src.isNullOrEmpty()) return null
+            val f = java.io.File(src)
+            if (!f.exists()) return null
+            val dst = java.io.File(outDir, name)
+            f.inputStream().use { inp ->
+                dst.outputStream().use { out ->
+                    inp.copyTo(out)
+                }
+            }
+            return dst
+        }
+        val main = copyApk(ai.sourceDir, "$safeLabel.apk")
+            ?: throw IllegalStateException("base APK missing")
+        try {
+            val splits = ai.splitSourceDirs
+            if (splits != null) {
+                for ((i, s) in splits.withIndex()) {
+                    copyApk(s, "${safeLabel}_split$i.apk")
+                }
+            }
+        } catch (_: Exception) {
+        }
+        return main.absolutePath
+    }
+
+    /// Visible installed packages with icons, versions, SDK levels,
+    /// timestamps and APK bytes. Sorted by label.
+    private fun collectAppList(): List<Map<String, Any?>> {
+        val out = ArrayList<Map<String, Any?>>()
+        try {
+            val pm = packageManager
+            val pkgs = pm.getInstalledPackages(0)
+            for (pi in pkgs) {
+                try {
+                    val pkg = pi.packageName ?: continue
+                    val ai = pi.applicationInfo ?: continue
+                    val label = try {
+                        pm.getApplicationLabel(ai)?.toString()
+                            ?: pkg
+                    } catch (_: Exception) {
+                        pkg
+                    }
+                    val version = try {
+                        pi.versionName ?: "—"
+                    } catch (_: Exception) {
+                        "—"
+                    }
+                    val vcode: Long = try {
+                        if (android.os.Build.VERSION.SDK_INT >= 28) {
+                            pi.longVersionCode
+                        } else {
+                            @Suppress("DEPRECATION")
+                            pi.versionCode.toLong()
+                        }
+                    } catch (_: Exception) {
+                        -1L
+                    }
+                    val targetSdk = try {
+                        ai.targetSdkVersion
+                    } catch (_: Exception) {
+                        0
+                    }
+                    val minSdk = try {
+                        if (android.os.Build.VERSION.SDK_INT >= 24) {
+                            ai.minSdkVersion
+                        } else {
+                            0
+                        }
+                    } catch (_: Exception) {
+                        0
+                    }
+                    val isSystem = (ai.flags and
+                        android.content.pm.ApplicationInfo
+                            .FLAG_SYSTEM) != 0
+                    var apkBytes = 0L
+                    try {
+                        apkBytes += java.io.File(ai.sourceDir).length()
+                        val splits = ai.splitSourceDirs
+                        if (splits != null) {
+                            for (s in splits) {
+                                try {
+                                    apkBytes +=
+                                        java.io.File(s).length()
+                                } catch (_: Exception) {
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {
+                    }
+                    val installer = try {
+                        @Suppress("DEPRECATION")
+                        pm.getInstallerPackageName(pkg)
+                    } catch (_: Exception) {
+                        null
+                    }
+                    var icon: ByteArray? = null
+                    try {
+                        val dr = pm.getApplicationIcon(ai)
+                        val bmp = android.graphics.Bitmap
+                            .createBitmap(
+                                96, 96,
+                                android.graphics.Bitmap.Config
+                                    .ARGB_8888,
+                            )
+                        val cv = android.graphics.Canvas(bmp)
+                        dr.setBounds(0, 0, 96, 96)
+                        dr.draw(cv)
+                        val bos =
+                            java.io.ByteArrayOutputStream()
+                        bmp.compress(
+                            android.graphics.Bitmap.CompressFormat
+                                .PNG,
+                            100, bos,
+                        )
+                        icon = bos.toByteArray()
+                        bmp.recycle()
+                    } catch (_: Exception) {
+                    }
+                    val row = HashMap<String, Any?>()
+                    row["package"] = pkg
+                    row["label"] = label
+                    row["version"] = version
+                    row["versionCode"] = vcode
+                    row["targetSdk"] = targetSdk
+                    row["minSdk"] = minSdk
+                    row["firstInstall"] = try {
+                        pi.firstInstallTime
+                    } catch (_: Exception) {
+                        0L
+                    }
+                    row["lastUpdate"] = try {
+                        pi.lastUpdateTime
+                    } catch (_: Exception) {
+                        0L
+                    }
+                    row["installer"] = installer
+                    row["isSystem"] = isSystem
+                    row["apkBytes"] = apkBytes
+                    if (icon != null) row["icon"] = icon!!
+                    out.add(row)
+                } catch (_: Exception) {
+                }
+            }
+        } catch (_: Exception) {
+        }
+        out.sortBy { (it["label"] as? String)?.lowercase() ?: "" }
+        return out
+    }
+
+    private fun <T> camChar(
+        c: CamChars,
+        key: CamChars.Key<T>,
+    ): T? {
+        return try {
+            c.get(key)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /// Camera2 characteristics per camera id for the Camera tab.
+    private fun collectCameraInfo(): List<Map<String, Any?>> {
+        val out = ArrayList<Map<String, Any?>>()
+        try {
+            val cm = getSystemService(CAMERA_SERVICE)
+                as? android.hardware.camera2.CameraManager
+                ?: return out
+            for (id in cm.cameraIdList) {
+                try {
+                    val c = cm.getCameraCharacteristics(id)
+                                        fun ints(
+                        key: android.hardware.camera2.CameraCharacteristics
+                            .Key<IntArray>,
+                    ): List<Int> {
+                        return camChar(c, key)?.toList()
+                            ?: emptyList()
+                    }
+                    val facing = camChar(c, CamChars.LENS_FACING) ?: -1
+                    // JPEG output sizes, largest first.
+                    var sizes = emptyList<String>()
+                    var maxW = 0
+                    var maxH = 0
+                    try {
+                        val map = camChar(
+                            c,
+                            CamChars.SCALER_STREAM_CONFIGURATION_MAP,
+                        )
+                        val arr = map?.getOutputSizes(
+                            android.graphics.ImageFormat.JPEG,
+                        )
+                        if (arr != null) {
+                            val sorted = arr.sortedByDescending {
+                                it.width * it.height
+                            }
+                            sizes = sorted.map {
+                                "${it.width} x ${it.height}"
+                            }
+                            if (sorted.isNotEmpty()) {
+                                maxW = sorted[0].width
+                                maxH = sorted[0].height
+                            }
+                        }
+                    } catch (_: Exception) {
+                    }
+                    val mp = if (maxW > 0 && maxH > 0) {
+                        (maxW * maxH / 1000000.0)
+                    } else {
+                        -1.0
+                    }
+                    // Physical sensor size mm.
+                    var sensorSize = ""
+                    try {
+                        val s = camChar(
+                            c, CamChars.SENSOR_INFO_PHYSICAL_SIZE,
+                        )
+                        if (s != null) {
+                            sensorSize =
+                                "${"%.2f".format(s.width)} x " +
+                                "${"%.2f".format(s.height)}"
+                        }
+                    } catch (_: Exception) {
+                    }
+                    var pixelArray = ""
+                    try {
+                        val s = camChar(
+                            c, CamChars.SENSOR_INFO_PIXEL_ARRAY_SIZE,
+                        )
+                        if (s != null) {
+                            pixelArray = "${s.width} x ${s.height}"
+                        }
+                    } catch (_: Exception) {
+                    }
+                    fun f1(
+                        key: android.hardware.camera2.CameraCharacteristics
+                            .Key<FloatArray>,
+                    ): List<Double> {
+                        return try {
+                            camChar(c, key)?.map { it.toDouble() }
+                                ?: emptyList()
+                        } catch (_: Exception) {
+                            emptyList()
+                        }
+                    }
+                    val focals = f1(CamChars.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                    val apertures = f1(CamChars.LENS_INFO_AVAILABLE_APERTURES)
+                    val ndDens = f1(
+                        CamChars.LENS_INFO_AVAILABLE_FILTER_DENSITIES,
+                    )
+                    var thumbs = emptyList<String>()
+                    try {
+                        val arr = camChar(
+                            c, CamChars.JPEG_AVAILABLE_THUMBNAIL_SIZES,
+                        )
+                        if (arr != null) {
+                            thumbs = arr.map {
+                                "${it.width} x ${it.height}"
+                            }
+                        }
+                    } catch (_: Exception) {
+                    }
+                    val flash = try {
+                        camChar(c, CamChars.FLASH_INFO_AVAILABLE) ?: false
+                    } catch (_: Exception) {
+                        false
+                    }
+                    // Three separate Integer keys (processed, raw,
+                    // stalling) — kept in the Dart-expected order.
+                    var streams = emptyList<Int>()
+                    try {
+                        val proc = camChar(
+                            c,
+                            CamChars.REQUEST_MAX_NUM_OUTPUT_PROC,
+                        ) ?: -1
+                        val raw = camChar(
+                            c,
+                            CamChars.REQUEST_MAX_NUM_OUTPUT_RAW,
+                        ) ?: -1
+                        val stall = camChar(
+                            c,
+                            CamChars
+                                .REQUEST_MAX_NUM_OUTPUT_PROC_STALLING,
+                        ) ?: -1
+                        streams = listOf(proc, raw, stall)
+                    } catch (_: Exception) {
+                    }
+                    val m = HashMap<String, Any?>()
+                    m["id"] = id
+                    m["facing"] = facing // 0 back, 1 front, 2 external
+                    m["maxW"] = maxW
+                    m["maxH"] = maxH
+                    m["mp"] = mp
+                    m["sizes"] = sizes
+                    m["sensorSize"] = sensorSize
+                    m["pixelArray"] = pixelArray
+                    m["focals"] = focals
+                    m["apertures"] = apertures
+                    m["ndDensities"] = ndDens
+                    m["thumbs"] = thumbs
+                    m["flash"] = flash
+                    m["hwLevel"] = camChar(c, CamChars.INFO_SUPPORTED_HARDWARE_LEVEL)
+                    m["aeModes"] = ints(CamChars.CONTROL_AE_AVAILABLE_MODES)
+                    m["afModes"] = ints(CamChars.CONTROL_AF_AVAILABLE_MODES)
+                    m["awbModes"] = ints(CamChars.CONTROL_AWB_AVAILABLE_MODES)
+                    m["aeRegions"] =
+                        camChar(c, CamChars.CONTROL_MAX_REGIONS_AE)
+                    m["afRegions"] =
+                        camChar(c, CamChars.CONTROL_MAX_REGIONS_AF)
+                    m["awbRegions"] =
+                        camChar(c, CamChars.CONTROL_MAX_REGIONS_AWB)
+                    m["edgeModes"] = ints(CamChars.EDGE_AVAILABLE_EDGE_MODES)
+                    m["noiseModes"] = ints(
+                        CamChars.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES,
+                    )
+                    m["hotPixelModes"] = ints(
+                        CamChars.HOT_PIXEL_AVAILABLE_HOT_PIXEL_MODES,
+                    )
+                    m["aberrModes"] = ints(
+                        CamChars.COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES,
+                    )
+                    m["effects"] = ints(CamChars.CONTROL_AVAILABLE_EFFECTS)
+                    m["scenes"] = ints(CamChars.CONTROL_AVAILABLE_SCENE_MODES)
+                    m["stabModes"] = ints(
+                        CamChars.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES,
+                    )
+                    m["faceModes"] = ints(
+                        CamChars.STATISTICS_INFO_AVAILABLE_FACE_DETECT_MODES,
+                    )
+                    m["testPatterns"] = ints(
+                        CamChars.SENSOR_AVAILABLE_TEST_PATTERN_MODES,
+                    )
+                    m["cfa"] = camChar(
+                        c, CamChars.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT,
+                    )
+                    m["timestampSrc"] = camChar(
+                        c, CamChars.SENSOR_INFO_TIMESTAMP_SOURCE,
+                    )
+                    m["orientation"] =
+                        camChar(c, CamChars.SENSOR_ORIENTATION)
+                    m["focusCalib"] = camChar(
+                        c, CamChars.LENS_INFO_FOCUS_DISTANCE_CALIBRATION,
+                    )
+                    m["ois"] = try {
+                        camChar(
+                            c,
+                            CamChars.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION,
+                        )?.toList()
+                    } catch (_: Exception) {
+                        null
+                    }
+                    m["caps"] = ints(CamChars.REQUEST_AVAILABLE_CAPABILITIES)
+                    m["partialResults"] = camChar(
+                        c, CamChars.REQUEST_PARTIAL_RESULT_COUNT,
+                    )
+                    m["maxZoom"] = try {
+                        camChar(
+                            c, CamChars.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
+                        )?.toDouble()
+                    } catch (_: Exception) {
+                        null
+                    }
+                    m["cropType"] = camChar(
+                        c, CamChars.SCALER_CROPPING_TYPE,
+                    )
+                    // AE compensation step numerator/denominator.
+                    try {
+                        val r = camChar(
+                            c, CamChars.CONTROL_AE_COMPENSATION_STEP,
+                        )
+                        m["aeStep"] = if (r != null) {
+                            "${r.numerator}/${r.denominator}"
+                        } else {
+                            null
+                        }
+                    } catch (_: Exception) {
+                        m["aeStep"] = null
+                    }
+                    out.add(m)
+                } catch (_: Exception) {
+                }
+            }
+        } catch (_: Exception) {
+        }
+        return out
+    }
+
+    /// Full sensor list (name/vendor/type/version/range/power).
+    private fun collectSensorList(): List<Map<String, Any?>> {
+        val out = ArrayList<Map<String, Any?>>()
+        try {
+            val sm = getSystemService(SENSOR_SERVICE)
+                as? android.hardware.SensorManager
+                ?: return out
+            val list = sm.getSensorList(
+                android.hardware.Sensor.TYPE_ALL,
+            ) ?: return out
+            for (s in list.sortedBy { it.name.lowercase() }) {
+                val m = HashMap<String, Any?>()
+                m["name"] = try {
+                    s.name ?: "—"
+                } catch (_: Exception) {
+                    "—"
+                }
+                m["vendor"] = try {
+                    s.vendor ?: "—"
+                } catch (_: Exception) {
+                    "—"
+                }
+                m["type"] = try {
+                    s.stringType ?: "—"
+                } catch (_: Exception) {
+                    "—"
+                }
+                m["version"] = try {
+                    s.version
+                } catch (_: Exception) {
+                    -1
+                }
+                m["range"] = try {
+                    s.maximumRange.toDouble()
+                } catch (_: Exception) {
+                    -1.0
+                }
+                m["resolution"] = try {
+                    s.resolution.toDouble()
+                } catch (_: Exception) {
+                    -1.0
+                }
+                m["power"] = try {
+                    s.power.toDouble()
+                } catch (_: Exception) {
+                    -1.0
+                }
+                m["wakeup"] = try {
+                    s.isWakeUpSensor
+                } catch (_: Exception) {
+                    false
+                }
+                m["minDelayUs"] = try {
+                    s.minDelay
+                } catch (_: Exception) {
+                    -1
+                }
+                m["maxDelayUs"] = try {
+                    s.maxDelay
+                } catch (_: Exception) {
+                    -1
+                }
+                m["fifoMax"] = try {
+                    s.fifoMaxEventCount
+                } catch (_: Exception) {
+                    0
+                }
+                m["fifoReserved"] = try {
+                    s.fifoReservedEventCount
+                } catch (_: Exception) {
+                    0
+                }
+                m["reportingMode"] = try {
+                    s.reportingMode
+                } catch (_: Exception) {
+                    -1
+                }
+                out.add(m)
+            }
+        } catch (_: Exception) {
+        }
+        return out
+    }
+
+    private fun openBtSettings(): Boolean {
+        return try {
+            val intent = android.content.Intent(
+                android.provider.Settings.ACTION_BLUETOOTH_SETTINGS,
+            )
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /// Radio capability bundle for the Connectivity tab. Every lookup
+    /// is guarded — null means "could not determine" (often a missing
+    /// runtime permission the app deliberately does not request).
+    private fun collectConnInfo(): Map<String, Any?> {
+        val pm = packageManager
+        fun feat(name: String): Boolean {
+            return try {
+                pm.hasSystemFeature(name)
+            } catch (_: Exception) {
+                false
+            }
+        }
+        // Wi-Fi device generation (best supported standard).
+        var wifiGen: String? = null
+        try {
+            val wm = applicationContext.getSystemService(WIFI_SERVICE)
+                as? android.net.wifi.WifiManager
+            if (wm != null &&
+                android.os.Build.VERSION.SDK_INT >= 30
+            ) {
+                val order = listOf(
+                    8 to "Wi-Fi 7",
+                    7 to "Wi-Fi 6",
+                    5 to "Wi-Fi 5",
+                    4 to "Wi-Fi 4",
+                )
+                for ((std, label) in order) {
+                    try {
+                        if (wm.isWifiStandardSupported(std)) {
+                            wifiGen = label
+                            break
+                        }
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+        val wifiDirect =
+            feat(android.content.pm.PackageManager.FEATURE_WIFI_DIRECT)
+        // Bands from the radio itself (WifiManager), not the feature
+        // strings — hasSystemFeature(band.5ghz) lies on some MIUI
+        // builds. Falls back to feature strings when unavailable.
+        var band5: Boolean? = null
+        var band6: Boolean? = null
+        try {
+            val wm = applicationContext.getSystemService(WIFI_SERVICE)
+                as? android.net.wifi.WifiManager
+            if (wm != null &&
+                android.os.Build.VERSION.SDK_INT >= 29
+            ) {
+                try {
+                    band5 = wm.is5GHzBandSupported
+                } catch (_: Exception) {
+                }
+                try {
+                    band6 = wm.is6GHzBandSupported
+                } catch (_: Exception) {
+                }
+            }
+        } catch (_: Exception) {
+        }
+        if (band5 == null) {
+            band5 = feat("android.hardware.wifi.band.5ghz")
+        }
+        if (band6 == null) {
+            band6 = feat("android.hardware.wifi.band.6ghz")
+        }
+        // Bluetooth presence + state + LE capabilities.
+        val btPresent = feat(
+            android.content.pm.PackageManager.FEATURE_BLUETOOTH,
+        )
+        val btLe = feat(
+            android.content.pm.PackageManager.FEATURE_BLUETOOTH_LE,
+        )
+        var btOn: Boolean? = null
+        var multiAdv: Boolean? = null
+        var offFilt: Boolean? = null
+        var offBatch: Boolean? = null
+        var le2m: Boolean? = null
+        var leCoded: Boolean? = null
+        var leExtAdv: Boolean? = null
+        var lePeriodAdv: Boolean? = null
+        try {
+            @Suppress("DEPRECATION")
+            val adapter = android.bluetooth.BluetoothAdapter
+                .getDefaultAdapter()
+            if (adapter != null) {
+                try {
+                    btOn = adapter.isEnabled
+                } catch (_: Exception) {
+                }
+                try {
+                    multiAdv = adapter.isMultipleAdvertisementSupported
+                } catch (_: Exception) {
+                }
+                try {
+                    offFilt = adapter.isOffloadedFilteringSupported
+                } catch (_: Exception) {
+                }
+                try {
+                    offBatch =
+                        adapter.isOffloadedScanBatchingSupported
+                } catch (_: Exception) {
+                }
+                try {
+                    le2m = adapter.isLe2MPhySupported
+                } catch (_: Exception) {
+                }
+                try {
+                    leCoded = adapter.isLeCodedPhySupported
+                } catch (_: Exception) {
+                }
+                try {
+                    leExtAdv =
+                        adapter.isLeExtendedAdvertisingSupported
+                } catch (_: Exception) {
+                }
+                try {
+                    lePeriodAdv =
+                        adapter.isLePeriodicAdvertisingSupported
+                } catch (_: Exception) {
+                }
+            }
+        } catch (_: Exception) {
+        }
+        // NFC presence + state.
+        val nfcPresent = feat(
+            android.content.pm.PackageManager.FEATURE_NFC,
+        )
+        var nfcOn: Boolean? = null
+        if (nfcPresent) {
+            try {
+                nfcOn = android.nfc.NfcAdapter.getDefaultAdapter(this)
+                    ?.isEnabled
+            } catch (_: Exception) {
+            }
+        }
+        val uwb = feat("android.hardware.uwb")
+        val usbHost = feat(
+            android.content.pm.PackageManager.FEATURE_USB_HOST,
+        )
+        val usbAcc = feat(
+            android.content.pm.PackageManager.FEATURE_USB_ACCESSORY,
+        )
+        var adbOn: Boolean? = null
+        try {
+            adbOn = android.provider.Settings.Global.getInt(
+                contentResolver,
+                android.provider.Settings.Global.ADB_ENABLED, 0,
+            ) == 1
+        } catch (_: Exception) {
+        }
+        return mapOf(
+            "wifiGen" to wifiGen,
+            "wifiDirect" to wifiDirect,
+            "band5" to band5,
+            "band6" to band6,
+            "btPresent" to btPresent,
+            "btLe" to btLe,
+            "btOn" to btOn,
+            "multiAdv" to multiAdv,
+            "offFilt" to offFilt,
+            "offBatch" to offBatch,
+            "le2m" to le2m,
+            "leCoded" to leCoded,
+            "leExtAdv" to leExtAdv,
+            "lePeriodAdv" to lePeriodAdv,
+            "nfcPresent" to nfcPresent,
+            "nfcOn" to nfcOn,
+            "uwb" to uwb,
+            "usbHost" to usbHost,
+            "usbAcc" to usbAcc,
+            "adbOn" to adbOn,
+        )
+    }
+
+    /// Opens the system Data Usage screen (Usage button), trying the
+    /// data-usage entry first, then operator and wireless settings.
+    /// String action: no such Settings constant exists to link against.
+    private fun openDataUsageSettings(): Boolean {
+        val actions = listOf(
+            "android.settings.DATA_USAGE_SETTINGS",
+            android.provider.Settings.ACTION_NETWORK_OPERATOR_SETTINGS,
+            android.provider.Settings.ACTION_WIRELESS_SETTINGS,
+        )
+        for (a in actions) {
+            try {
+                val intent = android.content.Intent(a)
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+                return true
+            } catch (_: Exception) {
+            }
+        }
+        return false
+    }
+
+    private fun intToIp(v: Int): String {
+        return "${v and 0xFF}.${(v shr 8) and 0xFF}" +
+            ".${(v shr 16) and 0xFF}.${(v shr 24) and 0xFF}"
+    }
+
+    /// Wi-Fi details for the Network tab. SSID/BSSID are deliberately
+    /// NOT read (they need location permission). Connection state comes
+    /// from the active transport (never from WifiInfo.networkId, which
+    /// throws SecurityException on some ROMs and blanked the whole
+    /// tab), and every WifiManager getter is individually guarded so
+    /// one throwing getter can't wipe the rest. IPv4/gateway fall back
+    /// to LinkProperties when WifiManager is gated.
+    private fun collectWifiInfo(): Map<String, Any> {
+        var transport = "NONE"
+        try {
+            transport = activeNetworkType()
+        } catch (_: Exception) {
+        }
+        val wifiUp = transport == "WIFI"
+        var ip = "—"
+        var ipv6 = "—"
+        var gateway = "—"
+        var mask = "—"
+        var prefix = -1
+        var dns = "—"
+        var lease = "—"
+        var iface = "—"
+        var linkMbps = -1
+        var freqMhz = -1
+        var standard = -1 // WifiInfo.WIFI_STANDARD_*
+        try {
+            val wm = applicationContext.getSystemService(WIFI_SERVICE)
+                as? android.net.wifi.WifiManager
+            val info = try {
+                wm?.connectionInfo
+            } catch (_: Exception) {
+                null
+            }
+            if (info != null) {
+                try {
+                    val rawIp = info.ipAddress
+                    if (rawIp != 0) ip = intToIp(rawIp)
+                } catch (_: Exception) {
+                }
+                try {
+                    linkMbps = info.linkSpeed
+                } catch (_: Exception) {
+                }
+                try {
+                    freqMhz = info.frequency
+                } catch (_: Exception) {
+                }
+                if (android.os.Build.VERSION.SDK_INT >= 30) {
+                    try {
+                        standard = info.wifiStandard
+                    } catch (_: Exception) {
+                    }
+                }
+                if (wifiUp) {
+                    val dhcp = try {
+                        wm?.dhcpInfo
+                    } catch (_: Exception) {
+                        null
+                    }
+                    if (dhcp != null) {
+                        try {
+                            if (dhcp.gateway != 0) {
+                                gateway = intToIp(dhcp.gateway)
+                            }
+                        } catch (_: Exception) {
+                        }
+                        try {
+                            if (dhcp.netmask != 0) {
+                                mask = intToIp(dhcp.netmask)
+                            }
+                        } catch (_: Exception) {
+                        }
+                        try {
+                            if (dhcp.dns1 != 0) {
+                                dns = intToIp(dhcp.dns1)
+                            }
+                        } catch (_: Exception) {
+                        }
+                        try {
+                            if (dhcp.leaseDuration != 0) {
+                                lease =
+                                    dhcp.leaseDuration.toString()
+                            }
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+        var ip4 = ""
+        try {
+            val cm = getSystemService(CONNECTIVITY_SERVICE)
+                as? android.net.ConnectivityManager
+            val props = cm?.getLinkProperties(cm.activeNetwork)
+            if (props != null) {
+                iface = props.interfaceName ?: "—"
+                for (la in props.linkAddresses) {
+                    val addr = la.address.hostAddress ?: continue
+                    if (addr.contains(":")) {
+                        if (ipv6 == "—") {
+                            val pct = addr.indexOf('%')
+                            ipv6 = if (pct > 0) {
+                                addr.substring(0, pct)
+                            } else {
+                                addr
+                            }
+                        }
+                    } else if (ip4.isEmpty() &&
+                        !addr.startsWith("127.")
+                    ) {
+                        ip4 = addr
+                        if (prefix < 0) prefix = la.prefixLength
+                    }
+                }
+                if (dns == "—") {
+                    val d = props.dnsServers.firstOrNull()
+                        ?.hostAddress
+                    if (!d.isNullOrEmpty()) dns = d
+                }
+                if (mask == "—" && prefix > 0 && prefix <= 32) {
+                    val bits = (0xFFFFFFFFL shl (32 - prefix)) and
+                        0xFFFFFFFFL
+                    mask = intToIp(bits.toInt())
+                }
+            }
+        } catch (_: Exception) {
+        }
+        if (ip == "—" && ip4.isNotEmpty()) ip = ip4
+        return mapOf(
+            "connected" to wifiUp,
+            "ip" to ip,
+            "ipv6" to ipv6,
+            "gateway" to gateway,
+            "mask" to mask,
+            "prefix" to prefix,
+            "dns" to dns,
+            "leaseSec" to lease,
+            "iface" to iface,
+            "linkMbps" to linkMbps,
+            "freqMhz" to freqMhz,
+            "standard" to standard,
+        )
+    }
+
+    private fun hasUsageAccess(): Boolean {
+        return try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE)
+                as? android.app.ActivityManager
+                ?: return false
+            val mode = if (android.os.Build.VERSION.SDK_INT >= 29) {
+                (getSystemService(Context.APP_OPS_SERVICE)
+                    as? android.app.AppOpsManager)
+                    ?.unsafeCheckOpNoThrow(
+                        android.app.AppOpsManager
+                            .OPSTR_GET_USAGE_STATS,
+                        android.os.Process.myUid(),
+                        packageName,
+                    )
+            } else {
+                @Suppress("DEPRECATION")
+                (getSystemService(Context.APP_OPS_SERVICE)
+                    as? android.app.AppOpsManager)
+                    ?.checkOpNoThrow(
+                        android.app.AppOpsManager
+                            .OPSTR_GET_USAGE_STATS,
+                        android.os.Process.myUid(),
+                        packageName,
+                    )
+            }
+            mode ==
+                android.app.AppOpsManager.MODE_ALLOWED
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun openUsageAccessSettings(): Boolean {
+        return try {
+            val intent = android.content.Intent(
+                android.provider.Settings
+                    .ACTION_USAGE_ACCESS_SETTINGS,
+            )
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun trafficManager()
+            : android.app.usage.NetworkStatsManager? {
+        return try {
+            getSystemService(Context.NETWORK_STATS_SERVICE)
+                as? android.app.usage.NetworkStatsManager
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /// Device totals in [startMs, endMs], split by transport.
+    /// Uses the int-based overloads (android.net.NetworkTemplate no
+    /// longer exists in current compile SDKs).
+    private fun collectTrafficSummary(
+        startMs: Long,
+        endMs: Long,
+    ): Map<String, Any> {
+        val nsm = trafficManager()
+            ?: throw IllegalStateException("no NetworkStatsManager")
+        val wifi = nsm.querySummaryForDevice(
+            android.net.ConnectivityManager.TYPE_WIFI,
+            null, startMs, endMs,
+        )
+        val mob = nsm.querySummaryForDevice(
+            android.net.ConnectivityManager.TYPE_MOBILE,
+            null, startMs, endMs,
+        )
+        val wifiRx = wifi.rxBytes
+        val wifiTx = wifi.txBytes
+        val mobileRx = mob.rxBytes
+        val mobileTx = mob.txBytes
+        val rx = wifiRx + mobileRx
+        val tx = wifiTx + mobileTx
+        return mapOf(
+            "rx" to rx,
+            "tx" to tx,
+            "wifiRx" to wifiRx,
+            "wifiTx" to wifiTx,
+            "mobileRx" to mobileRx,
+            "mobileTx" to mobileTx,
+        )
+    }
+
+    /// Per launcher-app totals in [startMs, endMs] with icons.
+    /// One querySummary per transport gives per-UID buckets; UIDs map
+    /// back to packages, launcher-visible ones resolve label + icon.
+    /// No QUERY_ALL_PACKAGES. Icons are 96px PNG bytes.
+    private fun collectTrafficApps(
+        startMs: Long,
+        endMs: Long,
+    ): List<Map<String, Any>> {
+        val nsm = trafficManager()
+            ?: throw IllegalStateException("no NetworkStatsManager")
+        val pm = packageManager
+        data class Quad(var wrx: Long, var wtx: Long,
+            var mrx: Long, var mtx: Long)
+        val byUid = HashMap<Int, Quad>()
+        val wifiT = android.net.ConnectivityManager.TYPE_WIFI
+        val mobT = android.net.ConnectivityManager.TYPE_MOBILE
+        var s = nsm.querySummary(wifiT, null, startMs, endMs)
+        try {
+            while (s.hasNextBucket()) {
+                val b = android.app.usage.NetworkStats.Bucket()
+                s.getNextBucket(b)
+                val q = byUid.getOrPut(b.uid) {
+                    Quad(0, 0, 0, 0)
+                }
+                q.wrx += b.rxBytes
+                q.wtx += b.txBytes
+            }
+        } finally {
+            try {
+                s.close()
+            } catch (_: Exception) {
+            }
+        }
+        s = nsm.querySummary(mobT, null, startMs, endMs)
+        try {
+            while (s.hasNextBucket()) {
+                val b = android.app.usage.NetworkStats.Bucket()
+                s.getNextBucket(b)
+                val q = byUid.getOrPut(b.uid) {
+                    Quad(0, 0, 0, 0)
+                }
+                q.mrx += b.rxBytes
+                q.mtx += b.txBytes
+            }
+        } finally {
+            try {
+                s.close()
+            } catch (_: Exception) {
+            }
+        }
+        val out = ArrayList<Map<String, Any>>(byUid.size)
+        for ((uid, q) in byUid) {
+            if (uid < 10000) continue // system uids, not apps
+            if (q.wrx + q.wtx + q.mrx + q.mtx <= 0) continue
+            val pkgs = try {
+                pm.getPackagesForUid(uid)
+            } catch (_: Exception) {
+                null
+            } ?: continue
+            // First launcher-visible package wins.
+            var pkg: String? = null
+            for (p in pkgs) {
+                try {
+                    if (pm.getLaunchIntentForPackage(p) != null) {
+                        pkg = p
+                        break
+                    }
+                } catch (_: Exception) {
+                }
+            }
+            val name = pkg ?: continue
+            val label = try {
+                val ai = pm.getApplicationInfo(name, 0)
+                pm.getApplicationLabel(ai)?.toString() ?: name
+            } catch (_: Exception) {
+                name
+            }
+            var icon: ByteArray? = null
+            try {
+                val ai = pm.getApplicationInfo(name, 0)
+                val dr = pm.getApplicationIcon(ai)
+                val bmp = android.graphics.Bitmap.createBitmap(
+                    96, 96,
+                    android.graphics.Bitmap.Config.ARGB_8888,
+                )
+                val cv = android.graphics.Canvas(bmp)
+                dr.setBounds(0, 0, 96, 96)
+                dr.draw(cv)
+                val bos = java.io.ByteArrayOutputStream()
+                bmp.compress(
+                    android.graphics.Bitmap.CompressFormat.PNG,
+                    100, bos,
+                )
+                icon = bos.toByteArray()
+                bmp.recycle()
+            } catch (_: Exception) {
+            }
+            val row = HashMap<String, Any>()
+            row["package"] = name
+            row["label"] = label
+            if (icon != null) row["icon"] = icon!!
+            row["rx"] = q.wrx + q.mrx
+            row["tx"] = q.wtx + q.mtx
+            row["wifiRx"] = q.wrx
+            row["wifiTx"] = q.wtx
+            row["mobileRx"] = q.mrx
+            row["mobileTx"] = q.mtx
+            out.add(row)
+        }
+        out.sortByDescending {
+            ((it["rx"] as Long) + (it["tx"] as Long))
+        }
+        return out
+    }
+
+    /// Since-boot totals, no permission needed (fallback page state).
+    /// TrafficStats needs no permission; explicit call syntax is used
+    /// (property syntax fails to resolve on this toolchain).
+    private fun collectTrafficBoot(): Map<String, Any> {
+        fun nz(v: Long): Long {
+            return try {
+                if (v ==
+                    android.net.TrafficStats.UNSUPPORTED.toLong()
+                ) {
+                    0L
+                } else {
+                    v
+                }
+            } catch (_: Exception) {
+                0L
+            }
+        }
+        return try {
+            val rx = nz(android.net.TrafficStats.getTotalRxBytes())
+            val tx = nz(android.net.TrafficStats.getTotalTxBytes())
+            val mrx = nz(android.net.TrafficStats.getMobileRxBytes())
+            val mtx = nz(android.net.TrafficStats.getMobileTxBytes())
+            mapOf(
+                "rx" to rx,
+                "tx" to tx,
+                "wifiRx" to (rx - mrx).coerceAtLeast(0L),
+                "wifiTx" to (tx - mtx).coerceAtLeast(0L),
+                "mobileRx" to mrx,
+                "mobileTx" to mtx,
+            )
+        } catch (_: Exception) {
+            mapOf(
+                "rx" to 0L, "tx" to 0L,
+                "wifiRx" to 0L, "wifiTx" to 0L,
+                "mobileRx" to 0L, "mobileTx" to 0L,
+            )
+        }
     }
 
     private fun readKhz(path: String): Int {
@@ -1180,6 +2565,93 @@ class MainActivity : FlutterFragmentActivity() {
                     "networkType" -> {
                         result.success(activeNetworkType())
                     }
+                    // Connectivity tab: validated internet + metered flag.
+                    "netExtra" -> {
+                        result.success(collectNetExtra())
+                    }
+                    // Connectivity sections: Wi-Fi caps, Bluetooth caps,
+                    // NFC, UWB, USB, ADB. No location/Bluetooth runtime
+                    // permission needed — unknowns come back null and
+                    // the UI renders them honestly.
+                    "connInfo" -> {
+                        result.success(collectConnInfo())
+                    }
+                    // Display tab bundle (all Settings.System reads are
+                    // permission-free).
+                    "displayInfo" -> {
+                        result.success(collectDisplayInfo())
+                    }
+                    // Camera tab: Camera2 characteristics per camera id.
+                    // No CAMERA permission needed (characteristics only,
+                    // never opened). Multi-lens phones report each id.
+                    "cameraInfo" -> {
+                        result.success(collectCameraInfo())
+                    }
+                    // Thermal tab: every thermal_zone type + temp +
+                    // PowerManager status. Sysfs reads, no permission.
+                    "thermalInfo" -> {
+                        result.success(collectThermalInfo())
+                    }
+                    // Full sensor list (beyond the count): name, vendor,
+                    // type string, version, range, resolution, power.
+                    "sensorList" -> {
+                        result.success(collectSensorList())
+                    }
+                    // Apps tab: visible installed packages with icons,
+                    // versions, SDK levels, timestamps, APK bytes.
+                    // No QUERY_ALL_PACKAGES: only packages visible to
+                    // the app (launcher + declared queries) are listed.
+                    "appList" -> {
+                        result.success(collectAppList())
+                    }
+                    "launchApp" -> {
+                        val pkg = call.argument<String>("package") ?: ""
+                        result.success(launchApp(pkg))
+                    }
+                    // Apps tab detail sheet: manifest components.
+                    "appDetail" -> {
+                        val pkg = call.argument<String>("package") ?: ""
+                        try {
+                            result.success(collectAppDetail(pkg))
+                        } catch (e: Exception) {
+                            result.error(
+                                "DETAIL_FAILED", e.message, null,
+                            )
+                        }
+                    }
+                    "extractApk" -> {
+                        val pkg = call.argument<String>("package") ?: ""
+                        try {
+                            result.success(extractApk(pkg))
+                        } catch (e: Exception) {
+                            result.error(
+                                "EXTRACT_FAILED", e.message, null,
+                            )
+                        }
+                    }
+                    "openAppSettings" -> {
+                        val pkg = call.argument<String>("package") ?: ""
+                        result.success(openAppSettings(pkg))
+                    }
+                    // Memory tab: system/vendor partition sizes so the
+                    // Internal Storage card can split "system reserved".
+                    "sysParts" -> {
+                        fun sz(p: String): Long {
+                            return try {
+                                val s = StatFs(p)
+                                s.blockCountLong * s.blockSizeLong
+                            } catch (_: Exception) {
+                                0L
+                            }
+                        }
+                        result.success(mapOf(
+                            "systemBytes" to sz("/system"),
+                            "vendorBytes" to sz("/vendor"),
+                        ))
+                    }
+                    "openBtSettings" -> {
+                        result.success(openBtSettings())
+                    }
                     // System tab bundle for CubicDevice Info (one round-trip).
                     "systemInfo" -> {
                         result.success(collectSystemInfo())
@@ -1192,6 +2664,71 @@ class MainActivity : FlutterFragmentActivity() {
                     // Battery live snapshot for the graph + capacities.
                     "battLive" -> {
                         result.success(collectBattLive())
+                    }
+                    // Wi-Fi details for the Network tab (no location
+                    // permission needed — SSID/MAC are NOT read).
+                    "wifiInfo" -> {
+                        result.success(collectWifiInfo())
+                    }
+                    // In-app Data Usage page (NetworkStatsManager).
+                    // Needs Usage Access (PACKAGE_USAGE_STATS):
+                    // trafficPerm -> Bool, openUsageAccess -> Bool,
+                    // trafficSummary{startMs,endMs} -> {rx,tx,wifiRx,
+                    //   wifiTx,mobileRx,mobileTx}, trafficApps{...} ->
+                    //   [{package,label,icon,rx,tx,wifiRx,wifiTx}],
+                    // trafficBoot -> since-boot totals (no permission).
+                    "trafficPerm" -> {
+                        result.success(hasUsageAccess())
+                    }
+                    "openUsageAccess" -> {
+                        result.success(openUsageAccessSettings())
+                    }
+                    "trafficSummary" -> {
+                        val s = (call.argument<Any>("startMs")
+                            as? Number)?.toLong() ?: 0L
+                        val e = (call.argument<Any>("endMs")
+                            as? Number)?.toLong()
+                            ?: System.currentTimeMillis()
+                        try {
+                            result.success(collectTrafficSummary(s, e))
+                        } catch (se: SecurityException) {
+                            result.error(
+                                "NEEDS_PERMISSION",
+                                "Usage access not granted",
+                                null,
+                            )
+                        } catch (ex: Exception) {
+                            result.error(
+                                "TRAFFIC_FAILED", ex.message, null,
+                            )
+                        }
+                    }
+                    "trafficApps" -> {
+                        val s = (call.argument<Any>("startMs")
+                            as? Number)?.toLong() ?: 0L
+                        val e = (call.argument<Any>("endMs")
+                            as? Number)?.toLong()
+                            ?: System.currentTimeMillis()
+                        try {
+                            result.success(collectTrafficApps(s, e))
+                        } catch (se: SecurityException) {
+                            result.error(
+                                "NEEDS_PERMISSION",
+                                "Usage access not granted",
+                                null,
+                            )
+                        } catch (ex: Exception) {
+                            result.error(
+                                "TRAFFIC_FAILED", ex.message, null,
+                            )
+                        }
+                    }
+                    "trafficBoot" -> {
+                        result.success(collectTrafficBoot())
+                    }
+                    // Open Android's Data Usage settings page.
+                    "openDataUsage" -> {
+                        result.success(openDataUsageSettings())
                     }
                     // Device tab fields for CubicDevice Info. The three
                     // telephony lookups need READ_PHONE_STATE — on

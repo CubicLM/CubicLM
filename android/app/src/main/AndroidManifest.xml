@@ -11,10 +11,23 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Microphone for speech-to-text -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Bluetooth capability reads for CubicDevice Info (normal,
+         install-time; API 31+ reads stay best-effort/Unknown without
+         BLUETOOTH_CONNECT, which is deliberately not declared) -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <!-- Wi-Fi details for CubicDevice Info (normal permissions, auto-granted) -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Biometric app lock -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <!-- In-app APK install (Check for Updates) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <!-- Data Usage page (NetworkStatsManager). Declaring it is what puts
+         CubicLM in the system Usage Access list — it is NOT granted at
+         install; the user toggles it there. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
 
     <application
         android:label="CubicLM"
@@ -138,6 +151,12 @@
         <package android:name="eu.chainfire.supersu" />
         <package android:name="com.koushikdutta.superuser" />
         <package android:name="com.kingroot.kinguser" />
+        <!-- Data Usage page: enumerate launcher apps for per-app
+             traffic (intent query, no QUERY_ALL_PACKAGES). -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

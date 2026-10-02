@@ -52,6 +52,296 @@ class DeviceExtraService {
     }
   }
 
+  static Map<String, dynamic>? _wifiCache;
+  static DateTime? _wifiAt;
+
+  /// Wi-Fi details for the Network tab (cached 15s).
+  static Future<Map<String, dynamic>?> getWifiInfo(
+      {bool force = false}) async {
+    if (!force &&
+        _wifiCache != null &&
+        _wifiAt != null &&
+        DateTime.now().difference(_wifiAt!).inSeconds < 15) {
+      return _wifiCache;
+    }
+    try {
+      final m =
+          await _ch.invokeMapMethod<String, dynamic>('wifiInfo');
+      if (m == null) return _wifiCache;
+      _wifiCache = Map<String, dynamic>.from(m);
+      _wifiAt = DateTime.now();
+      return _wifiCache;
+    } catch (_) {
+      return _wifiCache;
+    }
+  }
+
+  static Map<String, dynamic>? _netCache;
+  static DateTime? _netAt;
+
+  /// Connectivity tab bundle (cached 15s).
+  static Future<Map<String, dynamic>?> getNetExtra(
+      {bool force = false}) async {
+    if (!force &&
+        _netCache != null &&
+        _netAt != null &&
+        DateTime.now().difference(_netAt!).inSeconds < 15) {
+      return _netCache;
+    }
+    try {
+      final m =
+          await _ch.invokeMapMethod<String, dynamic>('netExtra');
+      if (m == null) return _netCache;
+      _netCache = Map<String, dynamic>.from(m);
+      _netAt = DateTime.now();
+      return _netCache;
+    } catch (_) {
+      return _netCache;
+    }
+  }
+
+  static Map<String, dynamic>? _connCache;
+  static DateTime? _connAt;
+
+  /// Radio capabilities for the Connectivity tab (cached 60s).
+  static Future<Map<String, dynamic>?> getConnInfo(
+      {bool force = false}) async {
+    if (!force &&
+        _connCache != null &&
+        _connAt != null &&
+        DateTime.now().difference(_connAt!).inSeconds < 60) {
+      return _connCache;
+    }
+    try {
+      final m =
+          await _ch.invokeMapMethod<String, dynamic>('connInfo');
+      if (m == null) return _connCache;
+      _connCache = Map<String, dynamic>.from(m);
+      _connAt = DateTime.now();
+      return _connCache;
+    } catch (_) {
+      return _connCache;
+    }
+  }
+
+  static Map<String, dynamic>? _dispCache;
+  static DateTime? _dispAt;
+
+  /// Display tab bundle (cached 60s; orientation/timeout can change).
+  static Future<Map<String, dynamic>?> getDisplayInfo(
+      {bool force = false}) async {
+    if (!force &&
+        _dispCache != null &&
+        _dispAt != null &&
+        DateTime.now().difference(_dispAt!).inSeconds < 60) {
+      return _dispCache;
+    }
+    try {
+      final m =
+          await _ch.invokeMapMethod<String, dynamic>('displayInfo');
+      if (m == null) return _dispCache;
+      _dispCache = Map<String, dynamic>.from(m);
+      _dispAt = DateTime.now();
+      return _dispCache;
+    } catch (_) {
+      return _dispCache;
+    }
+  }
+
+  static Map<String, dynamic>? _sysParts;
+  static DateTime? _sysPartsAt;
+
+  /// System/vendor partition sizes (cached 5 min — static data).
+  static Future<Map<String, dynamic>?> getSysParts(
+      {bool force = false}) async {
+    if (!force &&
+        _sysParts != null &&
+        _sysPartsAt != null &&
+        DateTime.now().difference(_sysPartsAt!).inMinutes < 5) {
+      return _sysParts;
+    }
+    try {
+      final m =
+          await _ch.invokeMapMethod<String, dynamic>('sysParts');
+      if (m == null) return _sysParts;
+      _sysParts = Map<String, dynamic>.from(m);
+      _sysPartsAt = DateTime.now();
+      return _sysParts;
+    } catch (_) {
+      return _sysParts;
+    }
+  }
+
+  static List<Map<String, dynamic>>? _camCache;
+  static DateTime? _camAt;
+
+  /// Camera2 characteristics per camera (cached 5 min — static data).
+  static Future<List<Map<String, dynamic>>> getCameraInfo(
+      {bool force = false}) async {
+    if (!force &&
+        _camCache != null &&
+        _camAt != null &&
+        DateTime.now().difference(_camAt!).inMinutes < 5) {
+      return _camCache!;
+    }
+    try {
+      final list =
+          await _ch.invokeListMethod<dynamic>('cameraInfo');
+      final out = <Map<String, dynamic>>[];
+      if (list != null) {
+        for (final e in list) {
+          if (e is Map) {
+            out.add(Map<String, dynamic>.from(e));
+          }
+        }
+      }
+      _camCache = out;
+      _camAt = DateTime.now();
+      return out;
+    } catch (_) {
+      return _camCache ?? const [];
+    }
+  }
+
+  static List<Map<String, dynamic>>? _senCache;
+  static DateTime? _senAt;
+
+  /// Full sensor list (cached 5 min — static data).
+  static Future<List<Map<String, dynamic>>> getSensorList(
+      {bool force = false}) async {
+    if (!force &&
+        _senCache != null &&
+        _senAt != null &&
+        DateTime.now().difference(_senAt!).inMinutes < 5) {
+      return _senCache!;
+    }
+    try {
+      final list =
+          await _ch.invokeListMethod<dynamic>('sensorList');
+      final out = <Map<String, dynamic>>[];
+      if (list != null) {
+        for (final e in list) {
+          if (e is Map) {
+            out.add(Map<String, dynamic>.from(e));
+          }
+        }
+      }
+      _senCache = out;
+      _senAt = DateTime.now();
+      return out;
+    } catch (_) {
+      return _senCache ?? const [];
+    }
+  }
+
+  static Map<String, dynamic>? _thermCache;
+  static DateTime? _thermAt;
+
+  /// Thermal zones + status (cached 5s — temps move constantly).
+  static Future<Map<String, dynamic>?> getThermalInfo(
+      {bool force = false}) async {
+    if (!force &&
+        _thermCache != null &&
+        _thermAt != null &&
+        DateTime.now().difference(_thermAt!).inSeconds < 5) {
+      return _thermCache;
+    }
+    try {
+      final m =
+          await _ch.invokeMapMethod<String, dynamic>('thermalInfo');
+      if (m == null) return _thermCache;
+      _thermCache = Map<String, dynamic>.from(m);
+      _thermAt = DateTime.now();
+      return _thermCache;
+    } catch (_) {
+      return _thermCache;
+    }
+  }
+
+  static List<Map<String, dynamic>>? _appCache;
+  static DateTime? _appAt;
+
+  /// Visible installed packages (cached 60s — installs are rare).
+  static Future<List<Map<String, dynamic>>> getAppList(
+      {bool force = false}) async {
+    if (!force &&
+        _appCache != null &&
+        _appAt != null &&
+        DateTime.now().difference(_appAt!).inMinutes < 5) {
+      return _appCache!;
+    }
+    try {
+      final list =
+          await _ch.invokeListMethod<dynamic>('appList');
+      final out = <Map<String, dynamic>>[];
+      if (list != null) {
+        for (final e in list) {
+          if (e is Map) {
+            out.add(Map<String, dynamic>.from(e));
+          }
+        }
+      }
+      _appCache = out;
+      _appAt = DateTime.now();
+      return out;
+    } catch (_) {
+      return _appCache ?? const [];
+    }
+  }
+
+  static Future<Map<String, dynamic>> getAppDetail(
+      String package) async {
+    try {
+      final m = await _ch.invokeMapMethod<String, dynamic>(
+          'appDetail', {'package': package});
+      if (m == null) return const {};
+      return Map<String, dynamic>.from(m);
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  static Future<bool> launchApp(String package) async {
+    try {
+      return await _ch.invokeMethod<bool>(
+              'launchApp', {'package': package}) ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Returns the extracted APK path, or null on failure.
+  static Future<String?> extractApk(String package) async {
+    try {
+      return await _ch.invokeMethod<String>(
+          'extractApk', {'package': package});
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> openAppSettings(String package) async {
+    try {
+      await _ch.invokeMethod<bool>(
+          'openAppSettings', {'package': package});
+    } catch (_) {}
+  }
+
+  static Future<void> openBtSettings() async {
+    try {
+      await _ch.invokeMethod<bool>('openBtSettings');
+    } catch (_) {}
+  }
+
+  static Future<bool> openDataUsage() async {
+    try {
+      return await _ch.invokeMethod<bool>('openDataUsage') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Map<String, dynamic>? _battCache;
   static DateTime? _battAt;
 

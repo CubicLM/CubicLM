@@ -13,6 +13,7 @@ import '../services/mcp/mcp_config.dart';
 import '../services/mcp/mcp_connection.dart';
 import 'settings/apple_widgets.dart';
 import '../widgets/app_ui.dart';
+import 'device_info_view.dart';
 import 'settings/device_card.dart';
 import 'settings/model_params.dart';
 import 'settings/skills_section.dart';
@@ -62,6 +63,20 @@ class SettingsView extends GetView<SettingsController> {
             const SizedBox(height: 16),
             sectionLabel(context, 'settings_section_hardware'.tr),
             buildDeviceCard(context, isDark),
+            const SizedBox(height: 12),
+            appleGroupedCard(context, isDark, children: [
+              appleListTile(
+                context,
+                isDark,
+                leading: iconBox(Dt.accent, LucideIcons.activity),
+                title: 'CubicDevice Info',
+                subtitle:
+                    'Live hardware dashboard — RAM, CPU, storage, battery, sensors, network',
+                trailing: const Icon(LucideIcons.chevronRight, size: 20),
+                showDivider: false,
+                onTap: () => Get.to(() => const DeviceInfoView()),
+              ),
+            ]),
             const SizedBox(height: 28),
             sectionLabel(context, 'settings_section_inference'.tr),
             appleGroupedCard(context, isDark, children: [
