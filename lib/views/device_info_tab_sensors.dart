@@ -172,36 +172,49 @@ class SensorsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       final list = c.sensors.value ?? const [];
-      return ListView(
-        padding:
-            const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      // Lazy rows: same freeze fix as the Apps tab.
+      return Column(
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: Theme.of(context)
-                      .dividerColor
-                      .withValues(alpha: 0.6)),
-            ),
-            child: Center(
-              child: Text(
-                  list.isEmpty
-                      ? 'No sensors reported on this device.'
-                      : '${list.length} Sensors are available on your device',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w800)),
+          Padding(
+            padding:
+                const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .dividerColor
+                        .withValues(alpha: 0.6)),
+              ),
+              child: Center(
+                child: Text(
+                    list.isEmpty
+                        ? 'No sensors reported on this device.'
+                        : '${list.length} Sensors are available on your device',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800)),
+              ),
             ),
           ),
           const SizedBox(height: 12),
-          for (final s in list)
-            Container(
-              margin: const EdgeInsets.only(bottom: 10),
+          if (list.isEmpty)
+            const SizedBox.shrink()
+          else
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(
+                    16, 0, 16, 32),
+                itemCount: list.length,
+                itemBuilder: (_, i) {
+                  final s = list[i];
+                  return Container(
+                    margin:
+                        const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(16),
@@ -265,7 +278,10 @@ class SensorsTab extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
+            );
+          },
+        ),
+      ),
         ],
       );
     });

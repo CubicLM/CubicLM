@@ -34,6 +34,7 @@ class DeviceInfoView extends StatefulWidget {
 
 class _DeviceInfoViewState extends State<DeviceInfoView> {
   late final DeviceInfoController c;
+  late final PageController _pageCtrl;
   Future<AndroidDeviceInfo>? _androidInfo;
   Future<Map<String, dynamic>?>? _sysInfo;
 
@@ -61,14 +62,25 @@ class _DeviceInfoViewState extends State<DeviceInfoView> {
         : Get.put(DeviceInfoController());
     _androidInfo = DeviceInfoPlugin().androidInfo;
     _sysInfo = DeviceExtraService.getSystemInfo();
+    _pageCtrl = PageController(initialPage: c.tab.value);
   }
 
   @override
   void dispose() {
+    _pageCtrl.dispose();
     try {
       Get.delete<DeviceInfoController>();
     } catch (_) {}
     super.dispose();
+  }
+
+  void _goTab(int i) {
+    c.tab.value = i;
+    try {
+      _pageCtrl.animateToPage(i,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut);
+    } catch (_) {}
   }
 
   @override
@@ -92,111 +104,60 @@ class _DeviceInfoViewState extends State<DeviceInfoView> {
       ),
       body: Column(
         children: [
-          // Same pill language as Explore → Local filter chips.
+          // Explore-style segmented tabs + swipeable pages.
           Obx(() => SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    for (var i = 0; i < _tabs.length; i++) ...[
-                      InkWell(
-                        onTap: () => c.tab.value = i,
-                        borderRadius:
-                            BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: c.tab.value == i
-                                ? Theme.of(context)
-                                    .primaryColor
-                                    .withValues(alpha: 0.18)
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .surfaceContainerHighest
-                                    .withValues(alpha: 0.5),
-                            borderRadius:
-                                BorderRadius.circular(20),
-                            border: Border.all(
-                              color: c.tab.value == i
-                                  ? Theme.of(context)
-                                      .primaryColor
-                                      .withValues(alpha: 0.3)
-                                  : Theme.of(context)
-                                      .dividerColor
-                                      .withValues(alpha: 0.5),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (c.tab.value == i) ...[
-                                Icon(Icons.check,
-                                    size: 16,
-                                    color: Theme.of(context)
-                                        .primaryColor),
-                                const SizedBox(width: 4),
-                              ],
-                              Text(
-                                _tabs[i],
-                                style: GoogleFonts
-                                    .plusJakartaSans(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: c.tab.value == i
-                                      ? Theme.of(context)
-                                          .primaryColor
-                                      : Theme.of(context)
-                                          .hintColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                child: SegmentedButton<int>(
+                  segments: [
+                    for (var i = 0; i < _tabs.length; i++)
+                      ButtonSegment(
+                        value: i,
+                        label: Text(_tabs[i],
+                            style: const TextStyle(
+                                fontSize: 12)),
                       ),
-                      const SizedBox(width: 8),
-                    ],
                   ],
+                  selected: {c.tab.value},
+                  onSelectionChanged: (s) =>
+                      _goTab(s.first),
+                  style: const ButtonStyle(
+                    visualDensity:
+                        VisualDensity.compact,
+                    tapTargetSize:
+                        MaterialTapTargetSize
+                            .shrinkWrap,
+                  ),
                 ),
               )),
           const SizedBox(height: 8),
           Expanded(
-            child: Obx(() {
-              switch (c.tab.value) {
-                case 1:
-                  return DeviceTab(
-                      androidInfo: _androidInfo);
-                case 2:
-                  return SystemTab(
-                      androidInfo: _androidInfo,
-                      sysInfo: _sysInfo);
-                case 3:
-                  return CpuTab(
-                      androidInfo: _androidInfo);
-                case 4:
-                  return const BatteryTab();
-                case 5:
-                  return const NetworkTab();
-                case 6:
-                  return const ConnectivityTab();
-                case 7:
-                  return const DisplayTab();
-                case 8:
-                  return const MemoryTab();
-                case 9:
-                  return const CameraTab();
-                case 10:
-                  return const SensorsTab();
-                case 11:
-                  return const ThermalTab();
-                case 12:
-                  return const AppsTab();
-                case 0:
-                default:
-                  return const DashboardTab();
-              }
-            }),
+            child: PageView(
+              controller: _pageCtrl,
+              onPageChanged: (i) {
+                if (c.tab.value != i) {
+                  c.tab.value = i;
+                }
+              },
+              children: [
+                const DashboardTab(),
+                DeviceTab(androidInfo: _androidInfo),
+                SystemTab(
+                    androidInfo: _androidInfo,
+                    sysInfo: _sysInfo),
+                CpuTab(androidInfo: _androidInfo),
+                const BatteryTab(),
+                const NetworkTab(),
+                const ConnectivityTab(),
+                const DisplayTab(),
+                const MemoryTab(),
+                const CameraTab(),
+                const SensorsTab(),
+                const ThermalTab(),
+                const AppsTab(),
+              ],
+            ),
           ),
         ],
       ),

@@ -416,6 +416,41 @@ class MainActivity : FlutterFragmentActivity() {
         )
     }
 
+    /// Runs channel work off the UI thread (heavy collectors like
+    /// appList/traffic would otherwise freeze the app for seconds)
+    /// and posts the result back on the UI thread, as required.
+    /// With needsPerm, SecurityException maps to NEEDS_PERMISSION.
+    private fun bg(
+        result: MethodChannel.Result,
+        needsPerm: Boolean = false,
+        work: () -> Any?,
+    ) {
+        kotlin.concurrent.thread {
+            try {
+                val r = work()
+                runOnUiThread { result.success(r) }
+            } catch (se: SecurityException) {
+                runOnUiThread {
+                    if (needsPerm) {
+                        result.error(
+                            "NEEDS_PERMISSION",
+                            "Usage access not granted",
+                            null,
+                        )
+                    } else {
+                        result.error(
+                            "FAILED", se.message, null,
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    result.error("FAILED", e.message, null)
+                }
+            }
+        }
+    }
+
     /// Validated-internet + metered flags for the Connectivity tab.
     private fun collectNetExtra(): Map<String, Any> {
         var validated = false
@@ -892,9 +927,16 @@ class MainActivity : FlutterFragmentActivity() {
             val cm = getSystemService(CAMERA_SERVICE)
                 as? android.hardware.camera2.CameraManager
                 ?: return out
-            for (id in cm.cameraIdList) {
+            val seenIds = HashSet<String>()
+            // Shared builder so logical + hidden physical lenses parse
+            // identically. `physical` marks aux lenses for the UI.
+            fun buildCam(
+                id: String,
+                c: android.hardware.camera2.CameraCharacteristics,
+                physical: Boolean,
+                parentFacing: Int,
+            ): Map<String, Any?>? {
                 try {
-                    val c = cm.getCameraCharacteristics(id)
                                         fun ints(
                         key: android.hardware.camera2.CameraCharacteristics
                             .Key<IntArray>,
@@ -902,7 +944,8 @@ class MainActivity : FlutterFragmentActivity() {
                         return camChar(c, key)?.toList()
                             ?: emptyList()
                     }
-                    val facing = camChar(c, CamChars.LENS_FACING) ?: -1
+                    var facing = camChar(c, CamChars.LENS_FACING) ?: -1
+                    if (facing < 0) facing = parentFacing
                     // JPEG output sizes, largest first.
                     var sizes = emptyList<String>()
                     var maxW = 0
@@ -1013,6 +1056,7 @@ class MainActivity : FlutterFragmentActivity() {
                     val m = HashMap<String, Any?>()
                     m["id"] = id
                     m["facing"] = facing // 0 back, 1 front, 2 external
+                    m["physical"] = physical
                     m["maxW"] = maxW
                     m["maxH"] = maxH
                     m["mp"] = mp
@@ -1101,8 +1145,43 @@ class MainActivity : FlutterFragmentActivity() {
                     } catch (_: Exception) {
                         m["aeStep"] = null
                     }
-                    out.add(m)
+                    return m
                 } catch (_: Exception) {
+                    return null
+                }
+            }
+            for (id in cm.cameraIdList) {
+                if (!seenIds.add(id)) continue
+                val lc = try {
+                    cm.getCameraCharacteristics(id)
+                } catch (_: Exception) {
+                    continue
+                }
+                val m = buildCam(id, lc, false, -1) ?: continue
+                out.add(m)
+                // Hidden aux lenses (macro/depth/tele) live behind
+                // logical multi-cameras — enumerate physical ids too.
+                val pids = try {
+                    lc.physicalCameraIds.toList()
+                } catch (_: Exception) {
+                    emptyList<String>()
+                }
+                for (pid in pids) {
+                    if (!seenIds.add(pid)) continue
+                    val pc = try {
+                        cm.getCameraCharacteristics(pid)
+                    } catch (_: Exception) {
+                        continue
+                    }
+                    val pm = buildCam(pid, pc, true,
+                        (m["facing"] as? Int) ?: -1) ?: continue
+                    // Drop fully-gated aux (no sizes at all).
+                    if ((pm["maxW"] as? Int ?: 0) <= 0 &&
+                        (pm["sizes"] as? List<*>).isNullOrEmpty()
+                    ) {
+                        continue
+                    }
+                    out.add(pm)
                 }
             }
         } catch (_: Exception) {
@@ -2584,8 +2663,10 @@ class MainActivity : FlutterFragmentActivity() {
                     // Camera tab: Camera2 characteristics per camera id.
                     // No CAMERA permission needed (characteristics only,
                     // never opened). Multi-lens phones report each id.
+                    // Off the UI thread: CameraManager enumeration can
+                    // stall on some devices.
                     "cameraInfo" -> {
-                        result.success(collectCameraInfo())
+                        bg(result) { collectCameraInfo() }
                     }
                     // Thermal tab: every thermal_zone type + temp +
                     // PowerManager status. Sysfs reads, no permission.
@@ -2601,8 +2682,9 @@ class MainActivity : FlutterFragmentActivity() {
                     // versions, SDK levels, timestamps, APK bytes.
                     // No QUERY_ALL_PACKAGES: only packages visible to
                     // the app (launcher + declared queries) are listed.
+                    // Off the UI thread: hundreds of icon encodes.
                     "appList" -> {
-                        result.success(collectAppList())
+                        bg(result) { collectAppList() }
                     }
                     "launchApp" -> {
                         val pkg = call.argument<String>("package") ?: ""
@@ -2653,8 +2735,9 @@ class MainActivity : FlutterFragmentActivity() {
                         result.success(openBtSettings())
                     }
                     // System tab bundle for CubicDevice Info (one round-trip).
+                    // Off the UI thread: getprop exec + MediaDrm init.
                     "systemInfo" -> {
-                        result.success(collectSystemInfo())
+                        bg(result) { collectSystemInfo() }
                     }
                     // CPU tab bundle: per-core min/max kHz, governor,
                     // EGL renderer/vendor/version (no permission needed).
@@ -2689,18 +2772,9 @@ class MainActivity : FlutterFragmentActivity() {
                         val e = (call.argument<Any>("endMs")
                             as? Number)?.toLong()
                             ?: System.currentTimeMillis()
-                        try {
-                            result.success(collectTrafficSummary(s, e))
-                        } catch (se: SecurityException) {
-                            result.error(
-                                "NEEDS_PERMISSION",
-                                "Usage access not granted",
-                                null,
-                            )
-                        } catch (ex: Exception) {
-                            result.error(
-                                "TRAFFIC_FAILED", ex.message, null,
-                            )
+                        // Off the UI thread: stats queries can stall.
+                        bg(result, needsPerm = true) {
+                            collectTrafficSummary(s, e)
                         }
                     }
                     "trafficApps" -> {
@@ -2709,18 +2783,9 @@ class MainActivity : FlutterFragmentActivity() {
                         val e = (call.argument<Any>("endMs")
                             as? Number)?.toLong()
                             ?: System.currentTimeMillis()
-                        try {
-                            result.success(collectTrafficApps(s, e))
-                        } catch (se: SecurityException) {
-                            result.error(
-                                "NEEDS_PERMISSION",
-                                "Usage access not granted",
-                                null,
-                            )
-                        } catch (ex: Exception) {
-                            result.error(
-                                "TRAFFIC_FAILED", ex.message, null,
-                            )
+                        // Off the UI thread: hundreds of UID queries.
+                        bg(result, needsPerm = true) {
+                            collectTrafficApps(s, e)
                         }
                     }
                     "trafficBoot" -> {

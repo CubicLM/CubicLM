@@ -368,7 +368,57 @@ class _ExploreDashboardState extends State<ExploreDashboard> {
               height: 1,
               color: Theme.of(context).dividerColor.withValues(alpha: 0.4)),
           const SizedBox(height: 12),
-          // ── RAM zone: label + tier + refresh + info ──
+          // SoC + Details live on one level, right above RAM Status.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SocBrandIcon(
+                  family: socFam,
+                  size: 16,
+                  fallbackColor: Theme.of(context).hintColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${advice.chipLabel} · ${advice.quantLine} · ${advice.sizeLine}',
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).hintColor),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () =>
+                    Get.to(() => const DeviceInfoView()),
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(LucideIcons.activity,
+                          size: 11, color: primary),
+                      const SizedBox(width: 4),
+                      Text('Details',
+                          style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: primary)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // ── RAM zone: label + refresh + info ──
           Row(children: [
             const Icon(LucideIcons.memoryStick, size: 15),
             const SizedBox(width: 8),
@@ -376,20 +426,6 @@ class _ExploreDashboardState extends State<ExploreDashboard> {
                 style: GoogleFonts.plusJakartaSans(
                     fontSize: 12.5, fontWeight: FontWeight.w800)),
             const Spacer(),
-            if (tierLabel.isNotEmpty)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(tierLabel,
-                    style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: primary)),
-              ),
             const SizedBox(width: 4),
             InkWell(
               onTap: onRefresh,
@@ -499,58 +535,7 @@ class _ExploreDashboardState extends State<ExploreDashboard> {
               ),
             ],
           ],
-          const SizedBox(height: 12),
-          Container(
-              height: 1,
-              color: Theme.of(context).dividerColor.withValues(alpha: 0.4)),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SocBrandIcon(
-                  family: socFam,
-                  size: 16,
-                  fallbackColor: Theme.of(context).hintColor),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '${advice.chipLabel} · ${advice.quantLine} · ${advice.sizeLine}',
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(context).hintColor),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          // Deep link: full device telemetry in Toolkit → Device Info.
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () =>
-                  Get.to(() => const DeviceInfoView()),
-              icon: const Icon(LucideIcons.activity, size: 15),
-              label: Text('View details',
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor:
-                    Theme.of(context).colorScheme.onSurface,
-                side: BorderSide(
-                    color: Theme.of(context)
-                        .dividerColor
-                        .withValues(alpha: 0.8)),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 10),
-              ),
-            ),
-          ),
+
         ],
       ),
     );
@@ -1020,7 +1005,7 @@ class _DownloadedFrameState extends State<_DownloadedFrame> {
                 itemCount: items.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (_, i) =>
-                    buildModelCard(context, items[i]),
+                    buildModelCard(context, items[i], index: i),
               );
             }),
           ),

@@ -206,6 +206,20 @@ class _CameraTabState extends State<CameraTab> {
         : '${d.toStringAsFixed(1)} MP';
   }
 
+  /// True sensor megapixels prefer the pixel array (e.g. 8000x6000 =
+  /// 48 MP); third-party JPEG caps are often binned (12 MP) on
+  /// Quad-Bayer sensors, which understates the hardware.
+  static String _camMp(Map<String, dynamic> m) {
+    final pa = '${m['pixelArray'] ?? ''}';
+    final mm = RegExp(r'(\d+)\s*x\s*(\d+)').firstMatch(pa);
+    if (mm != null) {
+      final w = int.tryParse(mm.group(1)!) ?? 0;
+      final h = int.tryParse(mm.group(2)!) ?? 0;
+      if (w > 0 && h > 0) return _mp(w * h / 1000000.0);
+    }
+    return _mp(m['mp']);
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = Get.find<DeviceInfoController>();
@@ -231,8 +245,9 @@ class _CameraTabState extends State<CameraTab> {
       int facingOf(Map<String, dynamic> m) =>
           (m['facing'] as num?)?.toInt() ?? -1;
       String cardTitle(Map<String, dynamic> m) {
-        final mp = _mp(m['mp']);
-        return '$mp - ${_facing(facingOf(m))}';
+        final mp = _camMp(m);
+        final aux = m['physical'] == true ? ' · Aux' : '';
+        return '$mp - ${_facing(facingOf(m))}$aux';
       }
 
       return ListView(

@@ -120,7 +120,9 @@ class DeviceInfoController extends GetxController {
     try {
       final m = await DeviceExtraService.getBattLive(force: force);
       if (m != null) {
-        battLive.value = m;
+        if (force || !identical(m, battLive.value)) {
+          battLive.value = m;
+        }
         final ua = (m['currentUa'] as num?)?.toDouble() ?? 0;
         battHistory.add(ua / 1000.0);
         if (battHistory.length > 40) {
@@ -130,58 +132,91 @@ class DeviceInfoController extends GetxController {
     } catch (_) {}
   }
 
+  /// Assign-only-if-new: services return the SAME cached instance
+  /// while fresh, so identical() skips the notify — without this the
+  /// 2s timer rebuilds every tab (even off-screen PageView pages)
+  /// and the page feels laggy.
+  void _set<T>(Rxn<T> rx, T? v, {required bool force}) {
+    if (v == null) return;
+    if (force || !identical(v, rx.value)) rx.value = v;
+  }
+
+  /// All channel calls are independent — fetch concurrently so one
+  /// slow collector (app icons, system bundle) never head-blocks the
+  /// fast ones. Each fetch is individually guarded.
+  Future<T?> _guard<T>(Future<T> f) async {
+    try {
+      return await f;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> refreshExtras({bool force = false}) async {
+    final results = await Future.wait([
+      _guard(DeviceExtraService.get(force: force)),
+      _guard(DeviceExtraService.getCpuInfo(force: force)),
+      _guard(DeviceExtraService.getWifiInfo(force: force)),
+      _guard(DeviceExtraService.getNetExtra(force: force)),
+      _guard(DeviceExtraService.getConnInfo(force: force)),
+      _guard(DeviceExtraService.getDisplayInfo(force: force)),
+      _guard(DeviceExtraService.getThermalInfo(force: force)),
+      _guard(DeviceExtraService.getSysParts(force: force)),
+      _guard(DeviceExtraService.getCameraInfo(force: force)),
+      _guard(DeviceExtraService.getSensorList(force: force)),
+      _guard(DeviceExtraService.getAppList(force: force)),
+      _guard(StorageInfoService.getStats(force: force)),
+    ]);
+    _set(extras, results[0] as DeviceExtras?,
+        force: force);
+    _set(cpu, results[1] as Map<String, dynamic>?,
+        force: force);
+    _set(wifi, results[2] as Map<String, dynamic>?,
+        force: force);
+    _set(net, results[3] as Map<String, dynamic>?,
+        force: force);
+    _set(conn, results[4] as Map<String, dynamic>?,
+        force: force);
+    _set(display, results[5] as Map<String, dynamic>?,
+        force: force);
+    _set(thermal, results[6] as Map<String, dynamic>?,
+        force: force);
+    // Static-ish snapshots: load once, refresh on demand.
+    if (force || mem.value == null) {
+      try {
+        mem.value = _readMeminfo();
+      } catch (_) {}
+    }
+    final sp = results[7] as Map<String, dynamic>?;
+    if (sp != null && (force || sysParts.value == null)) {
+      sysParts.value = sp;
+    }
+    final cm = results[8] as List<Map<String, dynamic>>?;
+    if (cm != null && (force || cameras.value == null)) {
+      cameras.value = cm;
+    }
+    final sn = results[9] as List<Map<String, dynamic>>?;
+    if (sn != null && (force || sensors.value == null)) {
+      sensors.value = sn;
+    }
+    final ap = results[10] as List<Map<String, dynamic>>?;
+    if (ap != null && (force || apps.value == null)) {
+      apps.value = ap;
+    }
     try {
-      extras.value = await DeviceExtraService.get(force: force);
-    } catch (_) {}
-    try {
-      cpu.value = await DeviceExtraService.getCpuInfo(force: force);
-    } catch (_) {}
-    try {
-      wifi.value = await DeviceExtraService.getWifiInfo(force: force);
-    } catch (_) {}
-    try {
-      net.value = await DeviceExtraService.getNetExtra(force: force);
-    } catch (_) {}
-    try {
-      conn.value = await DeviceExtraService.getConnInfo(force: force);
-    } catch (_) {}
-    try {
-      display.value =
-          await DeviceExtraService.getDisplayInfo(force: force);
-    } catch (_) {}
-    try {
-      mem.value = _readMeminfo();
-    } catch (_) {}
-    try {
-      sysParts.value =
-          await DeviceExtraService.getSysParts(force: force);
-    } catch (_) {}
-    try {
-      cameras.value =
-          await DeviceExtraService.getCameraInfo(force: force);
-    } catch (_) {}
-    try {
-      sensors.value =
-          await DeviceExtraService.getSensorList(force: force);
-    } catch (_) {}
-    try {
-      thermal.value =
-          await DeviceExtraService.getThermalInfo(force: force);
-    } catch (_) {}
-    try {
-      apps.value =
-          await DeviceExtraService.getAppList(force: force);
-    } catch (_) {}
-    try {
-      storage.value =
-          await StorageInfoService.getStats(force: force);
+      _set(storage,
+          await StorageInfoService.getStats(force: force),
+          force: force);
     } catch (_) {}
     try {
       final b = await PowerInfoService.getBattery(force: force);
       if (b != null) {
-        batteryLevel.value = b.level;
-        batteryCharging.value = b.charging;
+        if (force || b.level != batteryLevel.value) {
+          batteryLevel.value = b.level;
+        }
+        if (force || b.charging != batteryCharging.value) {
+          batteryCharging.value = b.charging;
+        }
       }
     } catch (_) {}
     _updateCpuCoreHistory();

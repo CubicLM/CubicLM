@@ -413,7 +413,9 @@ class _ContextWindowViewState extends State<ContextWindowView> {
           crossAxisCount: 2,
           mainAxisSpacing: 10,
           crossAxisSpacing: 10,
-          childAspectRatio: 2.6,
+          // 2.6 → 2.4: label row + value need ~68px; the tighter
+          // ratio overflowed 0.55px on 393dp screens (34 log rows).
+          childAspectRatio: 2.4,
           children: [
             _card(context,
                 child: _stat(
@@ -490,17 +492,30 @@ class _ContextWindowViewState extends State<ContextWindowView> {
           ],
         ),
         const SizedBox(height: 12),
-        // Raw messages.
-        _card(context,
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Text('Raw messages',
-                    style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800)),
-                const SizedBox(height: 6),
+        // Raw messages. Material (not just a decorated Container)
+        // so the ExpansionTile ink splashes have a surface to paint
+        // on — otherwise Flutter logs "ink splashes may be invisible".
+        Material(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .dividerColor
+                        .withValues(alpha: 0.6)),
+              ),
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  Text('Raw messages',
+                      style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 6),
                 for (var i = 0; i < msgs.length; i++)
                   Theme(
                     data: Theme.of(context).copyWith(
@@ -544,7 +559,9 @@ class _ContextWindowViewState extends State<ContextWindowView> {
                     ),
                   ),
               ],
-            )),
+            ),
+            ),
+            ),
       ],
     );
   }
@@ -698,7 +715,8 @@ class _ContextWindowViewState extends State<ContextWindowView> {
           crossAxisCount: 2,
           mainAxisSpacing: 10,
           crossAxisSpacing: 10,
-          childAspectRatio: 2.6,
+          // Same 0.55px overflow fix as the Local tab grid.
+          childAspectRatio: 2.4,
           children: [
             _card(context,
                 child: _stat(

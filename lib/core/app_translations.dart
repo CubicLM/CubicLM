@@ -426,6 +426,16 @@ class AppTranslations extends Translations {
 
   // ── Bangla (বাংলা) ──
   static const _bangla = {
+    'chat_response_style': 'চ্যাট রেসপন্স স্টাইল',
+    'chat_response_style_desc': 'AI রেসপন্স টাইপিং ও স্ট্রিমিং এফেক্ট বেছে নিন',
+    'chat_resp_default': '1. রিয়েল-টাইম টাইপিং (প্রাইমারি ডিফল্ট)',
+    'chat_resp_default_desc': 'প্রাইমারি APK স্টাইল: রিয়েল টাইমে টোকেন-বাই-টোকেন টেক্সট স্ট্রিম করে',
+    'chat_resp_blurry': '2. ঝাপসা বাক্য স্ট্রিমিং',
+    'chat_resp_blurry_desc': 'চলতি বাক্য সম্পূর্ণ না হওয়া পর্যন্ত ঝাপসা থাকে',
+    'chat_resp_blurry_word': '3. ঝাপসা শব্দ স্ট্রিমিং',
+    'chat_resp_blurry_word_desc': 'সারির চলতি সক্রিয় শব্দ সম্পূর্ণ না হওয়া পর্যন্ত ঝাপসা থাকে',
+    'chat_resp_instant': '4. তাৎক্ষণিক সম্পূর্ণ রেসপন্স',
+    'chat_resp_instant_desc': 'টাইপিং অ্যানিমেশন ছাড়াই একবারে সম্পূর্ণ উত্তর দেখায়',
     // Navigation
     'nav_chat': 'চ্যাট',
     'nav_explore': 'এক্সপ্লোর',
@@ -801,6 +811,16 @@ class AppTranslations extends Translations {
 
   // ── Hindi (हिन्दी) ──
   static const _hindi = {
+    'chat_response_style': 'चैट रिस्पॉन्स स्टाइल',
+    'chat_response_style_desc': 'AI रिस्पॉन्स टाइपिंग और स्ट्रीमिंग इफेक्ट चुनें',
+    'chat_resp_default': '1. रियल-टाइम टाइपिंग (प्राइमरी डिफॉल्ट)',
+    'chat_resp_default_desc': 'प्राइमरी APK स्टाइल: रियल टाइम में टोकन-दर-टोकन टेक्स्ट स्ट्रीम करता है',
+    'chat_resp_blurry': '2. धुंधला वाक्य स्ट्रीमिंग',
+    'chat_resp_blurry_desc': 'वर्तमान वाक्य पूरा होने तक धुंधला रहता है',
+    'chat_resp_blurry_word': '3. धुंधला शब्द स्ट्रीमिंग',
+    'chat_resp_blurry_word_desc': 'पंक्ति का वर्तमान सक्रिय शब्द पूरा होने तक धुंधला रहता है',
+    'chat_resp_instant': '4. तुरंत पूर्ण उत्तर',
+    'chat_resp_instant_desc': 'बिना टाइपिंग एनिमेशन के एक बार में पूरा उत्तर दिखाता है',
     'nav_chat': 'चैट',
     'nav_explore': 'एक्सप्लोर',
     'nav_nodes': 'नोड्स',
@@ -1131,6 +1151,16 @@ class AppTranslations extends Translations {
 
   // ── Arabic (العربية) ──
   static const _arabic = {
+    'chat_response_style': 'نمط رد الدردشة',
+    'chat_response_style_desc': 'اختر تأثير الكتابة والبث لرد الذكاء الاصطناعي',
+    'chat_resp_default': '1. الكتابة في الوقت الفعلي (الافتراضي الأساسي)',
+    'chat_resp_default_desc': 'نمط APK الأساسي: يبث النص رمزا برمز في الوقت الفعلي',
+    'chat_resp_blurry': '2. بث الجمل الضبابية',
+    'chat_resp_blurry_desc': 'تبقى الجملة الحالية ضبابية حتى اكتمالها',
+    'chat_resp_blurry_word': '3. بث الكلمات الضبابية',
+    'chat_resp_blurry_word_desc': 'تبقى الكلمة النشطة الحالية في الصف ضبابية حتى اكتمالها',
+    'chat_resp_instant': '4. الرد الكامل الفوري',
+    'chat_resp_instant_desc': 'يعرض الرد الكامل دفعة واحدة دون حركة الكتابة',
     'nav_chat': 'محادثة',
     'nav_explore': 'استكشاف',
     'nav_nodes': 'العقد',
@@ -1461,6 +1491,16 @@ class AppTranslations extends Translations {
 
   // ── Chinese (中文) ──
   static const _chinese = {
+    'chat_response_style': '聊天回复样式',
+    'chat_response_style_desc': '选择 AI 回复打字和流式效果',
+    'chat_resp_default': '1. 实时打字（主要默认）',
+    'chat_resp_default_desc': '主要 APK 样式：实时逐词流式显示文本',
+    'chat_resp_blurry': '2. 模糊句子流式显示',
+    'chat_resp_blurry_desc': '当前句子在完成前保持模糊',
+    'chat_resp_blurry_word': '3. 模糊词语流式显示',
+    'chat_resp_blurry_word_desc': '当前行中的活动词语在完成前保持模糊',
+    'chat_resp_instant': '4. 即时完整回复',
+    'chat_resp_instant_desc': '无打字动画，一次显示完整回复',
     'nav_chat': '聊天',
     'nav_explore': '探索',
     'nav_nodes': '节点',
@@ -1791,6 +1831,16 @@ class AppTranslations extends Translations {
 
   // ── Spanish (Español) ──
   static const _spanish = {
+    'chat_response_style': 'Estilo de respuesta del chat',
+    'chat_response_style_desc': 'Elige el efecto de escritura y transmisión de la respuesta de IA',
+    'chat_resp_default': '1. Escritura en tiempo real (predeterminado principal)',
+    'chat_resp_default_desc': 'Estilo principal de APK: transmite el texto token por token en tiempo real',
+    'chat_resp_blurry': '2. Transmisión difuminada por frases',
+    'chat_resp_blurry_desc': 'La frase actual permanece difuminada hasta completarse',
+    'chat_resp_blurry_word': '3. Transmisión difuminada por palabras',
+    'chat_resp_blurry_word_desc': 'La palabra activa actual de la fila permanece difuminada hasta completarse',
+    'chat_resp_instant': '4. Respuesta completa instantánea',
+    'chat_resp_instant_desc': 'Muestra la respuesta completa de una vez sin animación de escritura',
     'nav_chat': 'Chat',
     'nav_explore': 'Explorar',
     'nav_nodes': 'Nodos',
@@ -2121,6 +2171,16 @@ class AppTranslations extends Translations {
 
   // ── French (Français) ──
   static const _french = {
+    'chat_response_style': 'Style de réponse du chat',
+    'chat_response_style_desc': 'Choisissez l’effet de frappe et de diffusion de la réponse IA',
+    'chat_resp_default': '1. Frappe en temps réel (défaut principal)',
+    'chat_resp_default_desc': 'Style APK principal : diffuse le texte token par token en temps réel',
+    'chat_resp_blurry': '2. Diffusion floue par phrases',
+    'chat_resp_blurry_desc': 'La phrase en cours reste floue jusqu’à son achèvement',
+    'chat_resp_blurry_word': '3. Diffusion floue par mots',
+    'chat_resp_blurry_word_desc': 'Le mot actif actuel de la ligne reste flou jusqu’à son achèvement',
+    'chat_resp_instant': '4. Réponse complète instantanée',
+    'chat_resp_instant_desc': 'Affiche la réponse complète d’un coup sans animation de frappe',
     'nav_chat': 'Chat',
     'nav_explore': 'Explorer',
     'nav_nodes': 'Nœuds',
@@ -2451,6 +2511,16 @@ class AppTranslations extends Translations {
 
   // ── Japanese (日本語) ──
   static const _japanese = {
+    'chat_response_style': 'チャット応答スタイル',
+    'chat_response_style_desc': 'AI応答のタイピングとストリーミング効果を選択',
+    'chat_resp_default': '1. リアルタイムタイピング（主要デフォルト）',
+    'chat_resp_default_desc': '主要APKスタイル：トークンごとにリアルタイムでテキストをストリーム表示',
+    'chat_resp_blurry': '2. ぼかし文ストリーミング',
+    'chat_resp_blurry_desc': '現在の文は完成するまでぼやけたままになります',
+    'chat_resp_blurry_word': '3. ぼかし単語ストリーミング',
+    'chat_resp_blurry_word_desc': '行内の現在のアクティブな単語は完成するまでぼやけたままになります',
+    'chat_resp_instant': '4. 即時完全応答',
+    'chat_resp_instant_desc': 'タイピングアニメーションなしで応答全体を一度に表示します',
     'nav_chat': 'チャット',
     'nav_explore': '探索',
     'nav_nodes': 'ノード',
@@ -2781,6 +2851,16 @@ class AppTranslations extends Translations {
 
   // ── Korean (한국어) ──
   static const _korean = {
+    'chat_response_style': '채팅 응답 스타일',
+    'chat_response_style_desc': 'AI 응답 타이핑 및 스트리밍 효과 선택',
+    'chat_resp_default': '1. 실시간 타이핑 (기본 기본값)',
+    'chat_resp_default_desc': '기본 APK 스타일: 토큰 단위로 실시간 텍스트 스트리밍',
+    'chat_resp_blurry': '2. 흐릿한 문장 스트리밍',
+    'chat_resp_blurry_desc': '현재 문장은 완성될 때까지 흐릿하게 유지됩니다',
+    'chat_resp_blurry_word': '3. 흐릿한 단어 스트리밍',
+    'chat_resp_blurry_word_desc': '행의 현재 활성 단어는 완성될 때까지 흐릿하게 유지됩니다',
+    'chat_resp_instant': '4. 즉시 전체 응답',
+    'chat_resp_instant_desc': '타이핑 애니메이션 없이 전체 응답을 한 번에 표시합니다',
     'nav_chat': '채팅',
     'nav_explore': '탐색',
     'nav_nodes': '노드',
@@ -3111,6 +3191,16 @@ class AppTranslations extends Translations {
 
   // ── Portuguese (Português) ──
   static const _portuguese = {
+    'chat_response_style': 'Estilo de resposta do chat',
+    'chat_response_style_desc': 'Escolha o efeito de digitação e transmissão da resposta de IA',
+    'chat_resp_default': '1. Digitação em tempo real (padrão principal)',
+    'chat_resp_default_desc': 'Estilo principal de APK: transmite o texto token por token em tempo real',
+    'chat_resp_blurry': '2. Transmissão desfocada por frases',
+    'chat_resp_blurry_desc': 'A frase atual permanece desfocada até ser concluída',
+    'chat_resp_blurry_word': '3. Transmissão desfocada por palavras',
+    'chat_resp_blurry_word_desc': 'A palavra ativa atual da linha permanece desfocada até ser concluída',
+    'chat_resp_instant': '4. Resposta completa instantânea',
+    'chat_resp_instant_desc': 'Mostra a resposta completa de uma vez sem animação de digitação',
     'nav_chat': 'Chat',
     'nav_explore': 'Explorar',
     'nav_nodes': 'Nós',
@@ -3441,6 +3531,16 @@ class AppTranslations extends Translations {
 
   // ── German (Deutsch) ──
   static const _german = {
+    'chat_response_style': 'Chat-Antwortstil',
+    'chat_response_style_desc': 'Wähle Tipp- und Streaming-Effekt der KI-Antwort',
+    'chat_resp_default': '1. Echtzeit-Tippen (primärer Standard)',
+    'chat_resp_default_desc': 'Primärer APK-Stil: streamt Text Token für Token in Echtzeit',
+    'chat_resp_blurry': '2. Verschwommenes Satz-Streaming',
+    'chat_resp_blurry_desc': 'Der aktuelle Satz bleibt verschwommen, bis er fertig ist',
+    'chat_resp_blurry_word': '3. Verschwommenes Wort-Streaming',
+    'chat_resp_blurry_word_desc': 'Das aktuelle aktive Wort der Zeile bleibt verschwommen, bis es fertig ist',
+    'chat_resp_instant': '4. Sofortige Komplettantwort',
+    'chat_resp_instant_desc': 'Zeigt die komplette Antwort auf einmal ohne Tippanimation',
     'nav_chat': 'Chat',
     'nav_explore': 'Erkunden',
     'nav_nodes': 'Knoten',
@@ -3771,6 +3871,16 @@ class AppTranslations extends Translations {
 
   // ── Turkish (Türkçe) ──
   static const _turkish = {
+    'chat_response_style': 'Sohbet Yanıt Stili',
+    'chat_response_style_desc': 'YZ yanıt yazma ve akış efektini seçin',
+    'chat_resp_default': '1. Gerçek zamanlı yazma (birincil varsayılan)',
+    'chat_resp_default_desc': 'Birincil APK stili: metni gerçek zamanlı jeton jeton aktarır',
+    'chat_resp_blurry': '2. Bulanık cümle akışı',
+    'chat_resp_blurry_desc': 'Geçerli cümle tamamlanana kadar bulanık kalır',
+    'chat_resp_blurry_word': '3. Bulanık kelime akışı',
+    'chat_resp_blurry_word_desc': 'Satırdaki geçerli etkin kelime tamamlanana kadar bulanık kalır',
+    'chat_resp_instant': '4. Anında tam yanıt',
+    'chat_resp_instant_desc': 'Yazma animasyonu olmadan tüm yanıtı bir kerede gösterir',
     'nav_chat': 'Sohbet',
     'nav_explore': 'Keşfet',
     'nav_nodes': 'Düğümler',
@@ -4101,6 +4211,16 @@ class AppTranslations extends Translations {
 
   // ── Indonesian (Bahasa Indonesia) ──
   static const _indonesian = {
+    'chat_response_style': 'Gaya Respons Chat',
+    'chat_response_style_desc': 'Pilih efek pengetikan dan streaming respons AI',
+    'chat_resp_default': '1. Pengetikan real-time (default utama)',
+    'chat_resp_default_desc': 'Gaya APK utama: streaming teks token demi token secara real-time',
+    'chat_resp_blurry': '2. Streaming kalimat buram',
+    'chat_resp_blurry_desc': 'Kalimat saat ini tetap buram hingga selesai',
+    'chat_resp_blurry_word': '3. Streaming kata buram',
+    'chat_resp_blurry_word_desc': 'Kata aktif saat ini di baris tetap buram hingga selesai',
+    'chat_resp_instant': '4. Respons penuh instan',
+    'chat_resp_instant_desc': 'Menampilkan respons lengkap sekaligus tanpa animasi pengetikan',
     'nav_chat': 'Obrolan',
     'nav_explore': 'Jelajahi',
     'nav_nodes': 'Node',
@@ -4431,6 +4551,16 @@ class AppTranslations extends Translations {
 
   // ── Russian (Русский) ──
   static const _russian = {
+    'chat_response_style': 'Стиль ответов чата',
+    'chat_response_style_desc': 'Выберите эффект печати и потоковой выдачи ответа ИИ',
+    'chat_resp_default': '1. Печать в реальном времени (основной по умолчанию)',
+    'chat_resp_default_desc': 'Основной стиль APK: выводит текст по токенам в реальном времени',
+    'chat_resp_blurry': '2. Размытая потоковая выдача по предложениям',
+    'chat_resp_blurry_desc': 'Текущее предложение остаётся размытым до завершения',
+    'chat_resp_blurry_word': '3. Размытая потоковая выдача по словам',
+    'chat_resp_blurry_word_desc': 'Текущее активное слово строки остаётся размытым до завершения',
+    'chat_resp_instant': '4. Мгновенный полный ответ',
+    'chat_resp_instant_desc': 'Показывает полный ответ сразу без анимации печати',
     'nav_chat': 'Чат',
     'nav_explore': 'Обзор',
     'nav_nodes': 'Узлы',
@@ -4761,6 +4891,16 @@ class AppTranslations extends Translations {
 
   // ── Urdu (اردو) ──
   static const _urdu = {
+    'chat_response_style': 'چیٹ رسپانس اسٹائل',
+    'chat_response_style_desc': 'AI رسپانس ٹائپنگ اور اسٹریمنگ ایفیکٹ منتخب کریں',
+    'chat_resp_default': '1. ریئل ٹائم ٹائپنگ (بنیادی ڈیفالٹ)',
+    'chat_resp_default_desc': 'بنیادی APK اسٹائل: ریئل ٹائم میں ٹوکن بہ ٹوکن متن اسٹریم کرتا ہے',
+    'chat_resp_blurry': '2. دھندلا جملہ اسٹریمنگ',
+    'chat_resp_blurry_desc': 'موجودہ جملہ مکمل ہونے تک دھندلا رہتا ہے',
+    'chat_resp_blurry_word': '3. دھندلا لفظ اسٹریمنگ',
+    'chat_resp_blurry_word_desc': 'قطار کا موجودہ فعال لفظ مکمل ہونے تک دھندلا رہتا ہے',
+    'chat_resp_instant': '4. فوری مکمل جواب',
+    'chat_resp_instant_desc': 'ٹائپنگ اینیمیشن کے بغیر ایک بار میں مکمل جواب دکھاتا ہے',
     'nav_chat': 'چیٹ',
     'nav_explore': 'دریافت',
     'nav_nodes': 'نوڈز',

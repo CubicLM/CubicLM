@@ -89,34 +89,47 @@ class _AppsTabState extends State<AppsTab> {
           : _filter == 1
               ? systems
               : all;
-      return ListView(
-        padding:
-            const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      // Lazy rows: 400+ eager icon tiles froze the page.
+      return Column(
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _countChip(context, '${all.length}'),
-                const SizedBox(width: 8),
-                _filterChip(context, 'User', 0),
-                const SizedBox(width: 8),
-                _filterChip(context, 'System', 1),
-                const SizedBox(width: 8),
-                _filterChip(context, 'All', 2),
-                const SizedBox(width: 8),
-                _filterChip(context, 'Analyze', -1),
-              ],
+          Padding(
+            padding:
+                const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _countChip(context, '${all.length}'),
+                  const SizedBox(width: 8),
+                  _filterChip(context, 'User', 0),
+                  const SizedBox(width: 8),
+                  _filterChip(context, 'System', 1),
+                  const SizedBox(width: 8),
+                  _filterChip(context, 'All', 2),
+                  const SizedBox(width: 8),
+                  _filterChip(context, 'Analyze', -1),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 12),
           if (items.isEmpty)
-            Text('No apps in this filter.',
-                style: GoogleFonts.plusJakartaSans(
-                    color: Theme.of(context).hintColor))
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('No apps in this filter.',
+                  style: GoogleFonts.plusJakartaSans(
+                      color: Theme.of(context).hintColor)),
+            )
           else
-            for (final a in items)
-              _appRow(context, Map<String, dynamic>.from(a)),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(
+                    16, 0, 16, 32),
+                itemCount: items.length,
+                itemBuilder: (_, i) => _appRow(context,
+                    Map<String, dynamic>.from(items[i])),
+              ),
+            ),
         ],
       );
     });

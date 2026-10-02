@@ -287,48 +287,68 @@ Widget _ramFreeChip(BuildContext context) {
     // Unconditional Rx reads first — the early return below must never
     // precede them, or the empty scope warning returns.
     final freeGb = d.availableRamGB.value;
+    final totalGb = d.totalRamGB.value;
     final tier = d.deviceTier.value;
-    if (freeGb <= 0) return const SizedBox.shrink();
-    // Status lives in the little dot (same language as the
-    // "Fits in RAM" row) — the pill itself stays neutral app surface.
-    final dot = freeGb >= 3
+    if (freeGb <= 0 || totalGb <= 0) {
+      return const SizedBox.shrink();
+    }
+    // Tiny RAM ring instead of the dot pill: progress = used share,
+    // center = free GB. HubRing language, 30px.
+    final usedFrac =
+        ((totalGb - freeGb) / totalGb).clamp(0.0, 1.0);
+    final ring = freeGb >= 3
         ? AppColors.success
         : freeGb >= 1.5
             ? AppColors.warning
             : AppColors.error;
     return Tooltip(
       message: tier.isEmpty
-          ? 'Free RAM right now'
-          : 'Free RAM right now · $tier-tier device',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-              color:
-                  Theme.of(context).dividerColor.withValues(alpha: 0.6)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration:
-                  BoxDecoration(color: dot, shape: BoxShape.circle),
+          ? 'Free RAM: ${freeGb.toStringAsFixed(1)} GB'
+          : 'Free RAM: ${freeGb.toStringAsFixed(1)} GB · $tier-tier device',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 30,
+            height: 30,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: CircularProgressIndicator(
+                    value: usedFrac,
+                    strokeWidth: 3,
+                    backgroundColor: Theme.of(context)
+                        .dividerColor
+                        .withValues(alpha: 0.4),
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(ring),
+                  ),
+                ),
+                Text(
+                  freeGb.toStringAsFixed(1),
+                  style: GoogleFonts.firaCode(
+                    fontSize: 8,
+                    fontWeight: FontWeight.w700,
+                    color:
+                        Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 5),
-            Text(
-              'Free ${freeGb.toStringAsFixed(1)}GB',
-              style: GoogleFonts.firaCode(
-                fontSize: 10,
-                color: Theme.of(context).colorScheme.onSurface,
-                fontWeight: FontWeight.w700,
-              ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'RAM ${freeGb.toStringAsFixed(1)} free',
+            style: GoogleFonts.firaCode(
+              fontSize: 8,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).hintColor,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   });
@@ -658,7 +678,10 @@ void confirmDownload(BuildContext context, AiModel model,
   );
 }
 
-Widget buildModelCard(BuildContext context, AiModel model) {
+/// [index] is 0-based: when set (Dashboard list), a small serial
+/// badge (1, 2, 3…) shows before the model name.
+Widget buildModelCard(BuildContext context, AiModel model,
+    {int? index}) {
   return Obx(() {
     final isDownloaded = _c.isDownloaded(model.filename);
     final inference = Get.find<InferenceService>();
@@ -710,6 +733,31 @@ Widget buildModelCard(BuildContext context, AiModel model) {
                       children: [
                         Row(
                           children: [
+                            if (index != null)
+                              Container(
+                                margin: const EdgeInsets.only(
+                                    right: 8, top: 2),
+                                padding:
+                                    const EdgeInsets.symmetric(
+                                        horizontal: 7,
+                                        vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Dt.accent.withValues(
+                                      alpha: 0.12),
+                                  borderRadius:
+                                      BorderRadius.circular(
+                                          8),
+                                ),
+                                child: Text('${index + 1}',
+                                    style: GoogleFonts
+                                        .plusJakartaSans(
+                                            fontSize: 11,
+                                            fontWeight:
+                                                FontWeight
+                                                    .w800,
+                                            color:
+                                                Dt.accent)),
+                              ),
                             Expanded(
                               // Rule: full model name always — wraps to
                               // the next line, never "…" truncated.
