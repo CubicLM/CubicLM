@@ -83,10 +83,8 @@ Computational Universe for Building Intelligent Learning Machines
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
 <div align="center">
-
-## <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/target/target2.gif" width="90" /> 
-## What is CubicLM?
-
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/target/target2.gif" width="60" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">What is CubicLM?</h2>
 </div>
 
 <table>
@@ -123,9 +121,10 @@ Computational Universe for Building Intelligent Learning Machines
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
 <div align="center">
-
-## <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/download/installing-updates.gif" width="80" /> 
-## Download — `v1.18.0`
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/download/installing-updates.gif" width="60" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Download — v1.18.0
+</h2>
+</div>
 
 > 🎉 **Latest release** · Build date: current · [View full changelog →](CHANGELOG.md)
 
@@ -171,7 +170,7 @@ Computational Universe for Building Intelligent Learning Machines
 <td align="center"><a href="https://github.com/CubicLM/CubicLM/releases/download/v1.18.0/cubiclm-v1.18.0-windows-x64.zip"><img src="https://img.shields.io/badge/⬇_GET-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download"/></a></td>
 </tr>
 <tr>
-<td align="center"><img src="https://github.com/abir2afridi/abir2afridi/blob/main/lock.png" width="120" /></td>
+<td align="center"><img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/lock/lock.png" width="120" /></td>
 <td><b>Checksums</b><br/><sub>SHA-256 verification</sub></td>
 <td><code>checksums.sha256</code></td>
 <td align="right">—</td>
@@ -472,10 +471,9 @@ Computational Universe for Building Intelligent Learning Machines
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
 <div align="center">
-
-# Features
-<sub><i>Everything CubicLM can do — organized by capability</i></sub>
-## <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/ai/icons8-ai.gif" width="80" /> 
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/ai/icons8-ai.gif" width="60" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Features</h2>
+  <sub><i>Everything CubicLM can do — organized by capability</i></sub>
 </div>
 
 
@@ -1311,12 +1309,8 @@ Auto-detects **10 crash patterns**:
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
 <div align="center">
-
-# <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/ai/ai.gif" width="120" /> 
-# Supported Models
-
-<sub><i>18+ curated models across 3 runtimes — all downloadable in-app</i></sub>
-
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/ai/ai.gif" width="60" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Supported Models</h2>
 </div>
 
 ### ⚡ LiteRT-LM *(on-device)*
@@ -1368,13 +1362,9 @@ Auto-detects **10 crash patterns**:
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
 <div align="center">
-
-<div align="center">
-<h1>🛠️ Tech Stack</h1>
-<sub><i>Technologies powering CubicLM</i></sub>
+  <img src="https://raw.githubusercontent.com/abir2afridi/abir2afridi/main/asset/tool/tool.gif" width="60" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Tech Stack</h2>
 </div>
-
-<br/>
 
 | Category | Technologies |
 | :--- | :--- |
@@ -1413,9 +1403,8 @@ Auto-detects **10 crash patterns**:
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
 <div align="center">
-
-# 📂 Project Structure
-
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/folder/folder.gif" width="60" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Project Structure</h2>
 </div>
 
 <details>
@@ -2381,9 +2370,8 @@ There's no donation link — this is a passion project. If you build something c
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
 <div align="center">
-
-# 🤝 Contributing
-
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/collaboration/handshake.gif" width="60" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Contributing</h2>
 </div>
 
 Contributions are welcome — code, docs, translations, bug reports, or feature ideas.
@@ -2441,10 +2429,9 @@ Use the [GitHub Issues](https://github.com/CubicLM/CubicLM/issues) template. Inc
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
 <div align="center">
-  
-# <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/love/icons8-heart-balloon.gif" />
-## Acknowledgments
-
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/love/icons8-heart-balloon.gif" width="60" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Acknowledgments
+</h2>
 </div>
 
 CubicLM stands on the shoulders of giants:
@@ -2469,10 +2456,13 @@ And to the **open-source community** that made every one of these tools free and
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 <!--                            LICENSE                                      -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-
+<div align="center">
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/license/license.gif" width="60" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">License</h2>
+</div>
 <div align="center">
 
-# 📄 License
+
 
 **MIT License**
 
