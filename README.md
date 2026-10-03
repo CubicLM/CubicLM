@@ -210,26 +210,8 @@ Computational Universe for Building Intelligent Learning Machines
 <!-- ░░ SECTION HEADER ░░                                                -->
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-<img src="https://img.shields.io/badge/📚-DOCUMENTATION%20MAP-FF4D00?style=for-the-badge&labelColor=0d1117&logo=readthedocs&logoColor=white" alt="Docs"/>
 
-<h2>🧭 Navigation</h2>
 
-**<sub>Everything you need — organized into <b>3 zones</b> · <b>23 sections</b> · <b>instant jump</b></sub>**
-
-<br/>
-
-<!-- ─── Quick Jump Bar ─── -->
-
-<a href="#-what-is-cubiclm"><img src="https://img.shields.io/badge/🎯_Intro-FF4D00?style=flat-square&labelColor=0d1117" alt="Intro"/></a>
-<a href="#-download--v1160"><img src="https://img.shields.io/badge/📥_Download-FF4D00?style=flat-square&labelColor=0d1117" alt="Download"/></a>
-<a href="#-features"><img src="https://img.shields.io/badge/✨_Features-8b5cf6?style=flat-square&labelColor=0d1117" alt="Features"/></a>
-<a href="#-supported-models"><img src="https://img.shields.io/badge/🤖_Models-22c55e?style=flat-square&labelColor=0d1117" alt="Models"/></a>
-<a href="#-getting-started"><img src="https://img.shields.io/badge/🚀_Setup-3b82f6?style=flat-square&labelColor=0d1117" alt="Setup"/></a>
-<a href="#-frequently-asked-questions"><img src="https://img.shields.io/badge/❓_FAQ-facc15?style=flat-square&labelColor=0d1117" alt="FAQ"/></a>
-
-<br/>
-
----
 
 ## 🗂️ Documentation Zones
 
@@ -381,84 +363,7 @@ Computational Universe for Building Intelligent Learning Machines
 
 
 
-## Choose Your Path
-<sub><i>Pick the journey that matches your goal</i></sub>
 
-<br/>
-
-<table width="100%">
-<tr>
-
-<td width="25%" align="center" valign="top">
-
-<h3>🆕</h3>
-
-**First Time Here?**
-
-<sub>Get up and running in 5 minutes</sub>
-
-<br/>
-
-<a href="#-download--v1160"><img src="https://img.shields.io/badge/📥_Download-FF4D00?style=for-the-badge" alt="Download"/></a>
-<a href="#-getting-started"><img src="https://img.shields.io/badge/🚀_Setup-FF4D00?style=for-the-badge" alt="Setup"/></a>
-
-<sub>1️⃣ Download → 2️⃣ Install → 3️⃣ Chat</sub>
-
-</td>
-
-<td width="25%" align="center" valign="top">
-
-<h3>🔍</h3>
-
-**Exploring Features?**
-
-<sub>See what CubicLM can do</sub>
-
-<br/>
-
-<a href="#-features"><img src="https://img.shields.io/badge/✨_Features-8b5cf6?style=for-the-badge" alt="Features"/></a>
-<a href="#-supported-models"><img src="https://img.shields.io/badge/🤖_Models-8b5cf6?style=for-the-badge" alt="Models"/></a>
-
-<sub>Local · Cloud · Vision · Image</sub>
-
-</td>
-
-<td width="25%" align="center" valign="top">
-
-<h3>⚡</h3>
-
-**Power User?**
-
-<sub>Extend with Skills & MCP</sub>
-
-<br/>
-
-<a href="#-skills--offline-instruction-extensions"><img src="https://img.shields.io/badge/🧩_Skills-8b5cf6?style=for-the-badge" alt="Skills"/></a>
-<a href="#-custom-mcp-server--single-remote-connection-no-marketplace"><img src="https://img.shields.io/badge/🔌_MCP-8b5cf6?style=for-the-badge" alt="MCP"/></a>
-
-<sub>Tools · Automation · APIs</sub>
-
-</td>
-
-<td width="25%" align="center" valign="top">
-
-<h3>👨‍💻</h3>
-
-**Developer?**
-
-<sub>Build from source</sub>
-
-<br/>
-
-<a href="#-project-structure"><img src="https://img.shields.io/badge/📂_Structure-3b82f6?style=for-the-badge" alt="Structure"/></a>
-<a href="#-contributing"><img src="https://img.shields.io/badge/🤝_Contribute-3b82f6?style=for-the-badge" alt="Contribute"/></a>
-
-<sub>Fork · Build · PR</sub>
-
-</td>
-
-</tr>
-</table>
 
 </div>
 
@@ -747,7 +652,10 @@ Controlled by `AppConstants.keyAutoLoadLastModel`:
 
 ---
 
-## ☁️ Cloud AI Providers
+<div align="center">
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/cloud/cloud.gif" width="150" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Cloud AI Providers</h2>
+</div>
 
 > **23+ providers, one unified interface.** Every provider implements the same `CloudProvider` interface and registers in `CloudProviderRegistry`.
 
@@ -1201,7 +1109,10 @@ Existing `shared` is Dart (`lib/`), not TS — Tauri would require rewriting `li
 
 ---
 
-## 🩺 System Diagnostics *(Settings › Config › System Logs)*
+<div align="center">
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/love/Love%20Sick%20Heart%20GIF%20by%20Barbara%20Pozzi.gif" width="100" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">System Diagnostics (Settings › Config › System Logs)</h2>
+</div>
 
 <table>
 <tr>
@@ -1248,7 +1159,11 @@ Auto-detects **10 crash patterns**:
 
 ---
 
-## 🎨 Theming & UX Deep Dive
+<div align="center">
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/colors/Rainbow%20Character%20GIF.gif" width="100" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Theming & UX Deep Dive</h2>
+</div>
+
 
 <details>
 <summary><b>Click to explore the design system</b></summary>
@@ -1794,9 +1709,8 @@ docs/
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
 <div align="center">
-
-# 📋 Requirements
-
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/book/icons8-book%20(5).gif" width="60" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Requirements</h2>
 </div>
 
 <table>
@@ -1841,9 +1755,8 @@ docs/
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
 <div align="center">
-
-# 🚀 Getting Started
-
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/rocket/rocket%20(1).gif" width="60" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Getting Started</h2>
 </div>
 
 ### 1️⃣ Clone & Install
@@ -1940,7 +1853,10 @@ bash scripts/build-all.sh          # Linux/macOS
 
 <div align="center">
 
-# ⚙️ Configuration
+<div align="center">
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/settings/administrative-tools.gif" width="60" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Configuration</h2>
+</div>
 
 </div>
 
@@ -2055,9 +1971,8 @@ Once running, point any OpenAI-compatible client at `http://<device-ip>:8080` to
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
 <div align="center">
-
-# 🔐 Security & Privacy
-
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/security/security.gif" width="60" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Security & Privacy</h2>
 </div>
 
 <table>
@@ -2284,9 +2199,8 @@ There's no donation link — this is a passion project. If you build something c
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
 <div align="center">
-
-# 🐛 Troubleshooting
-
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/frog/Art%20Loop%20GIF%20by%20Fionnuala%20Claire.gif" width="100" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Troubleshooting</h2>
 </div>
 
 | Symptom | Likely Cause | Fix |
@@ -2313,7 +2227,10 @@ There's no donation link — this is a passion project. If you build something c
 
 <div align="center">
 
-# 🗺️ Roadmap
+<div align="center">
+  <img src="https://github.com/abir2afridi/abir2afridi/blob/main/asset/map/Travel%20Camping%20GIF%20by%20JENDES.gif" width="100" style="display: block; margin: 0 auto -5px auto;" />
+  <h2 style="border-bottom: none; margin-top: 0; padding-top: 0;">Roadmap</h2>
+</div>
 
 </div>
 
