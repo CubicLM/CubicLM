@@ -24,9 +24,14 @@ void main() {
           'assets/device_soc/intel.png');
     });
 
+    test('apple and unisoc map to their bundled logos', () {
+      expect(SocBrandIcon.assetFor(SocFamily.apple),
+          'assets/device_soc/apple.png');
+      expect(SocBrandIcon.assetFor(SocFamily.unisoc),
+          'assets/device_soc/unisoc.png');
+    });
+
     test('families without a logo fall back to the CPU icon', () {
-      expect(SocBrandIcon.assetFor(SocFamily.apple), isNull);
-      expect(SocBrandIcon.assetFor(SocFamily.unisoc), isNull);
       expect(SocBrandIcon.assetFor(SocFamily.rockchip), isNull);
       expect(SocBrandIcon.assetFor(SocFamily.unknown), isNull);
     });

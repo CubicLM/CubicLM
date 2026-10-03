@@ -9,6 +9,7 @@ import '../services/device_extra_service.dart';
 import 'device_info_apps.dart';
 import 'device_info_camera.dart';
 import 'device_info_tab_battery.dart';
+import 'device_info_tab_category.dart';
 import 'device_info_tab_connectivity.dart';
 import 'device_info_tab_cpu.dart';
 import 'device_info_tab_dashboard.dart';
@@ -51,7 +52,8 @@ class _DeviceInfoViewState extends State<DeviceInfoView> {
     'Camera',
     'Sensors',
     'Thermal',
-    'Apps'
+    'Apps',
+    'Category',
   ];
 
   @override
@@ -156,6 +158,7 @@ class _DeviceInfoViewState extends State<DeviceInfoView> {
                 const SensorsTab(),
                 const ThermalTab(),
                 const AppsTab(),
+                const CategoryTab(),
               ],
             ),
           ),

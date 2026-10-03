@@ -232,6 +232,77 @@ String? ramFor(String hardware) {
   return null;
 }
 
+/// Launch year per chip (public launch years). Powers the era
+/// adjustment: old flagships decay toward their modern equivalent
+/// class as years pass (future-proof — uses the current year, so
+/// 2026+ behavior needs no code change).
+/// NOTE: 'zumapro' must precede 'zuma' — substring match.
+const _chipYear = {
+  'sm8150': 2019,
+  'sm8250': 2020,
+  'sm8350': 2021,
+  'sm8450': 2022,
+  'sm8475': 2022,
+  'sm8550': 2023,
+  'sm8650': 2024,
+  'sm8750': 2025,
+  'sm7325': 2021,
+  'sm6375': 2021,
+  'sm6225': 2021,
+  'mt6983': 2022,
+  'mt6877': 2021,
+  'mt6833': 2020,
+  'gs201': 2022,
+  'zumapro': 2024,
+  'zuma': 2023,
+  'exynos2100': 2021,
+  's5e9925': 2022,
+  'hi3680': 2020,
+};
+
+int chipYearFor(String hardware) {
+  final h = hardware.toLowerCase();
+  if (h.isEmpty) return 0;
+  for (final e in _chipYear.entries) {
+    if (h.contains(e.key)) return e.value;
+  }
+  return 0;
+}
+
+/// Modern performance equivalent (cross-generation analysis, e.g.
+/// SD 855 (2019) performs like a 2024 Snapdragon 7-series chip).
+const _chipEquiv = {
+  'sm8150': 'Snapdragon 7-series (2024) class',
+  'sm8250': 'Snapdragon 7+ Gen 2 class',
+  'sm8350': 'Snapdragon 7 Gen 3 class',
+  'sm8450': 'Snapdragon 8s Gen 3 class',
+  'sm8475': 'Snapdragon 8s Gen 3 class',
+  'sm8550': 'Current flagship class',
+  'sm8650': 'Current flagship class',
+  'sm8750': 'Current flagship class',
+  'sm7325': 'Snapdragon 6 Gen 1 class',
+  'sm6375': 'Snapdragon 6s class',
+  'sm6225': 'Helio G99 class',
+  'mt6983': 'Snapdragon 8s class',
+  'mt6877': 'Snapdragon 6 Gen 1 class',
+  'mt6833': 'Helio G99 class',
+  'gs201': 'Snapdragon 8 Gen 1 class',
+  'zumapro': 'Snapdragon 8 Gen 3 class',
+  'zuma': 'Snapdragon 8 Gen 2 class',
+  'exynos2100': 'Snapdragon 888 class',
+  's5e9925': 'Snapdragon 8 Gen 1 class',
+  'hi3680': 'Snapdragon 888 class',
+};
+
+String? chipEquivFor(String hardware) {
+  final h = hardware.toLowerCase();
+  if (h.isEmpty) return null;
+  for (final e in _chipEquiv.entries) {
+    if (h.contains(e.key)) return e.value;
+  }
+  return null;
+}
+
 /// Returns the marketing spec when [hardware] matches, else null
 /// (caller falls back to measured data only).
 SocSpec? socSpecFor(String hardware) {

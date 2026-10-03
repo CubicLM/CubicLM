@@ -4,7 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../services/soc_family.dart';
 
 /// Brand icon for a chip family: vendor PNG when one is bundled, plain
-/// CPU icon otherwise (Apple / Unisoc / Rockchip / unknown). The image
+/// CPU icon otherwise (Rockchip / unknown). The image
 /// falls back to the CPU icon if the asset ever fails to load.
 class SocBrandIcon extends StatelessWidget {
   final SocFamily family;
@@ -37,7 +37,9 @@ class SocBrandIcon extends StatelessWidget {
       case SocFamily.intel:
         return 'assets/device_soc/intel.png';
       case SocFamily.apple:
+        return 'assets/device_soc/apple.png';
       case SocFamily.unisoc:
+        return 'assets/device_soc/unisoc.png';
       case SocFamily.rockchip:
       case SocFamily.unknown:
         return null;
