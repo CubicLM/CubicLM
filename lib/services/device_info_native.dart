@@ -321,6 +321,7 @@ String _buildProcessorName({
   const googleNames = <String, String>{
     'GS101': 'Google Tensor',
     'GS201': 'Google Tensor G2',
+    'GS501': 'Google Tensor G5',
     'ZUMA': 'Google Tensor G3',
     'ZUMAPRO': 'Google Tensor G4',
   };

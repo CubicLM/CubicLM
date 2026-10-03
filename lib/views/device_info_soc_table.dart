@@ -41,7 +41,7 @@ const socTierTable = [
   ]),
   SocTierEntry('C-', 'Low Budget', [
     SocBrandGroup('Snapdragon',
-        ['4 Gen 1', '480+', '480', '675', '670', '665', '660']),
+        ['4 Gen 1', '4s Gen 2', '480+', '480', '675', '670', '665', '660']),
     SocBrandGroup('MediaTek Helio',
         ['G70', 'G37', 'G36', 'G35', 'G25', 'G92', 'P35', 'P23', 'P22']),
     SocBrandGroup('Unisoc',
@@ -57,9 +57,9 @@ const socTierTable = [
     SocBrandGroup('Snapdragon',
         ['4 Gen 2', '6s 4G Gen 2', '6s 4G Gen 1', '732G', '730G', '730', '720G', '712', '710', '690', '685', '680', '662']),
     SocBrandGroup('MediaTek Helio',
-        ['G200', 'G100', 'G99', 'G96', 'G95', 'G91', 'G88', 'G85', 'G81', 'G80', 'P95', 'P90', 'P70', 'P65', 'P60']),
+        ['G200', 'G100', 'G99', 'G96', 'G95', 'G90T', 'G91', 'G88', 'G85', 'G81', 'G80', 'P95', 'P90', 'P70', 'P65', 'P60']),
     SocBrandGroup('MediaTek Dimensity',
-        ['7025', '7020', '6400', '6300', '6100+', '6080', '6050', '6020', '810 Ultra', '810', '800U', '800', '720', '700', '600']),
+        ['7025', '7020', '6400', '6300', '6100+', '6080', '6050', '6020', '810 Ultra', '810', '800U', '800', '720', '7100', '700', '600']),
     SocBrandGroup('Unisoc',
         ['T8100', 'T765', 'T760', 'T750', 'T712', 'T710', 'T700', 'T619']),
     SocBrandGroup('Samsung Exynos',
@@ -68,55 +68,54 @@ const socTierTable = [
   ]),
   SocTierEntry('B-', 'Lower Mid-Range', [
     SocBrandGroup('Snapdragon',
-        ['6 Gen 3', '6 Gen 1', '768G', '765G', '765', '750G']),
+        ['6 Gen 3', '6 Gen 1', '768G', '765G', '765', '750G', '695', '6s Gen 3']),
     SocBrandGroup('MediaTek Dimensity',
-        ['7050', '1080', '920', '900']),
+        ['7200', '7050', '1080', '920', '900']),
     SocBrandGroup('Samsung Exynos', ['1380', '980']),
-    SocBrandGroup('HiSilicon Kirin', ['985', '820E', '820']),
+    SocBrandGroup('HiSilicon Kirin', ['985', '820E', '820', '810']),
     SocBrandGroup('Unisoc', ['T8300', 'T820', 'T770', 'T7280']),
-    SocBrandGroup('Apple A-series (ref)', ['A11']),
   ]),
   SocTierEntry('B', 'Mid-Range', [
     SocBrandGroup('Snapdragon',
         ['7s Gen 3', '7s Gen 2', '7 Gen 1', '6 Gen 4', '780G']),
     SocBrandGroup('MediaTek Dimensity',
         ['7400', '7350', '7300X', '7300', '8200', '8100', '8000']),
-    SocBrandGroup('Samsung Exynos', ['1580', '1480']),
-    SocBrandGroup('HiSilicon Kirin', ['980', '970']),
+    SocBrandGroup('Samsung Exynos', ['1680', '1580', '1480']),
+    SocBrandGroup('HiSilicon Kirin', ['970']),
     SocBrandGroup('Apple A-series (ref)', ['A12']),
   ]),
   SocTierEntry('B+', 'Upper Mid-Range', [
-    SocBrandGroup('Snapdragon', ['7 Gen 3', '782G', '778G']),
+    SocBrandGroup('Snapdragon', ['7 Gen 3', '7s Gen 4', '782G', '778G']),
     SocBrandGroup('MediaTek Dimensity', ['8350', '8300']),
     SocBrandGroup('HiSilicon Kirin', ['8000']),
   ]),
   SocTierEntry('A-', 'Premium Mid-Range', [
     SocBrandGroup('Snapdragon', ['7 Gen 4', '7+ Gen 3', '7+ Gen 2']),
-    SocBrandGroup('MediaTek Dimensity', ['8400', '8050', '8020']),
+    SocBrandGroup('MediaTek Dimensity', ['8450', '8400', '8050', '8020']),
   ]),
   SocTierEntry('A', 'Flagship Killer', [
     SocBrandGroup('Snapdragon',
         ['8s Gen 4', '8s Gen 3', '8+ Gen 1', '8 Gen 1', '888+', '888', '870', '865+', '865', '860', '855+', '855', '845', '835', '821', '820']),
     SocBrandGroup('MediaTek Dimensity',
-        ['9400e', '9400', '9300+', '9300', '9200+', '9200', '9000+', '9000', '1200', '1100', '1000+', '1000']),
+        ['9400e', '9300+', '9300', '9200+', '9200', '9000+', '9000', '1200', '1100', '1000+', '1000']),
     SocBrandGroup('Samsung Exynos',
         ['2200', '2100', '1080', '990', '9825', '9820', '9810']),
     SocBrandGroup('Google Tensor', ['G4', 'G3', 'G2', 'G1']),
     SocBrandGroup('HiSilicon Kirin',
-        ['9020', '9010', '9000S', '9000', '9000E', '8010', '990 5G', '990E', '990', '980', '960', '955']),
+        ['9020', '9010', '9000S', '9000', '9000E', '990 5G', '990E', '990', '980', '960', '955']),
     SocBrandGroup('Apple A-series (ref)',
         ['A15', 'A14', 'A13']),
   ]),
   SocTierEntry('S', 'Flagship', [
     SocBrandGroup('Snapdragon', ['8 Gen 3', '8 Gen 2']),
-    SocBrandGroup('MediaTek Dimensity', ['9400']),
+    SocBrandGroup('MediaTek Dimensity', ['9400+', '9400']),
     SocBrandGroup('Samsung Exynos', ['2500', '2400', '2400e']),
-    SocBrandGroup('Google Tensor', ['G5']),
+    SocBrandGroup('Google Tensor', ['G6', 'G5']),
     SocBrandGroup('Apple A-series (ref)',
         ['A17 Pro', 'A16']),
   ]),
   SocTierEntry('S+', 'Ultra Flagship', [
-    SocBrandGroup('Snapdragon', ['8 Elite Gen 5', '8 Elite']),
+    SocBrandGroup('Snapdragon', ['8 Elite Gen 6', '8 Elite Gen 5', '8 Gen 5', '8 Elite']),
     SocBrandGroup('MediaTek Dimensity', ['9500']),
     SocBrandGroup('Apple A-series (ref)',
         ['A19 Pro', 'A19', 'A18 Pro', 'A18']),
@@ -162,37 +161,37 @@ const _chipYears = {
   '460': 2020, '625': 2016, '626': 2016, '630': 2017, '636': 2017,
   '650': 2016, '652': 2016, '660': 2017, '665': 2019, '670': 2018,
   '675': 2018, '480': 2021, '480+': 2022, '4 Gen 1': 2022,
-  '4 Gen 2': 2023, '662': 2020, '680': 2021, '685': 2023,
+  '4 Gen 2': 2023, '4s Gen 2': 2024, '662': 2020, '680': 2021, '685': 2023, '695': 2021,
   '690': 2020, '710': 2018, '712': 2019, '720G': 2020, '730': 2019,
   '730G': 2019, '732G': 2020, '6s 4G Gen 1': 2024,
   '6s 4G Gen 2': 2025, '750G': 2020, '765': 2019, '765G': 2020,
-  '768G': 2020, '6 Gen 1': 2022, '6 Gen 3': 2024, '6 Gen 4': 2025, '7 Gen 1': 2022,
+  '768G': 2020, '6 Gen 1': 2022, '6 Gen 3': 2024, '6 Gen 4': 2025, '6s Gen 3': 2026, '7 Gen 1': 2022,
   '7s Gen 2': 2023, '7s Gen 3': 2024, '780G': 2021, '778G': 2021,
-  '782G': 2022, '7 Gen 3': 2023, '7 Gen 4': 2025, '7+ Gen 2': 2023,
+  '782G': 2022, '7 Gen 3': 2023, '7 Gen 4': 2025, '7s Gen 4': 2025, '7+ Gen 2': 2023,
   '7+ Gen 3': 2024, '820': 2016, '821': 2016, '835': 2017,
   '845': 2018, '855': 2019, '855+': 2019, '860': 2021, '865': 2020,
   '865+': 2020, '870': 2021, '888': 2021, '888+': 2021,
   '8 Gen 1': 2021, '8+ Gen 1': 2022, '8 Gen 2': 2022,
   '8 Gen 3': 2023, '8s Gen 3': 2024, '8s Gen 4': 2025,
-  '8 Elite': 2024, '8 Elite Gen 5': 2025,
+  '8 Elite': 2024, '8 Elite Gen 5': 2025, '8 Elite Gen 6': 2025, '8 Gen 5': 2026,
   'MT6735': 2016, 'MT6737': 2016, 'MT6739': 2017, 'MT6750': 2016,
   'A20': 2020, 'A22': 2018, 'A25': 2020, 'P20': 2016, 'P25': 2017,
   'P22': 2018, 'P23': 2017, 'P35': 2018, 'X10': 2015, 'X20': 2016,
   'X25': 2016, 'X27': 2016, 'X30': 2017, 'G25': 2020, 'G35': 2020,
   'G36': 2022, 'G37': 2022, 'G70': 2020, 'G80': 2020, 'G81': 2022,
-  'G85': 2020,   'G88': 2021, 'G91': 2024, 'G92': 2024, 'G95': 2020, 'G96': 2021,
-  'G99': 2022, 'G100': 2024, 'G200': 2025, 'P60': 2018, 'P65': 2019,
+  'G85': 2020,   'G88': 2021, 'G90T': 2019, 'G91': 2024, 'G92': 2024, 'G95': 2020, 'G96': 2021,
+  'G99': 2022, 'G100': 2024, 'G200': 2024, 'P60': 2018, 'P65': 2019,
   'P70': 2018, 'P90': 2019, 'P95': 2020,
   '600': 2020, '700': 2020, '720': 2020, '800': 2020, '800U': 2020, '810': 2021,
   '810 Ultra': 2021, '900': 2020, '920': 2021, '1000': 2019,
   '1000+': 2020, '1100': 2021, '1200': 2021,
   '1300': 2022, '6020': 2023, '6050': 2023, '6080': 2023, '6100+': 2023,
   '6300': 2024, '6400': 2025, '7020': 2023, '7025': 2024,
-  '7050': 2023, '7300': 2024, '7300X': 2024, '7350': 2024,
+  '7050': 2023, '7100': 2025, '7200': 2023, '7300': 2024, '7300X': 2024, '7350': 2024,
   '7400': 2025, '8000': 2024, '8020': 2023, '8050': 2023,
   '8100': 2022, '8200': 2022, '8300': 2023, '8350': 2024,
-  '8400': 2024, '9300': 2023, '9300+': 2024, '9000': 2021, '9000+': 2022, '9200': 2022,
-  '9200+': 2023, '9400e': 2025, '9400': 2024, '9500': 2025,
+  '8400': 2024, '8450': 2025, '9300': 2023, '9300+': 2024, '9000': 2021, '9000+': 2022, '9200': 2022,
+  '9200+': 2023, '9400e': 2025, '9400': 2024, '9400+': 2025, '9500': 2025,
   'SC7731': 2019, 'SC9832E': 2018, 'SC9863A': 2019,
   'T107': 2023, 'T310': 2019, 'T606': 2021, 'T610': 2019,
   'T612': 2021, 'T615': 2023, 'T616': 2021, 'T618': 2019,
@@ -204,24 +203,24 @@ const _chipYears = {
   '9610': 2018, '9611': 2019, '9810': 2018, '9820': 2018,
   '9825': 2019,
   '1280': 2022, '1330': 2023, '1380': 2023, '1480': 2024,
-  '1580': 2024, '2100': 2020, '2200': 2022, '2400': 2024,
+  '1580': 2024, '1680': 2025, '2100': 2020, '2200': 2022, '2400': 2024,
   '2400e': 2024, '2500': 2025,
   '659': 2017, '710A': 2020, '710F': 2019,
   '955': 2016, '960': 2016, '970': 2017, '985': 2020,
   '990E': 2020, '990 5G': 2019, '9000E': 2020,
-  '8010': 2024, '820E': 2022,
+  '820E': 2022,
   '9000S': 2023, '9010': 2024, '9020': 2024,
   // Same number, different vendors — brand-qualified so each row
   // shows its own launch year.
   'Snapdragon|710': 2018, 'HiSilicon Kirin|710': 2018,
   'HiSilicon Kirin|650': 2016, 'HiSilicon Kirin|655': 2016,
-  'HiSilicon Kirin|820': 2020,
+  'HiSilicon Kirin|810': 2019, 'HiSilicon Kirin|820': 2020,
   'MediaTek Dimensity|8000': 2024, 'HiSilicon Kirin|8000': 2024,
   'MediaTek Dimensity|9000': 2021, 'HiSilicon Kirin|9000': 2020,
   'MediaTek Dimensity|1080': 2022, 'Samsung Exynos|1080': 2020,
   'HiSilicon Kirin|980': 2018, 'Samsung Exynos|980': 2019,
   'HiSilicon Kirin|990': 2019, 'Samsung Exynos|990': 2020,
-  'G1': 2021, 'G2': 2022, 'G3': 2023, 'G4': 2024, 'G5': 2025,
+  'G1': 2021, 'G2': 2022, 'G3': 2023, 'G4': 2024, 'G5': 2025, 'G6': 2026,
   'A9': 2015, 'A10': 2016, 'A10X': 2017, 'A11': 2017,
   'A12': 2018, 'A13': 2019, 'A14': 2020, 'A15': 2021,
   'A16': 2022, 'A17 Pro': 2023, 'A18': 2024, 'A18 Pro': 2024,
@@ -248,18 +247,21 @@ const _chipAliases = {
   'sm4450': ['Snapdragon|4 Gen 2'],
   'sm6225': ['Snapdragon|680'],
   'sm6375': ['Snapdragon|695'],
+  'sm6375-ac': ['Snapdragon|6s Gen 3'],
   'sm7325': ['Snapdragon|778G'],
   'sm7435': ['Snapdragon|7s Gen 2'],
   'sm7450-ab': ['Snapdragon|7 Gen 1'],
   'sm7550': ['Snapdragon|7 Gen 3'],
   'sm7675': ['Snapdragon|7+ Gen 3'],
   'sm7750': ['Snapdragon|7 Gen 4'],
+  'sm7635': ['Snapdragon|7s Gen 4'],
   'sm6450': ['Snapdragon|6 Gen 1'],
   'sm6650': ['Snapdragon|6s 4G Gen 1'],
   'sm6150': ['Snapdragon|675'],
   'sm6125': ['Snapdragon|665'],
   'sm7150': ['Snapdragon|730'],
   'sm4375': ['Snapdragon|480'],
+  'sm4635': ['Snapdragon|4s Gen 2'],
   'sdm820': ['Snapdragon|820'],
   'sdm821': ['Snapdragon|821'],
   'sdm835': ['Snapdragon|835'],
@@ -282,20 +284,36 @@ const _chipAliases = {
   'sm8475': ['Snapdragon|8+ Gen 1'],
   'sm8550': ['Snapdragon|8 Gen 2'],
   'sm8650': ['Snapdragon|8 Gen 3'],
+  'sm8635': ['Snapdragon|8s Gen 3'],
+  'sm8850': ['Snapdragon|8s Gen 4'],
   'sm8750': ['Snapdragon|8 Elite'],
+  'sm8950': ['Snapdragon|8 Elite Gen 6'],
+  'sm8845': ['Snapdragon|8 Gen 5'],
+  'sm7450': ['Snapdragon|7 Gen 1'],
+  'mt6769': ['MediaTek Helio|G91', 'MediaTek Helio|G92'],
+  'mt6785': ['MediaTek Helio|G90T'],
   'mt6833': ['MediaTek Dimensity|700'],
+  'mt6835': ['MediaTek Dimensity|6300', 'MediaTek Dimensity|6400'],
+  'mt6855': ['MediaTek Dimensity|7025'],
+  'mt6858': ['MediaTek Dimensity|7100'],
   'mt6877': ['MediaTek Dimensity|900'],
+  'mt6886': ['MediaTek Dimensity|7200', 'MediaTek Dimensity|7350'],
   'mt6893': ['MediaTek Dimensity|1200'],
+  'mt6899': ['MediaTek Dimensity|8400', 'MediaTek Dimensity|8450'],
   'mt6983': ['MediaTek Dimensity|9000'],
-  'mt6896': ['MediaTek Dimensity|9300'],
-  'mt6991': ['MediaTek Dimensity|9500'],
+  'mt6896': ['MediaTek Dimensity|8200'],
+  'mt6991': ['MediaTek Dimensity|9400', 'MediaTek Dimensity|9400+'],
   'gs101': ['Google Tensor|G1'],
   'gs201': ['Google Tensor|G2'],
+  'gs501': ['Google Tensor|G5'],
   'zuma': ['Google Tensor|G3'],
   'zumapro': ['Google Tensor|G4'],
   'exynos2100': ['Samsung Exynos|2100'],
   's5e9925': ['Samsung Exynos|2200'],
   's5e9945': ['Samsung Exynos|2400'],
+  's5e8865': ['Samsung Exynos|1680'],
+  's5e8855': ['Samsung Exynos|1580'],
+  's5e8835': ['Samsung Exynos|1380'],
   'hi3680': ['HiSilicon Kirin|9000'],
 };
 
@@ -322,6 +340,9 @@ Set<String> deviceChipsFor(String hardware) {
   for (final e in _chipAliases.entries) {
     if (h.contains(e.key)) out.addAll(e.value);
   }
+  // 'zumapro' contains 'zuma': without this a Pixel 9 ticks both
+  // Tensor G3 and G4. Longer-id wins.
+  if (h.contains('zumapro')) out.remove('Google Tensor|G3');
   for (final e in socTierTable) {
     for (final g in e.brands) {
       if (g.brand.startsWith('Apple')) continue;
@@ -336,6 +357,35 @@ Set<String> deviceChipsFor(String hardware) {
     }
   }
   return out;
+}
+
+/// Tier entry containing [brand]/[chip], or null when the chip is not
+/// in any table (tables are representative, not a silicon census).
+SocTierEntry? socTierEntryForChip(String brand, String chip) {
+  for (final e in socTierTable) {
+    for (final g in e.brands) {
+      if (g.brand == brand && g.chips.contains(chip)) return e;
+    }
+  }
+  return null;
+}
+
+/// Human line for the current device's own chip, e.g.
+/// "Snapdragon 695 · B- Lower Mid-Range". Null when the chip is not
+/// in the tables — callers then show nothing instead of a guess.
+String? deviceChipTierLabel(String hardware) {
+  final mine = deviceChipsFor(hardware);
+  if (mine.isEmpty) return null;
+  for (final m in mine) {
+    final i = m.indexOf('|');
+    if (i < 0) continue;
+    final e = socTierEntryForChip(
+        m.substring(0, i), m.substring(i + 1));
+    if (e != null) {
+      return '${m.substring(0, i)} ${m.substring(i + 1)} · ${e.tier} ${e.tierName}';
+    }
+  }
+  return null;
 }
 
 /// Current device's `Brand|chip` pairs (empty when unavailable).

@@ -38,13 +38,18 @@ class DeviceInfoController extends GetxController {
   final cpu = Rxn<Map<String, dynamic>>();
 
   Timer? _timer;
+  var _tick = 0;
 
   @override
   void onInit() {
     super.onInit();
     refreshAll();
-    // Live sampling while the page is open (RAM sparkline + CPU).
+    // Live sampling while the page is open. The fast tick (2s) touches
+    // only cheap live values (RAM, battery, thermal, waves); the
+    // 12-channel extras bundle refreshes on the slow tick (~16s) so
+    // tab switches and scrolling never wait behind native collectors.
     _timer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _tick++;
       try {
         final dev = Get.find<DeviceInfoService>();
         unawaited(dev.refreshMemoryInfo());
@@ -57,8 +62,9 @@ class DeviceInfoController extends GetxController {
           }
         }
       } catch (_) {}
-      refreshExtras();
+      if (_tick % 8 == 0) refreshExtras();
       refreshBattLive();
+      unawaited(_refreshThermal());
       _updateCpuCoreHistory();
       paintVersion.value++;
     });
@@ -129,6 +135,15 @@ class DeviceInfoController extends GetxController {
           battHistory.removeRange(0, battHistory.length - 40);
         }
       }
+    } catch (_) {}
+  }
+
+  /// Thermal zones move constantly (5s cache) but live outside the
+  /// heavy extras bundle — refreshed on the fast tick.
+  Future<void> _refreshThermal() async {
+    try {
+      _set(thermal, await DeviceExtraService.getThermalInfo(),
+          force: false);
     } catch (_) {}
   }
 

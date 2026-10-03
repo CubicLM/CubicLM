@@ -136,11 +136,22 @@ class DeviceInfoService extends GetxService {
     // Never overwrite good readings with transient zeros: a hiccup in
     // the native probe must not zero out RAM state (it hides the RAM
     // card and, worse, poisons the load gate + eviction decisions).
+    //
+    // Assign-only-if-changed: this runs on the 2s sampling tick and a
+    // bare `.value =` notifies every subscriber even when nothing
+    // moved — that rebuilt every mounted tab twice a second and made
+    // the whole page feel laggy. Free RAM still ticks (it genuinely
+    // moves); everything else goes quiet.
     final total = (info['totalRamGB'] as num?)?.toDouble() ?? 0;
-    if (total > 0) totalRamGB.value = total;
+    if (total > 0 && total != totalRamGB.value) {
+      totalRamGB.value = total;
+    }
     final avail = (info['availableRamGB'] as num?)?.toDouble() ?? -1;
-    if (avail > 0) availableRamGB.value = avail;
-    isTensorSoC.value = (info['isTensorSoC'] as num? ?? 0.0) > 0.5;
+    if (avail > 0 && avail != availableRamGB.value) {
+      availableRamGB.value = avail;
+    }
+    final tensor = (info['isTensorSoC'] as num? ?? 0.0) > 0.5;
+    if (tensor != isTensorSoC.value) isTensorSoC.value = tensor;
     // Native exchanges the family as an index; Dart-side families past
     // index 8 (amd/intel, set by desktop vendor detection) round-trip
     // through the same map — clamp to the enum length, not to 8, or
@@ -148,21 +159,28 @@ class DeviceInfoService extends GetxService {
     final rawIndex = (info['socFamily'] as num? ?? 8).toInt();
     final maxIndex = SocFamily.values.length - 1;
     final clamped = rawIndex < 0 ? 0 : (rawIndex > maxIndex ? 8 : rawIndex);
-    socFamily.value = SocFamily.values[clamped];
-    socHardware.value = (info['socHardware'] as String?) ?? '';
-    processorName.value = (info['processor'] as String?) ?? '';
-    gpuName.value = (info['gpuName'] as String?) ?? '';
+    final fam = SocFamily.values[clamped];
+    if (fam != socFamily.value) socFamily.value = fam;
+    final hw = (info['socHardware'] as String?) ?? '';
+    if (hw != socHardware.value) socHardware.value = hw;
+    final proc = (info['processor'] as String?) ?? '';
+    if (proc != processorName.value) processorName.value = proc;
+    final gpu = (info['gpuName'] as String?) ?? '';
+    if (gpu != gpuName.value) gpuName.value = gpu;
     final brand = (info['deviceBrand'] as String?) ?? '';
     final model = (info['deviceModel'] as String?) ?? '';
-    deviceLabel.value = '$brand $model'.trim();
-    osVersion.value = (info['osVersion'] as String?) ?? '';
+    final label = '$brand $model'.trim();
+    if (label != deviceLabel.value) deviceLabel.value = label;
+    final osv = (info['osVersion'] as String?) ?? '';
+    if (osv != osVersion.value) osVersion.value = osv;
     final cores = (info['cpuCores'] as num?)?.toInt() ?? 0;
-    if (cores > 0) cpuCores.value = cores;
+    if (cores > 0 && cores != cpuCores.value) cpuCores.value = cores;
     final abi = (info['cpuAbi'] as String?) ?? '';
-    cpuInfo.value = [
+    final ci = [
       if (cores > 0) '$cores cores',
       if (abi.isNotEmpty) abi,
     ].join(' · ');
+    if (ci != cpuInfo.value) cpuInfo.value = ci;
   }
 
   String get tierDescription {
