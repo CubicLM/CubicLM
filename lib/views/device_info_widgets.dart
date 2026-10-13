@@ -275,3 +275,41 @@ class CoreWavePainter extends CustomPainter {
   bool shouldRepaint(covariant CoreWavePainter old) =>
       old.values != values || old.line != line;
 }
+
+/// Defers a heavy subtree one frame: first build returns a light
+/// placeholder (keeps swipe animations at 60fps), the real content
+/// builds in a post-frame callback. Used by the heaviest tabs
+/// (Category chart, Apps list, Camera specs) so first-visit tab
+/// switches glide instead of blocking the animation frame.
+class DeferredBuild extends StatefulWidget {
+  final Widget Function(BuildContext context) builder;
+  final Widget? placeholder;
+  const DeferredBuild(
+      {super.key, required this.builder, this.placeholder});
+
+  @override
+  State<DeferredBuild> createState() => _DeferredBuildState();
+}
+
+class _DeferredBuildState extends State<DeferredBuild> {
+  var _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _ready = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_ready) return widget.builder(context);
+    return widget.placeholder ??
+        const Center(
+            child: Padding(
+          padding: EdgeInsets.all(32),
+          child: CircularProgressIndicator(),
+        ));
+  }
+}

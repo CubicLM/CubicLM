@@ -6,6 +6,7 @@ import '../controllers/device_info_controller.dart';
 import 'device_info_camera_detail.dart';
 import 'device_info_camera_header.dart';
 import 'device_info_camera_list_item.dart';
+import 'device_info_widgets.dart';
 
 /// Camera tab: one card per camera id (Back/Front/External) + the full
 /// Camera2 characteristics of the selected one. Everything is measured
@@ -86,7 +87,10 @@ class _CameraBodyState extends State<_CameraBody> {
     }
     if (_sel >= cams.length) _sel = 0;
     final sel = cams[_sel];
-    return ListView(
+    // Heavy spec subtree: deferred one frame so the swipe animation
+    // that opened this tab never blocks on its build.
+    return DeferredBuild(
+        builder: (_) => ListView(
       padding:
           const EdgeInsets.fromLTRB(16, 4, 16, 32),
       children: [
@@ -100,6 +104,6 @@ class _CameraBodyState extends State<_CameraBody> {
         const SizedBox(height: 12),
         CameraSpecSection(camera: sel),
       ],
-    );
+    ));
   }
 }

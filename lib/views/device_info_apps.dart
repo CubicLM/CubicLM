@@ -5,6 +5,7 @@ import '../controllers/device_info_controller.dart';
 import 'device_info_apps_detail.dart';
 import 'device_info_apps_header.dart';
 import 'device_info_apps_list.dart';
+import 'device_info_widgets.dart';
 
 /// Apps tab: visible installed packages with icons, versions, APK
 /// sizes + a detail sheet (SDK levels, dates, installer, components,
@@ -51,8 +52,11 @@ class _AppsBodyState extends State<_AppsBody> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
+    // Heavy list subtree: deferred one frame so the swipe animation
+    // that opened this tab never blocks on its build.
+    return DeferredBuild(
+        builder: (_) => Column(
+              children: [
         AppsFilterHeader(
           totalCount: widget.apps.length,
           filter: _filter,
@@ -70,6 +74,6 @@ class _AppsBodyState extends State<_AppsBody> {
           ),
         ),
       ],
-    );
+    ));
   }
 }

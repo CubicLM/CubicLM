@@ -9,6 +9,8 @@ import '../services/device_extra_service.dart';
 import '../theme/design_tokens.dart';
 import 'device_info_apps.dart';
 import 'device_info_camera.dart';
+import 'device_info_report.dart';
+import 'device_info_search.dart';
 import 'device_info_tab_battery.dart';
 import 'device_info_tab_category.dart';
 import 'device_info_tab_connectivity.dart';
@@ -229,6 +231,22 @@ class _DeviceInfoViewState extends State<DeviceInfoView> {
             style: GoogleFonts.plusJakartaSans(
                 fontWeight: FontWeight.w800, fontSize: 20)),
         actions: [
+          IconButton(
+            tooltip: 'Search',
+            icon: const Icon(LucideIcons.search, size: 18),
+            onPressed: () async {
+              final tab = await showSearch<int?>(
+                context: context,
+                delegate: DeviceInfoSearchDelegate(),
+              );
+              if (tab != null) _goTab(tab);
+            },
+          ),
+          IconButton(
+            tooltip: 'Share report',
+            icon: const Icon(LucideIcons.share2, size: 18),
+            onPressed: () => shareDeviceReport(),
+          ),
           IconButton(
             tooltip: 'Quick Tab Jump',
             icon: const Icon(LucideIcons.layoutGrid, size: 18),

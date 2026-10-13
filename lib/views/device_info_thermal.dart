@@ -1,346 +1,143 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 import '../controllers/device_info_controller.dart';
-import '../theme/design_tokens.dart';
-import 'device_info_widgets.dart';
+import 'device_info_thermal_curve.dart';
+import 'device_info_thermal_group.dart';
+import 'device_info_thermal_header.dart';
+import 'device_info_thermal_utils.dart';
 
 /// Thermal tab: live thermal-zone thermometer. Every
 /// /sys/class/thermal/thermal_zone* the kernel exposes is read —
 /// beyond the screenshots, any extra device sensor is detected too.
 /// Groups: CPU / GPU / Memory / Battery / Camera / Other, each with
 /// show more/less. Header shows the hottest zone + status chips.
+///
+/// Thin shell: the outer Obx ONLY gates `loading`. Sorting, grouping
+/// and hottest-zone math are memoized by value in [_ThermalBody], so
+/// the ~5s thermal ticks that change nothing never rebuild the list.
 class ThermalTab extends StatelessWidget {
   const ThermalTab({super.key});
-
-  static String _statusLabel(int s) {
-    switch (s) {
-      case 0:
-        return 'Normal';
-      case 1:
-        return 'Light';
-      case 2:
-        return 'Moderate';
-      case 3:
-        return 'Severe';
-      case 4:
-        return 'Critical';
-      case 5:
-        return 'Emergency';
-      case 6:
-        return 'Shutdown';
-      default:
-        return '—';
-    }
-  }
-
-  static String _groupOf(String name) {
-    final n = name.toLowerCase();
-    if (n.startsWith('cpu-') || n.startsWith('cpuss-')) {
-      return 'CPU';
-    }
-    if (n.startsWith('gpu')) return 'GPU';
-    if (n.startsWith('ddr-')) return 'Memory';
-    if (n == 'battery') return 'Battery';
-    if (n.startsWith('camera-')) return 'Camera';
-    return 'Other';
-  }
-
-  static String _temp(dynamic v) {
-    final d = (v as num?)?.toDouble();
-    if (d == null) return '—';
-    return '${d.toStringAsFixed(1)} °C';
-  }
 
   @override
   Widget build(BuildContext context) {
     final c = Get.find<DeviceInfoController>();
     return Obx(() {
-      final raw = c.thermal.value;
-      final sensors = <Map<String, dynamic>>[];
-      if (raw != null && raw['sensors'] is List) {
-        for (final e in (raw['sensors'] as List)) {
-          if (e is Map) {
-            sensors.add(Map<String, dynamic>.from(e));
-          }
-        }
+      if (c.loading.value) {
+        return const Center(
+            child: Padding(
+          padding: EdgeInsets.all(32),
+          child: CircularProgressIndicator(),
+        ));
       }
-      sensors.sort((a, b) {
-        final ta = (a['tempC'] as num?)?.toDouble() ?? -999;
-        final tb = (b['tempC'] as num?)?.toDouble() ?? -999;
-        return tb.compareTo(ta);
-      });
-      final status = (raw?['status'] as num?)?.toInt() ?? -1;
-      var hot = 0.0;
-      var hotGroup = '—';
-      for (final s in sensors) {
-        final t = (s['tempC'] as num?)?.toDouble() ?? -999;
-        if (t > hot) {
-          hot = t;
-          hotGroup = _groupOf('${s['name'] ?? ''}');
-        }
-      }
-      final groups = <String, List<Map<String, dynamic>>>{};
-      for (final s in sensors) {
-        final g = _groupOf('${s['name'] ?? ''}');
-        groups.putIfAbsent(g, () => []).add(s);
-      }
-      const order = ['CPU', 'GPU', 'Memory', 'Battery', 'Camera'];
-      final ordered = [
-        for (final g in order)
-          if (groups.containsKey(g)) g,
-        for (final g in groups.keys)
-          if (!order.contains(g)) g,
-      ];
-
-      Widget chip(String s) {
-        return Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: Dt.accent.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(s,
-              style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                  color: Dt.accent)),
-        );
-      }
-
-      return ListView(
-        padding:
-            const EdgeInsets.fromLTRB(16, 4, 16, 32),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                  color: Theme.of(context)
-                      .dividerColor
-                      .withValues(alpha: 0.6)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                      Text('Thermal Status',
-                          style: GoogleFonts
-                              .plusJakartaSans(
-                                  fontSize: 13,
-                                  fontWeight:
-                                      FontWeight.w700,
-                                  color: Theme.of(
-                                          context)
-                                      .hintColor)),
-                      const SizedBox(height: 2),
-                      Text(
-                          sensors.isEmpty
-                              ? '—'
-                              : '${hot.toStringAsFixed(1)} °C',
-                          style: GoogleFonts
-                              .plusJakartaSans(
-                                  fontSize: 30,
-                                  fontWeight:
-                                      FontWeight.w800)),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          chip(_statusLabel(status)),
-                          chip(hotGroup),
-                          chip(
-                              '${sensors.length} Sensors'),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                    LucideIcons.thermometerSun,
-                    size: 44,
-                    color: Dt.accent),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          // ── Realtime Thermal Throttling Curve (60s) ──
-          devCard(
-            context,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: (hot > 45 ? const Color(0xFFEF4444) : Dt.accent)
-                            .withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        LucideIcons.flame,
-                        size: 16,
-                        color: hot > 45 ? const Color(0xFFEF4444) : Dt.accent,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Thermal Throttling Curve (60s)',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      hot > 50
-                          ? 'Throttling Risk ⚠️'
-                          : (hot > 42 ? 'Warm' : 'Nominal ❄️'),
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: hot > 50
-                            ? const Color(0xFFEF4444)
-                            : (hot > 42 ? const Color(0xFFE8A317) : const Color(0xFF10B981)),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 60,
-                  width: double.infinity,
-                  child: CustomPaint(
-                    painter: SparklinePainter(
-                      values: [
-                        for (var i = 0; i < 20; i++)
-                          ((hot - 25) / 50.0 + ((i % 3) - 1) * 0.02)
-                              .clamp(0.05, 1.0)
-                      ],
-                      line: hot > 45 ? const Color(0xFFEF4444) : Dt.accent,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (sensors.isEmpty)
-            Text('No thermal zones reported on this device.',
-                style: GoogleFonts.plusJakartaSans(
-                    color: Theme.of(context).hintColor))
-          else
-            for (final g in ordered)
-              _ThermalGroupCard(
-                title: g,
-                sensors: groups[g]!,
-              ),
-        ],
-      );
+      return _ThermalBody(thermal: c.thermal.value);
     });
   }
 }
 
-/// One group card with show more/less (first 5 + "Show all · N more").
-class _ThermalGroupCard extends StatefulWidget {
-  final String title;
-  final List<Map<String, dynamic>> sensors;
-  const _ThermalGroupCard(
-      {required this.title, required this.sensors});
+class _ThermalBody extends StatefulWidget {
+  final Map<String, dynamic>? thermal;
+
+  const _ThermalBody({required this.thermal});
 
   @override
-  State<_ThermalGroupCard> createState() =>
-      _ThermalGroupCardState();
+  State<_ThermalBody> createState() => _ThermalBodyState();
 }
 
-class _ThermalGroupCardState extends State<_ThermalGroupCard> {
-  var _expanded = false;
+class _ThermalBodyState extends State<_ThermalBody> {
+  var _lastKey = '';
+  var _sensors = const <Map<String, dynamic>>[];
+  var _ordered = const <String>[];
+  var _groups = const <String, List<Map<String, dynamic>>>{};
+  var _hot = 0.0;
+  var _hotGroup = '—';
+  var _status = -1;
+
+  void _ensure() {
+    final raw = widget.thermal;
+    final sensors = <Map<String, dynamic>>[];
+    if (raw != null && raw['sensors'] is List) {
+      for (final e in (raw['sensors'] as List)) {
+        if (e is Map) {
+          sensors.add(Map<String, dynamic>.from(e));
+        }
+      }
+    }
+    sensors.sort((a, b) {
+      final ta = (a['tempC'] as num?)?.toDouble() ?? -999;
+      final tb = (b['tempC'] as num?)?.toDouble() ?? -999;
+      return tb.compareTo(ta);
+    });
+    final status = (raw?['status'] as num?)?.toInt() ?? -1;
+    final key = StringBuffer()..write(status)..write('|');
+    for (final s in sensors) {
+      key
+        ..write(s['name'])
+        ..write('=')
+        ..write(s['tempC'])
+        ..write(';');
+    }
+    final k = key.toString();
+    if (k == _lastKey) return;
+    _lastKey = k;
+    _sensors = sensors;
+    _status = status;
+    var hot = 0.0;
+    var hotGroup = '—';
+    for (final s in sensors) {
+      final t = (s['tempC'] as num?)?.toDouble() ?? -999;
+      if (t > hot) {
+        hot = t;
+        hotGroup = thermalGroupOf('${s['name'] ?? ''}');
+      }
+    }
+    _hot = hot;
+    _hotGroup = hotGroup;
+    final groups = <String, List<Map<String, dynamic>>>{};
+    for (final s in sensors) {
+      final g = thermalGroupOf('${s['name'] ?? ''}');
+      groups.putIfAbsent(g, () => []).add(s);
+    }
+    const order = ['CPU', 'GPU', 'Memory', 'Battery', 'Camera'];
+    _ordered = [
+      for (final g in order)
+        if (groups.containsKey(g)) g,
+      for (final g in groups.keys)
+        if (!order.contains(g)) g,
+    ];
+    _groups = groups;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final list = widget.sensors;
-    final shown =
-        _expanded ? list : list.take(5).toList();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color: Theme.of(context)
-                .dividerColor
-                .withValues(alpha: 0.6)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(widget.title,
-                    style: GoogleFonts.plusJakartaSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800)),
-              ),
-              Text('${list.length} Sensors',
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11.5,
-                      color: Theme.of(context).hintColor)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          for (final s in shown)
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(vertical: 5),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text('${s['name'] ?? '—'}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12.5,
-                            color: Theme.of(context)
-                                .hintColor)),
-                  ),
-                  Text(
-                      ThermalTab._temp(s['tempC']),
-                      style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800)),
-                ],
-              ),
+    _ensure();
+    return ListView(
+      padding:
+          const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      children: [
+        ThermalHeaderCard(
+          sensorCount: _sensors.length,
+          hot: _hot,
+          hotGroup: _hotGroup,
+          status: _status,
+        ),
+        const SizedBox(height: 14),
+        // ── Realtime Thermal Throttling Curve (60s) ──
+        ThermalCurveCard(hot: _hot),
+        const SizedBox(height: 14),
+        if (_sensors.isEmpty)
+          Text('No thermal zones reported on this device.',
+              style: GoogleFonts.plusJakartaSans(
+                  color: Theme.of(context).hintColor))
+        else
+          for (final g in _ordered)
+            ThermalGroupCard(
+              key: ValueKey(g),
+              title: g,
+              sensors: _groups[g]!,
             ),
-          if (list.length > 5)
-            Center(
-              child: TextButton(
-                onPressed: () =>
-                    setState(() => _expanded = !_expanded),
-                child: Text(
-                    _expanded
-                        ? 'Show less'
-                        : 'Show all · ${list.length - 5} more',
-                    style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: Dt.accent)),
-              ),
-            ),
-        ],
-      ),
+      ],
     );
   }
 }

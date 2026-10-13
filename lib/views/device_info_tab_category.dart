@@ -12,6 +12,7 @@ import 'device_info_category_hero.dart';
 import 'device_info_category_ladder.dart';
 import 'device_info_soc.dart';
 import 'device_info_soc_table.dart';
+import 'device_info_widgets.dart';
 
 /// Device Category tab: thin shell + data plumbing.
 ///
@@ -219,7 +220,10 @@ class _CategoryContentState extends State<_CategoryContent> {
   Widget build(BuildContext context) {
     final score = _current();
     final cat = score.category;
-    return ListView(
+    // Heavy chart (~11 expandable rows): deferred one frame so the
+    // swipe animation that opened this tab never blocks on its build.
+    return DeferredBuild(
+        builder: (_) => ListView(
       padding:
           const EdgeInsets.fromLTRB(16, 4, 16, 32),
       children: [
@@ -241,6 +245,6 @@ class _CategoryContentState extends State<_CategoryContent> {
         // ── Full chart ──
         CategoryChart(cat: cat),
       ],
-    );
+    ));
   }
 }
