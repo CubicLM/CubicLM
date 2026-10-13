@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../controllers/device_info_controller.dart';
+import 'device_info_battery_discharging_card.dart';
 import 'device_info_battery_health_details.dart';
 import 'device_info_battery_live_header.dart';
 
 /// Battery tab: live header (current + graph + power + status) then
-/// Health … Capacity rows. No ads card.
+/// Health … Capacity rows, and real-time Discharging & Charging rates.
 ///
 /// Thin shell: the outer Obx gates [DeviceInfoController.loading]
 /// only. Values ticking on the 2s sampling timer (battery level,
@@ -29,6 +30,8 @@ class BatteryTab extends StatelessWidget {
             const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: const [
           BatteryLiveHeaderCard(),
+          SizedBox(height: 14),
+          BatteryDischargingCard(),
           SizedBox(height: 14),
           BatteryHealthDetailsCard(),
         ],

@@ -2912,6 +2912,35 @@ class MainActivity : FlutterFragmentActivity() {
                             },
                         )
                     }
+                    // SIM operator names for the Device tab (up to 2
+                    // subscriptions: carrier name + country ISO for the
+                    // flag). Needs READ_PHONE_STATE — on
+                    // SecurityException returns "PERMISSION" and the UI
+                    // shows the Grant Permission button instead.
+                    "simOperators" -> {
+                        try {
+                            val sm = getSystemService(
+                                TELEPHONY_SUBSCRIPTION_SERVICE,
+                            ) as? android.telephony.SubscriptionManager
+                            val subs = try {
+                                sm?.activeSubscriptionInfoList
+                            } catch (_: Exception) {
+                                null
+                            } ?: emptyList()
+                            result.success(
+                                subs.take(2).map {
+                                    mapOf(
+                                        "name" to "${it.carrierName}",
+                                        "iso" to "${it.countryIso}",
+                                    )
+                                },
+                            )
+                        } catch (e: SecurityException) {
+                            result.success("PERMISSION")
+                        } catch (e: Exception) {
+                            result.error("DEVICE_FAILED", e.message, null)
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             } catch (e: Exception) {

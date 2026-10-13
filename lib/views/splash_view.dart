@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -43,6 +44,27 @@ class _SplashViewState extends State<SplashView>
     );
 
     _animCtrl.forward();
+
+    // Warm the core text fonts while the boot animation plays: without
+    // this every new screen pays a runtime-fetch → fallback → relayout
+    // jank on first paint (google_fonts ships no bundled assets).
+    // Fire-and-forget — navigation never waits on the network.
+    unawaited(GoogleFonts.pendingFonts([
+      GoogleFonts.plusJakartaSans(),
+      GoogleFonts.plusJakartaSans(
+          fontWeight: FontWeight.w500),
+      GoogleFonts.plusJakartaSans(
+          fontWeight: FontWeight.w600),
+      GoogleFonts.plusJakartaSans(
+          fontWeight: FontWeight.w700),
+      GoogleFonts.plusJakartaSans(
+          fontWeight: FontWeight.w800),
+      GoogleFonts.firaCode(),
+      GoogleFonts.firaCode(
+          fontWeight: FontWeight.w600),
+      GoogleFonts.firaCode(
+          fontWeight: FontWeight.w700),
+    ]).then((_) {}, onError: (_) {}));
 
     _animCtrl.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
@@ -133,7 +155,7 @@ class _Cube3DSplash extends StatelessWidget {
             const Color(0xFF7A5900),
           ];
       final textColor =
-          settings?.cubeTextColor.value ?? (isDark ? Colors.white : Dt.textPrimary);
+          settings?.cubeTextColor.value ?? (isDark ? Colors.white : Colors.black);
       final textFont = settings?.cubeTextFont.value ?? 'Plus Jakarta Sans';
 
       final rotY = (1.0 -

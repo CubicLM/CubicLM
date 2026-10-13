@@ -7,24 +7,41 @@ import '../controllers/device_info_controller.dart';
 import 'device_info_android.dart';
 import 'device_info_system_details.dart';
 import 'device_info_system_drm.dart';
+import 'device_info_vulkan_compute_card.dart';
 
-/// System tab: version header card + rows + DRM card.
+/// System tab: version header card + rows + Vulkan/Compute card + DRM card.
 /// "Released With" is skipped — the factory-shipped OS is not
 /// measurable on-device; everything else is live data.
 ///
 /// Thin shell: the outer Obx ONLY gates `loading`. Future values are
 /// static snapshots; extras-driven rows (kernel, uptime) subscribe
 /// inside their own tiny Obxs in [SystemDetailsCard].
-class SystemTab extends StatelessWidget {
+class SystemTab extends StatefulWidget {
   final Future<AndroidDeviceInfo>? androidInfo;
   final Future<Map<String, dynamic>?>? sysInfo;
   const SystemTab(
       {super.key, required this.androidInfo, required this.sysInfo});
 
   @override
+  State<SystemTab> createState() => _SystemTabState();
+}
+
+class _SystemTabState extends State<SystemTab> {
+  late final Future<List<dynamic>> _info;
+
+  @override
+  void initState() {
+    super.initState();
+    // Built once: creating the combined future inside build() refires
+    // both native calls on every rebuild (spinner flash + jank).
+    _info =
+        Future.wait([widget.androidInfo!, widget.sysInfo!]);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<dynamic>>(
-      future: Future.wait([androidInfo!, sysInfo!]),
+      future: _info,
       builder: (context, snap) {
         final a = snap.data?[0] as AndroidDeviceInfo?;
         final sys =
@@ -75,6 +92,8 @@ class SystemTab extends StatelessWidget {
                     a?.version.securityPatch ?? '—',
                 buildNumber: a?.display ?? '—',
               ),
+              const SizedBox(height: 14),
+              const VulkanComputeCard(),
               const SizedBox(height: 18),
               Text('DRM',
                   style: GoogleFonts.plusJakartaSans(

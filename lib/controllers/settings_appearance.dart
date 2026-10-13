@@ -106,7 +106,7 @@ extension SettingsControllerAppearance on SettingsController {
       const Color(0xFFE8A317),
       const Color(0xFF7A5900),
     ]);
-    cubeTextColor.value = Colors.white;
+    cubeTextColor.value = Colors.black;
     cubeTextFont.value = 'Plus Jakarta Sans';
     await _hive.deleteSetting(AppConstants.keyCubeTextColor);
     await _hive.deleteSetting(AppConstants.keyCubeTextFont);

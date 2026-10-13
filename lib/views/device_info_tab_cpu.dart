@@ -7,10 +7,11 @@ import '../services/device_info_service.dart';
 import '../widgets/soc_brand_icon.dart';
 import 'device_info_cpu_header.dart';
 import 'device_info_cpu_live.dart';
+import 'device_info_cpu_sparkline.dart';
 import 'device_info_cpu_specs.dart';
 import 'device_info_soc.dart';
 
-/// CPU tab: SoC header card + spec rows + live bars.
+/// CPU tab: SoC header card + spec rows + 60s load trend + live bars.
 /// Marketing lines (name/clusters/process) come from the static SoC
 /// table when hardware matches; otherwise measured data only.
 ///
@@ -120,6 +121,8 @@ class _CpuBody extends StatelessWidget {
               .map((e) => e.line)
               .toList(),
         ),
+        const SizedBox(height: 14),
+        const CpuLoadSparklineCard(),
         // Live per-core bars (Dashboard grid shows the same).
         if (cores > 0) ...[
           const SizedBox(height: 14),

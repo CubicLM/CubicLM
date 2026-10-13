@@ -227,18 +227,25 @@ Future<Map<String, dynamic>> getDeviceInfo() async {
           final ident =
               (Platform.environment['PROCESSOR_IDENTIFIER'] ?? '')
                   .toLowerCase();
+          final rawModel = Platform.environment['PROCESSOR_IDENTIFIER'] ?? '';
           if (ident.contains('genuineintel')) {
             socFamily = SocFamily.intel;
-            processor = 'Intel PC · ${win.numberOfCores} cores';
+            processor = rawModel.isNotEmpty ? rawModel : 'Intel PC · ${win.numberOfCores} cores';
           } else if (ident.contains('authenticamd')) {
             socFamily = SocFamily.amd;
-            processor = 'AMD PC · ${win.numberOfCores} cores';
+            processor = rawModel.isNotEmpty ? rawModel : 'AMD PC · ${win.numberOfCores} cores';
           }
         } catch (_) {}
-        deviceBrand = win.computerName.isNotEmpty ? 'PC' : '';
+        deviceBrand = win.computerName.isNotEmpty ? 'PC' : 'Windows';
         deviceModel = win.computerName;
         osVersion = 'Windows ${win.displayVersion} (build ${win.buildNumber})';
         cpuAbi = 'x86_64';
+        try {
+          final gpu = await LlamaHostApi().detectGpu();
+          if (gpu.gpuName.isNotEmpty && gpu.gpuName != 'None') {
+            gpuName = gpu.gpuName;
+          }
+        } catch (_) {}
       } catch (_) {}
     }
   } catch (e) {

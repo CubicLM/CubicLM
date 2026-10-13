@@ -19,6 +19,7 @@ class DeviceExtras {
   final String phoneType; // or "PERMISSION"
   final String esim;
   final String mobileNet; // or "PERMISSION"
+  final List<Map<String, String>> sims; // [{name, iso}], empty = none/unknown
 
   const DeviceExtras({
     required this.cpuFreqsMHz,
@@ -36,6 +37,7 @@ class DeviceExtras {
     required this.phoneType,
     required this.esim,
     required this.mobileNet,
+    required this.sims,
   });
 }
 
@@ -49,6 +51,26 @@ class DeviceExtraService {
       return await _ch.invokeMethod<T>(method);
     } catch (_) {
       return null;
+    }
+  }
+
+  /// SIM operators [{name, iso}] for the Device tab. "PERMISSION" (or
+  /// any failure) yields an empty list — the permission gate keys off
+  /// phoneType/mobileNet instead.
+  static Future<List<Map<String, String>>> _simOperators() async {
+    try {
+      final l = await _ch.invokeListMethod<dynamic>('simOperators');
+      if (l == null) return const [];
+      return l
+          .whereType<Map>()
+          .map((m) => {
+                'name': '${m['name'] ?? ''}',
+                'iso': '${m['iso'] ?? ''}',
+              })
+          .where((m) => m['name']!.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return const [];
     }
   }
 
@@ -441,6 +463,7 @@ class DeviceExtraService {
         phoneType: (await _call<String>('phoneType')) ?? '—',
         esim: (await _call<String>('esim')) ?? '—',
         mobileNet: (await _call<String>('mobileNet')) ?? '—',
+        sims: await _simOperators(),
       );
       _cache = ex;
       _at = DateTime.now();

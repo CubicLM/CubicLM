@@ -18,6 +18,17 @@ class DevicePermissionBlock extends StatelessWidget {
       if (st.isGranted) {
         await Get.find<DeviceInfoController>()
             .refreshExtras(force: true);
+      } else if (st.isPermanentlyDenied) {
+        // System dialog will never show again — point at Settings
+        // instead of silently doing nothing.
+        Get.snackbar(
+          'Phone permission needed',
+          'Allow phone state access in Settings to show SIM and network info.',
+          mainButton: TextButton(
+            onPressed: () => openAppSettings(),
+            child: const Text('Open Settings'),
+          ),
+        );
       }
     } catch (_) {}
   }

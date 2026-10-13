@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#0F0F12</color>
+    <!-- Adaptive-icon + splash icon background: parchment (Dt.canvas)
+         so the navy logo sits on brand color everywhere — launcher,
+         Android 12+ splash, legacy window. No white box, no black. -->
+    <color name="ic_launcher_background">#F8F4ED</color>
     <!-- Parchment = Dt.canvas: the dark-navy icon is visible on it, and
          light-mode Flutter splash starts on the same color (seamless).
          The old near-black value WAS the perceived "black screen". -->

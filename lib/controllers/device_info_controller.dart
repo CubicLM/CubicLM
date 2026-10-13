@@ -40,6 +40,26 @@ class DeviceInfoController extends GetxController {
   Timer? _timer;
   var _tick = 0;
 
+  /// True while the user is actively scrolling or swiping (set by the
+  /// DeviceInfoView scroll gate, debounced). Sampling UI pauses during
+  /// gestures so rebuilds never land mid-scroll and cause jank; data
+  /// sampling itself (memory info) keeps running underneath.
+  final userScrolling = false.obs;
+  Timer? _scrollIdleTimer;
+
+  void setUserScrolling(bool v) {
+    if (v) {
+      _scrollIdleTimer?.cancel();
+      if (!userScrolling.value) userScrolling.value = true;
+      return;
+    }
+    _scrollIdleTimer?.cancel();
+    _scrollIdleTimer = Timer(
+        const Duration(milliseconds: 350), () {
+      userScrolling.value = false;
+    });
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -50,29 +70,47 @@ class DeviceInfoController extends GetxController {
     // tab switches and scrolling never wait behind native collectors.
     _timer = Timer.periodic(const Duration(seconds: 2), (_) {
       _tick++;
+      // Wave tabs: 0 Dashboard (RAM spark + CPU waves), 3 CPU (live
+      // bars), 4 Battery (current graph). Histories pause while their
+      // tab is off-screen so background ticks rebuild nothing; the
+      // next visit resumes sampling seamlessly.
+      final wavesLive =
+          tab.value == 0 || tab.value == 3 || tab.value == 4;
+      // Gesture in progress: keep data fresh but freeze every UI
+      // notification (histories, live maps, repaint clock) until the
+      // scroll settles — this is what makes Dashboard/Battery scroll
+      // and tab swipes glide instead of stutter.
+      final calm = !userScrolling.value;
       try {
         final dev = Get.find<DeviceInfoService>();
         unawaited(dev.refreshMemoryInfo());
-        final t = dev.totalRamGB.value;
-        final a = dev.availableRamGB.value;
-        if (t > 0) {
-          ramHistory.add(((t - a) / t).clamp(0.0, 1.0));
-          if (ramHistory.length > 40) {
-            ramHistory.removeRange(0, ramHistory.length - 40);
+        if (wavesLive && tab.value == 0 && calm) {
+          final t = dev.totalRamGB.value;
+          final a = dev.availableRamGB.value;
+          if (t > 0) {
+            ramHistory.add(((t - a) / t).clamp(0.0, 1.0));
+            if (ramHistory.length > 40) {
+              ramHistory.removeRange(0, ramHistory.length - 40);
+            }
           }
         }
       } catch (_) {}
-      if (_tick % 8 == 0) refreshExtras();
-      refreshBattLive();
-      unawaited(_refreshThermal());
-      _updateCpuCoreHistory();
-      paintVersion.value++;
+      if (_tick % 8 == 0 && calm) refreshExtras();
+      if (calm) {
+        refreshBattLive(record: tab.value == 4);
+        unawaited(_refreshThermal());
+      }
+      if (wavesLive && calm) {
+        _updateCpuCoreHistory();
+        paintVersion.value++;
+      }
     });
   }
 
   @override
   void onClose() {
     _timer?.cancel();
+    _scrollIdleTimer?.cancel();
     super.onClose();
   }
 
@@ -122,13 +160,15 @@ class DeviceInfoController extends GetxController {
     return m;
   }
 
-  Future<void> refreshBattLive({bool force = false}) async {
+  Future<void> refreshBattLive(
+      {bool force = false, bool record = true}) async {
     try {
       final m = await DeviceExtraService.getBattLive(force: force);
       if (m != null) {
         if (force || !identical(m, battLive.value)) {
           battLive.value = m;
         }
+        if (!record) return;
         final ua = (m['currentUa'] as num?)?.toDouble() ?? 0;
         battHistory.add(ua / 1000.0);
         if (battHistory.length > 40) {

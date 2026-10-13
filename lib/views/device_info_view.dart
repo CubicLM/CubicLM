@@ -6,6 +6,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../controllers/device_info_controller.dart';
 import '../services/device_extra_service.dart';
+import '../theme/design_tokens.dart';
 import 'device_info_apps.dart';
 import 'device_info_camera.dart';
 import 'device_info_tab_battery.dart';
@@ -23,9 +24,7 @@ import 'device_info_thermal.dart';
 
 /// CubicDevice Info — on-device hardware dashboard (Toolkit feature).
 /// Thin shell: one tab widget per file under
-/// views/device_info_tab_*.dart (Camera/Apps/Thermal already had
-/// their own files). Every number is measured live; unknowns render
-/// as '—', never as fake zeros.
+/// views/device_info_tab_*.dart.
 class DeviceInfoView extends StatefulWidget {
   const DeviceInfoView({super.key});
 
@@ -54,6 +53,23 @@ class _DeviceInfoViewState extends State<DeviceInfoView> {
     'Thermal',
     'Apps',
     'Category',
+  ];
+
+  static const _tabIcons = [
+    LucideIcons.layoutDashboard,
+    LucideIcons.smartphone,
+    LucideIcons.shieldCheck,
+    LucideIcons.cpu,
+    LucideIcons.batteryMedium,
+    LucideIcons.wifi,
+    LucideIcons.radio,
+    LucideIcons.monitor,
+    LucideIcons.hardDrive,
+    LucideIcons.camera,
+    LucideIcons.compass,
+    LucideIcons.flame,
+    LucideIcons.layers,
+    LucideIcons.award,
   ];
 
   @override
@@ -85,6 +101,122 @@ class _DeviceInfoViewState extends State<DeviceInfoView> {
     } catch (_) {}
   }
 
+  void _showTabGridModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).cardColor,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Dt.accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(LucideIcons.layoutGrid,
+                          size: 18, color: Dt.accent),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Hardware Navigation Jump',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(LucideIcons.x, size: 20),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _tabs.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 1.5,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemBuilder: (_, i) {
+                    final selected = c.tab.value == i;
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _goTab(i);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? Dt.accent.withValues(alpha: 0.15)
+                              : Theme.of(context)
+                                  .dividerColor
+                                  .withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: selected
+                                ? Dt.accent
+                                : Theme.of(context)
+                                    .dividerColor
+                                    .withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _tabIcons[i],
+                              size: 18,
+                              color: selected
+                                  ? Dt.accent
+                                  : Theme.of(context).hintColor,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _tabs[i],
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                fontWeight: selected
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
+                                color: selected
+                                    ? Dt.accent
+                                    : Theme.of(context)
+                                        .colorScheme
+                                        .onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -98,6 +230,11 @@ class _DeviceInfoViewState extends State<DeviceInfoView> {
                 fontWeight: FontWeight.w800, fontSize: 20)),
         actions: [
           IconButton(
+            tooltip: 'Quick Tab Jump',
+            icon: const Icon(LucideIcons.layoutGrid, size: 18),
+            onPressed: () => _showTabGridModal(context),
+          ),
+          IconButton(
             tooltip: 'Refresh',
             icon: const Icon(LucideIcons.refreshCw, size: 18),
             onPressed: () => c.refreshAll(),
@@ -109,57 +246,66 @@ class _DeviceInfoViewState extends State<DeviceInfoView> {
           // Explore-style segmented tabs + swipeable pages.
           Obx(() => SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: SegmentedButton<int>(
                   segments: [
                     for (var i = 0; i < _tabs.length; i++)
                       ButtonSegment(
                         value: i,
                         label: Text(_tabs[i],
-                            style: const TextStyle(
-                                fontSize: 12)),
+                            style: const TextStyle(fontSize: 12)),
                       ),
                   ],
                   selected: {c.tab.value},
-                  onSelectionChanged: (s) =>
-                      _goTab(s.first),
+                  onSelectionChanged: (s) => _goTab(s.first),
                   style: const ButtonStyle(
-                    visualDensity:
-                        VisualDensity.compact,
-                    tapTargetSize:
-                        MaterialTapTargetSize
-                            .shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
               )),
           const SizedBox(height: 8),
           Expanded(
-            child: PageView(
-              controller: _pageCtrl,
-              onPageChanged: (i) {
-                if (c.tab.value != i) {
-                  c.tab.value = i;
+            // Scroll gate: inner ListView drags AND page swipes bubble
+            // their notifications up here. While a gesture is active
+            // the controller freezes sampling UI (waves, live maps,
+            // repaint clock) so rebuilds never land mid-scroll.
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (n) {
+                if (n is ScrollStartNotification ||
+                    n is UserScrollNotification) {
+                  c.setUserScrolling(true);
+                } else if (n is ScrollEndNotification) {
+                  c.setUserScrolling(false);
                 }
+                return false;
               },
-              children: [
-                const DashboardTab(),
-                DeviceTab(androidInfo: _androidInfo),
-                SystemTab(
-                    androidInfo: _androidInfo,
-                    sysInfo: _sysInfo),
-                CpuTab(androidInfo: _androidInfo),
-                const BatteryTab(),
-                const NetworkTab(),
-                const ConnectivityTab(),
-                const DisplayTab(),
-                const MemoryTab(),
-                const CameraTab(),
-                const SensorsTab(),
-                const ThermalTab(),
-                const AppsTab(),
-                const CategoryTab(),
-              ],
+              child: PageView(
+                controller: _pageCtrl,
+                onPageChanged: (i) {
+                  if (c.tab.value != i) {
+                    c.tab.value = i;
+                  }
+                },
+                children: [
+                  const DashboardTab(),
+                  DeviceTab(androidInfo: _androidInfo),
+                  SystemTab(
+                      androidInfo: _androidInfo,
+                      sysInfo: _sysInfo),
+                  CpuTab(androidInfo: _androidInfo),
+                  const BatteryTab(),
+                  const NetworkTab(),
+                  const ConnectivityTab(),
+                  const DisplayTab(),
+                  const MemoryTab(),
+                  const CameraTab(),
+                  const SensorsTab(),
+                  const ThermalTab(),
+                  const AppsTab(),
+                  const CategoryTab(),
+                ],
+              ),
             ),
           ),
         ],

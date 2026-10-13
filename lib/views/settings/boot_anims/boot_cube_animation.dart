@@ -60,7 +60,7 @@ class _BootCubeAnimationState extends State<BootCubeAnimation>
                 const Color(0xFF7A5900),
               ];
           final textColor =
-              settings?.cubeTextColor.value ?? (isDark ? Colors.white : Dt.textPrimary);
+              settings?.cubeTextColor.value ?? (isDark ? Colors.white : Colors.black);
           final textFont = settings?.cubeTextFont.value ?? 'Plus Jakarta Sans';
 
           return Column(

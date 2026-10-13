@@ -19,6 +19,10 @@
     <!-- Wi-Fi details for CubicDevice Info (normal permissions, auto-granted) -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- SIM + network details for CubicDevice Info (Device tab: device
+         type, network type, operators). Runtime-requested from the
+         Grant Permission button; without it those rows stay hidden. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <!-- Biometric app lock -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <!-- In-app APK install (Check for Updates) -->

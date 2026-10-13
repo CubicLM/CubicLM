@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -80,6 +81,20 @@ class _VersionArtworkState extends State<VersionArtwork> {
   var _i = 0;
   final _logged = <String>{};
 
+  @override
+  void didUpdateWidget(covariant VersionArtwork old) {
+    super.didUpdateWidget(old);
+    // The header first builds with placeholder candidates while the
+    // device-info futures are still in flight (release '—' misses
+    // every file and walks _i to the end). Without this reset the
+    // real candidates arriving one frame later would still show the
+    // fallback — the image only appeared on the second visit, when
+    // the state was fresh and the futures already complete.
+    if (!listEquals(widget.candidates, old.candidates)) {
+      _i = 0;
+    }
+  }
+
   void _logMiss(String asset, Object error) {
     if (!_logged.add(asset)) return;
     try {
@@ -145,15 +160,11 @@ class AndroidVersionHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
+          // Artwork as-is: the badge has its own shape and transparency,
+          // no circle container, no tinted background.
+          SizedBox(
             width: 76,
             height: 76,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color:
-                  Dt.accent.withValues(alpha: 0.12),
-            ),
-            clipBehavior: Clip.antiAlias,
             child: VersionArtwork(
                 candidates:
                     androidVersionAssets(release, meta.codename)),

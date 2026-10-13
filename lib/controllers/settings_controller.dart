@@ -270,7 +270,7 @@ class SettingsController extends GetxController {
   final chatResponseStyle = AppConstants.responseStyleDefault.obs;
 
   // 3D Cube Customization Properties
-  final cubeTextColor = Colors.white.obs;
+  final cubeTextColor = Colors.black.obs;
   final cubeTextFont = 'Plus Jakarta Sans'.obs;
   final cubeFaceColors = <Color>[
     const Color(0xFFFF7A00), // 0: Front

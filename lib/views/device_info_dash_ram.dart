@@ -9,7 +9,7 @@ import '../theme/design_tokens.dart';
 import 'device_info_widgets.dart';
 import 'hub/hub_widgets.dart';
 
-/// RAM card extracted from DashboardTab._ramCard (pure move, no changes).
+/// RAM card with ZRAM/Swap memory indicator.
 class DashRamCard extends StatelessWidget {
   const DashRamCard({super.key});
 
@@ -19,8 +19,6 @@ class DashRamCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final dev = Get.find<DeviceInfoService>();
     return Obx(() {
-      // paintVersion FIRST: history .toList()/[] reads alone do not
-      // reliably resubscribe (blank wave until remount).
       c.paintVersion.value;
       final total = dev.totalRamGB.value;
       final avail = dev.availableRamGB.value;
@@ -38,6 +36,12 @@ class DashRamCard extends StatelessWidget {
       }
       final peakGb = total > 0 ? maxFrac * total : 0.0;
       final minGb = total > 0 ? minFrac * total : 0.0;
+
+      final m = c.mem.value ?? const {};
+      final swapTotalKb = m['SwapTotal'] ?? 0;
+      final swapFreeKb = m['SwapFree'] ?? 0;
+      final swapUsedKb = (swapTotalKb - swapFreeKb).clamp(0, swapTotalKb);
+      final swapFrac = swapTotalKb > 0 ? swapUsedKb / swapTotalKb : 0.0;
 
       return devCard(context,
           child: Column(
@@ -185,6 +189,43 @@ class DashRamCard extends StatelessWidget {
                   ),
                 ],
               ),
+              if (swapTotalKb > 0) ...[
+                const SizedBox(height: 10),
+                Divider(
+                  height: 1,
+                  thickness: 0.5,
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Text('ZRAM / Swap',
+                        style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700)),
+                    const Spacer(),
+                    Text(
+                      '${(swapUsedKb / 1024).round()} MB / ${(swapTotalKb / 1024).round()} MB (${(swapFrac * 100).round()}%)',
+                      style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).hintColor),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: swapFrac,
+                    minHeight: 4,
+                    backgroundColor: Theme.of(context)
+                        .dividerColor
+                        .withValues(alpha: 0.3),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Dt.accent),
+                  ),
+                ),
+              ],
             ],
           ));
     });

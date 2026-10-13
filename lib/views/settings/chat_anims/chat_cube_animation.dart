@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../controllers/settings_controller.dart';
-import '../../../theme/design_tokens.dart';
 import '../../splash_view.dart';
 
 /// CHAT animation: 3D Tech Cube (compact, Chat page size).
@@ -59,7 +58,7 @@ class _ChatCubeAnimationState extends State<ChatCubeAnimation>
                 const Color(0xFF7A5900),
               ];
           final textColor =
-              settings?.cubeTextColor.value ?? (isDark ? Colors.white : Dt.textPrimary);
+              settings?.cubeTextColor.value ?? (isDark ? Colors.white : Colors.black);
           final textFont = settings?.cubeTextFont.value ?? 'Plus Jakarta Sans';
 
           return Column(
