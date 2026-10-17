@@ -9,6 +9,13 @@
 ## CubicLM
 Computational Universe for Building Intelligent Learning Machines
 
+<div align="center">
+  <a href="https://youtu.be/ucc1ElqBk-I">
+    <img src="https://img.youtube.com/vi/ucc1ElqBk-I/maxresdefault.jpg" alt="CubicLM Demo Video" width="80%" style="border-radius: 8px;" />
+  </a>
+  <br>
+  🎬 <a href="https://youtu.be/ucc1ElqBk-I"><b>Watch CubicLM Demo Video</b></a>
+</div>
 
 ### The Cross-Platform AI Chat Powerhouse
 
@@ -16,6 +23,7 @@ Computational Universe for Building Intelligent Learning Machines
 **Connect to 23+ cloud providers** ☁️ · **Extend with Skills** 🧩 · **Built-in OpenAI-compatible API** 🔌
 
 <br/>
+
 
 [![Release](https://img.shields.io/github/v/release/CubicLM/CubicLM?label=Latest%20Release&style=for-the-badge&color=FF4D00&labelColor=0d1117&logo=github)](https://github.com/CubicLM/CubicLM/releases/tag/v1.18.0)
 [![Downloads](https://img.shields.io/github/downloads/CubicLM/CubicLM/total?style=for-the-badge&color=22c55e&labelColor=0d1117&logo=github)](https://github.com/CubicLM/CubicLM/releases)
