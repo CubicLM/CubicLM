@@ -504,27 +504,81 @@ class ExportFile {
     }
   }
 
-  /// Lists all files in the export directory.
+  /// Lists ALL files (every type) the app has in its export tree:
+  /// the root folder plus every per-feature subfolder
+  /// ([exportSubfolders]). Android merges per-folder MediaStore
+  /// queries; desktop walks the tree recursively. Duplicates are
+  /// removed by path so overlapping folder queries stay clean.
   static Future<List<ExportedFile>> listAllFiles() async {
     if (kIsWeb) return [];
+    final out = <String, ExportedFile>{};
+    void absorb(List<ExportedFile> list) {
+      for (final f in list) {
+        if (f.name.isEmpty) continue;
+        out[f.path] = f;
+      }
+    }
+
     try {
       if (Platform.isAndroid) {
-        return await _listAndroidFiles(all: true);
+        // Root + each registered per-feature folder. MediaStore queries
+        // are prefix-matched, so children folders are covered too.
+        final folders = <String>{appSubfolder(), ...exportSubfolders.values};
+        for (final folder in folders) {
+          try {
+            absorb(await _listAndroidFiles(subfolder: folder, all: true));
+          } catch (_) {}
+        }
+        return out.values.toList()
+          ..sort((a, b) => b.modified.compareTo(a.modified));
       }
       final dir = await _desktopExportDir();
-      return await _listDirFiles(dir, all: true);
+      absorb(await _listDirFilesDeep(dir));
+      return out.values.toList()
+        ..sort((a, b) => b.modified.compareTo(a.modified));
     } catch (_) {
-      return [];
+      return out.values.toList();
     }
   }
 
+  /// Recursively lists files under [dir] (all types, follows the export
+  /// tree on desktop). Never throws.
+  static Future<List<ExportedFile>> _listDirFilesDeep(Directory dir) async {
+    final files = <ExportedFile>[];
+    try {
+      await for (final e in dir.list(recursive: true, followLinks: false)) {
+        if (e is File) {
+          try {
+            final stat = await e.stat();
+            final name = e.path.split(Platform.pathSeparator).last;
+            files.add(ExportedFile(
+              name: name,
+              path: e.path,
+              sizeBytes: stat.size,
+              modified: stat.modified,
+              relPath: e.path.startsWith(dir.path)
+                  ? e.path.substring(dir.path.length + 1)
+                  : null,
+            ));
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+    return files;
+  }
+
   /// Android: list files via MediaStore or direct Downloads path.
-  static Future<List<ExportedFile>> _listAndroidFiles({bool all = false}) async {
+  /// [subfolder] overrides [appSubfolder] (used by the deep listing).
+  static Future<List<ExportedFile>> _listAndroidFiles(
+      {bool all = false, String? subfolder}) async {
+    final folder = (subfolder == null || subfolder.isEmpty)
+        ? appSubfolder()
+        : subfolder;
     // A user-picked SAF folder wins (saves go there).
     try {
       final hive = Get.isRegistered<HiveService>() ? Get.find<HiveService>() : null;
       final treeUri = hive?.getSetting<String>(AppConstants.keyExportTreeUri) ?? '';
-      if (treeUri.isNotEmpty) {
+      if (treeUri.isNotEmpty && folder == appSubfolder()) {
         final ok = await _androidChannel.invokeMethod<bool>('checkTreeFolderAccess', {'treeUri': treeUri});
         if (ok == true) {
           final results = await _androidChannel.invokeMethod<List>('listTreeFiles', {'treeUri': treeUri});
@@ -538,7 +592,8 @@ class ExportFile {
       }
     } catch (_) {}
     try {
-      final results = await _androidChannel.invokeMethod<List>('listExportFiles', {'subfolder': appSubfolder()});
+      final results = await _androidChannel.invokeMethod<List>(
+          'listExportFiles', {'subfolder': folder, 'all': all});
       if (results != null) {
         return results
             .map((m) => ExportedFile.fromMap(Map<String, dynamic>.from(m)))
@@ -549,7 +604,7 @@ class ExportFile {
     // Fallback: try listing via the Documents directory
     try {
       final docs = await getApplicationDocumentsDirectory();
-      final sub = Directory('${docs.path}${Platform.pathSeparator}${appSubfolder()}');
+      final sub = Directory('${docs.path}${Platform.pathSeparator}$folder');
       if (await sub.exists()) return await _listDirFiles(sub, all: all);
     } catch (_) {}
     return [];
@@ -628,11 +683,16 @@ class ExportedFile {
   final int sizeBytes;
   final DateTime modified;
 
+  /// Relative path inside the export tree when the platform provides
+  /// one (desktop walk / MediaStore RELATIVE_PATH). Null otherwise.
+  final String? relPath;
+
   ExportedFile({
     required this.name,
     required this.path,
     required this.sizeBytes,
     required this.modified,
+    this.relPath,
   });
 
   factory ExportedFile.fromMap(Map<String, dynamic> m) {
@@ -650,7 +710,111 @@ class ExportedFile {
       path: m['uri']?.toString() ?? m['path']?.toString() ?? '',
       sizeBytes: m['size'] is int ? m['size'] : 0,
       modified: parsed,
+      relPath: m['relPath']?.toString(),
     );
+  }
+
+  /// Lowercase extension without the dot ('' when none).
+  String get extension {
+    final i = name.lastIndexOf('.');
+    return i < 0 ? '' : name.substring(i + 1).toLowerCase();
+  }
+
+  /// Broad kind bucket driving the icon/color in the Saved Files tree.
+  String get kind {
+    switch (extension) {
+      case 'pdf':
+        return 'pdf';
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+      case 'webp':
+      case 'gif':
+      case 'heic':
+      case 'bmp':
+      case 'svg':
+        return 'image';
+      case 'mp4':
+      case 'mov':
+      case 'avi':
+      case 'mkv':
+      case 'webm':
+        return 'video';
+      case 'mp3':
+      case 'm4a':
+      case 'wav':
+      case 'aac':
+      case 'ogg':
+      case 'flac':
+        return 'audio';
+      case 'zip':
+      case 'tar':
+      case 'gz':
+      case '7z':
+      case 'rar':
+        return 'archive';
+      case 'pptx':
+      case 'ppt':
+        return 'slides';
+      case 'docx':
+      case 'doc':
+        return 'docs';
+      case 'json':
+      case 'yaml':
+      case 'yml':
+      case 'xml':
+      case 'csv':
+        return 'data';
+      case 'dart':
+      case 'js':
+      case 'ts':
+      case 'py':
+      case 'kt':
+      case 'java':
+      case 'html':
+      case 'css':
+      case 'php':
+      case 'c':
+      case 'cpp':
+      case 'h':
+      case 'go':
+      case 'rs':
+      case 'rb':
+      case 'sh':
+        return 'code';
+      case 'txt':
+      case 'log':
+      case 'md':
+      case 'markdown':
+        return 'text';
+      default:
+        return 'other';
+    }
+  }
+
+  /// Folder this file lives in, relative to the export root (e.g.
+  /// 'System Logs'). Best effort from [relPath] or the plain path.
+  String get folderLabel {
+    final rel = relPath;
+    if (rel != null && rel.isNotEmpty) {
+      final parts = rel.split('/');
+      return parts.length > 1
+          ? parts.sublist(0, parts.length - 1).join('/')
+          : '';
+    }
+    if (!path.startsWith('content://')) {
+      final norm = path.replaceAll('\\', '/');
+      final marker = ExportFile.appSubfolder();
+      final i = norm.indexOf('$marker/');
+      if (i >= 0) {
+        final tail = norm.substring(i + marker.length + 1);
+        final parts = tail.split('/');
+        return parts.length > 1
+            ? parts.sublist(0, parts.length - 1).join('/')
+            : '';
+      }
+    }
+    return '';
   }
 
   String get sizeLabel {

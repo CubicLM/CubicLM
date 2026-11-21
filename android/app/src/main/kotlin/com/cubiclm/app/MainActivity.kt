@@ -2178,9 +2178,10 @@ class MainActivity : FlutterFragmentActivity() {
                 }
                 "listExportFiles" -> {
                     val subfolder = sanitizeSubfolder(call.argument<String>("subfolder") ?: "CubicLM")
+                    val all = call.argument<Boolean>("all") ?: false
                     thread(name = "list-exports") {
                         try {
-                            val files = listExportFiles(subfolder)
+                            val files = listExportFiles(subfolder, all)
                             mainHandler.post { result.success(files) }
                         } catch (e: Exception) {
                             mainHandler.post {
@@ -3428,7 +3429,7 @@ class MainActivity : FlutterFragmentActivity() {
     /// Returns [{name, uri, size, modified}] with content URIs (direct
     /// file paths don't work under scoped storage) and millis timestamps.
     /// Newest first. Never throws (empty list on any failure).
-    private fun listExportFiles(subfolder: String): List<Map<String, Any?>> {
+    private fun listExportFiles(subfolder: String, all: Boolean = false): List<Map<String, Any?>> {
         val out = mutableListOf<Map<String, Any?>>()
         try {
             val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -3446,6 +3447,7 @@ class MainActivity : FlutterFragmentActivity() {
                     MediaStore.Downloads.SIZE,
                     MediaStore.Downloads.DATE_MODIFIED,
                     MediaStore.Downloads.MIME_TYPE,
+                    MediaStore.Downloads.RELATIVE_PATH,
                 ),
                 selection, args,
                 "${MediaStore.Downloads.DATE_MODIFIED} DESC",
@@ -3455,10 +3457,11 @@ class MainActivity : FlutterFragmentActivity() {
                 val sizeCol = c.getColumnIndex(MediaStore.Downloads.SIZE)
                 val modCol = c.getColumnIndex(MediaStore.Downloads.DATE_MODIFIED)
                 val mimeCol = c.getColumnIndex(MediaStore.Downloads.MIME_TYPE)
+                val relCol = c.getColumnIndex(MediaStore.Downloads.RELATIVE_PATH)
                 while (c.moveToNext()) {
                     try {
                         val name = c.getString(nameCol) ?: continue
-                        if (!name.endsWith(".txt", true) &&
+                        if (!all && !name.endsWith(".txt", true) &&
                             !name.endsWith(".log", true)) continue
                         val id = c.getLong(idCol)
                         val uri = android.content.ContentUris.withAppendedId(
@@ -3468,12 +3471,14 @@ class MainActivity : FlutterFragmentActivity() {
                         val modSec =
                             if (modCol >= 0 && !c.isNull(modCol)) c.getLong(modCol) else 0L
                         val mime = if (mimeCol >= 0) c.getString(mimeCol) else null
+                        val rel = if (relCol >= 0) c.getString(relCol) else null
                         out.add(mapOf(
                             "name" to name,
                             "uri" to uri.toString(),
                             "size" to size,
                             "modified" to modSec * 1000L,
                             "mime" to mime,
+                            "relPath" to rel,
                         ))
                     } catch (_: Exception) {
                     }

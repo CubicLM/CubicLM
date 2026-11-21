@@ -574,14 +574,21 @@ extension _AgentWorkspaceChat on _AgentWorkspaceViewState {
               ),
               const SizedBox(width: 8),
               Flexible(
-                child: Obx(() => AppModelPill(
-                      label: _agentModelLabel(),
-                      onTap: () {
-                        if (!controller.running.value) {
-                          showModelSwitcherSheet(context);
-                        }
-                      },
-                    )),
+                child: Obx(() {
+                  // Touch an always-present observable first: the label
+                  // getter reads none when SettingsController is missing
+                  // (fresh install/tests), and a zero-observable Obx
+                  // throws GetX's improper-use error.
+                  controller.running.value;
+                  return AppModelPill(
+                    label: _agentModelLabel(),
+                    onTap: () {
+                      if (!controller.running.value) {
+                        showModelSwitcherSheet(context);
+                      }
+                    },
+                  );
+                }),
               ),
               const SizedBox(width: 4),
               Obx(() => _modeChip(

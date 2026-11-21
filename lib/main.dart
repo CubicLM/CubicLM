@@ -27,6 +27,7 @@ import 'services/inference_service.dart';
 import 'services/cloud_service.dart';
 import 'services/cubicdata/controller.dart';
 import 'services/download_service.dart';
+import 'services/cache_auto_clean_service.dart';
 import 'services/device_info_service.dart';
 import 'services/local_image_service.dart';
 import 'services/app_log_service.dart';
@@ -298,6 +299,8 @@ void main() {
       Get.put(BrowserDownloadService());
       Get.put(BrowserSoundService());
       Get.put(DownloadService());
+      final cacheCleaner = Get.put(CacheAutoCleanService());
+      unawaited(cacheCleaner.init().then((_) {}, onError: (_) {}));
       Get.put(LocalImageService());
       Get.put(VisionLiveController());
       Get.put(ServerController(), permanent: true);

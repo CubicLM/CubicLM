@@ -227,9 +227,13 @@ class _LogViewState extends State<LogView> {
                 dividerColor: Colors.transparent,
                 labelStyle:
                     GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 13),
-                tabs: const [
-                  Tab(text: 'Live Logs'),
-                  Tab(text: 'Saved Files'),
+                tabs: [
+                  const Tab(text: 'Live Logs'),
+                  ValueListenableBuilder<int>(
+                    valueListenable: savedFilesCount,
+                    builder: (_, n, __) => Tab(
+                        text: n > 0 ? 'Saved Files ($n)' : 'Saved Files'),
+                  ),
                 ],
               ),
             ),

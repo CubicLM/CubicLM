@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:io' show Platform;
 import 'dart:math';
 
@@ -14,6 +16,7 @@ import '../../controllers/settings_controller.dart';
 import '../../core/colors.dart';
 import '../../core/constants.dart';
 import '../../core/routes.dart';
+import '../../services/cache_auto_clean_service.dart';
 import '../../services/chat_backup.dart';
 import '../../services/download_service.dart';
 import '../../services/hive_service.dart';
@@ -269,6 +272,9 @@ class DataView extends GetView<SettingsController> {
                 },
               ),
             ]),
+            const SizedBox(height: 28),
+            sectionLabel(context, 'CACHE'),
+            _buildCacheCareCard(context, isDark),
             const SizedBox(height: 28),
             sectionLabel(context, 'settings_section_diagnostics'.tr),
             appleGroupedCard(context, isDark, children: [
@@ -736,6 +742,106 @@ class DataView extends GetView<SettingsController> {
     } finally {
       c.dispose();
     }
+  }
+
+  /// Cache care: auto-clean schedule + manual clear (Settings → Data).
+  Widget _buildCacheCareCard(BuildContext context, bool isDark) {
+    final cleaner = Get.isRegistered<CacheAutoCleanService>()
+        ? Get.find<CacheAutoCleanService>()
+        : Get.put(CacheAutoCleanService(), permanent: true);
+    unawaited(cleaner.refreshSize());
+    return appleGroupedCard(context, isDark, children: [
+      // Master switch — disabled by default; user opts in.
+      Obx(() {
+        return appleListTile(
+          context,
+          isDark,
+          leading: const Icon(LucideIcons.trash2, size: 20, color: Dt.accent),
+          title: 'Auto clear cached data',
+          subtitle: cleaner.enabled.value
+              ? 'Runs automatically ${cleaner.intervalLabel(cleaner.days.value)} · last ${cleaner.lastCleanLabel}'
+              : 'Off — cached data is kept until you clear it',
+          trailing: Switch.adaptive(
+            value: cleaner.enabled.value,
+            activeThumbColor: Dt.accent,
+            onChanged: (v) => cleaner.setEnabled(v),
+          ),
+        );
+      }),
+      // Interval picker — only meaningful when enabled.
+      Obx(() {
+        if (!cleaner.enabled.value) return const SizedBox.shrink();
+        return appleListTile(
+          context,
+          isDark,
+          leading: const Icon(LucideIcons.calendarClock,
+              size: 20, color: Dt.accent),
+          title: 'Clear every',
+          subtitle: cleaner.intervalLabel(cleaner.days.value),
+          onTap: () => _pickCacheDays(context, cleaner),
+        );
+      }),
+      // Live size + manual clean.
+      Obx(() {
+        return appleListTile(
+          context,
+          isDark,
+          leading: cleaner.cleaning.value
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(LucideIcons.database,
+                  size: 20, color: Dt.accent),
+          title: 'Cached data size',
+          subtitle:
+              '${cleaner.cacheSizeLabel} · includes temp files, share staging and model previews',
+          showDivider: false,
+          trailing: TextButton(
+            onPressed:
+                cleaner.cleaning.value ? null : () => cleaner.cleanNow(),
+            child: const Text('Clear now'),
+          ),
+        );
+      }),
+    ]);
+  }
+
+  Future<void> _pickCacheDays(
+      BuildContext context, CacheAutoCleanService cleaner) async {
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+              child: Text('Auto-clear interval',
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15, fontWeight: FontWeight.w800)),
+            ),
+            for (final d in CacheAutoCleanService.intervalOptions)
+              ListTile(
+                leading: Icon(
+                    d == cleaner.days.value
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    color: d == cleaner.days.value ? Dt.accent : null),
+                title: Text(cleaner.intervalLabel(d),
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: d == cleaner.days.value ? Dt.accent : null)),
+                onTap: () => Navigator.pop(ctx, d),
+              ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+    if (picked != null) await cleaner.setDays(picked);
   }
 
   Future<void> _pickAutoBackupDays(
