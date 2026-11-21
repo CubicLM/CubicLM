@@ -120,46 +120,42 @@ class ToolchainCatalog {
         ToolchainStack(
           id: ToolchainId.android,
           title: 'Android & JVM',
-          subtitle: 'OpenJDK 17 + Gradle for on-device APK builds',
+          subtitle: 'OpenJDK 17 + Gradle 8.7 + ARM64 aapt2 — on-device APK builds',
           bundles: [
             RuntimeBundle(
               fileName: 'cubiclm-android-arm64.tar.gz',
-              version: 'android-sdk36-arm64',
-              title: 'Android overlay',
+              version: 'jdk-17.0.21.1-gradle-8.7-bt-34.0.3-arm64',
+              title: 'Android & JVM overlay',
             ),
           ],
           downloadNote:
-              'Large download. Enables the build play button → direct install.',
-          // Needs an ARM64 AAPT2 built from AOSP source — honest hold.
-          available: false,
+              'Large download (~370 MB). Enables build/test commands and javac/d8/aapt2/apksigner on-device.',
         ),
         ToolchainStack(
           id: ToolchainId.cpp,
           title: 'C / C++ suite',
-          subtitle: 'GCC, Clang, Make, CMake',
+          subtitle: 'GCC 9, Clang 10, Make, CMake, GDB',
           bundles: [
             RuntimeBundle(
               fileName: 'cubiclm-cpp-arm64.tar.gz',
-              version: 'cpp-suite-arm64',
+              version: 'gcc-9.3.0-clang-10.0.0-cmake-3.16.3-arm64',
               title: 'Compiler overlay',
             ),
           ],
           downloadNote: 'For native compilation inside the runtime.',
-          available: false,
         ),
         ToolchainStack(
           id: ToolchainId.php,
           title: 'PHP runtime',
-          subtitle: 'PHP CLI + Composer',
+          subtitle: 'PHP 7.4 CLI + Composer 2.2',
           bundles: [
             RuntimeBundle(
               fileName: 'cubiclm-php-arm64.tar.gz',
-              version: 'php-cli-arm64',
+              version: 'php-7.4.3-composer-2.2-arm64',
               title: 'PHP overlay',
             ),
           ],
           downloadNote: 'For PHP projects and Composer packages.',
-          available: false,
         ),
       ];
 

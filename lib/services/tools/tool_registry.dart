@@ -122,7 +122,8 @@ class ToolRegistry {
 
     // Approval gate
     if (!await _approveToolCall(tool, args)) {
-      _emit(name, false, 0, 0);
+      _emit(name, false, 0, 0, argsPreview: _argsPreview(args),
+          output: 'Tool call denied by user.');
       return const ToolResult(
         output: 'Tool call denied by user.',
         success: false,
@@ -132,10 +133,12 @@ class ToolRegistry {
     final sw = Stopwatch()..start();
     try {
       final result = await tool.execute(args, context);
-      _emit(name, result.success, result.output.length, sw.elapsedMilliseconds);
+      _emit(name, result.success, result.output.length, sw.elapsedMilliseconds,
+          argsPreview: _argsPreview(args), output: result.output);
       return result;
     } catch (e) {
-      _emit(name, false, 0, sw.elapsedMilliseconds);
+      _emit(name, false, 0, sw.elapsedMilliseconds,
+          argsPreview: _argsPreview(args), output: 'Tool execution failed: $e');
       return ToolResult.error('Tool execution failed: $e');
     }
   }
@@ -157,19 +160,45 @@ class ToolRegistry {
     final sw = Stopwatch()..start();
     try {
       final result = await tool.execute(args, context);
-      _emit(name, result.success, result.output.length, sw.elapsedMilliseconds);
+      _emit(name, result.success, result.output.length, sw.elapsedMilliseconds,
+          argsPreview: _argsPreview(args), output: result.output);
       return result;
     } catch (e) {
-      _emit(name, false, 0, sw.elapsedMilliseconds);
+      _emit(name, false, 0, sw.elapsedMilliseconds,
+          argsPreview: _argsPreview(args), output: 'Tool execution failed: $e');
       return ToolResult.error('Tool execution failed: $e');
     }
   }
 
-  void _emit(String name, bool success, int outputChars, int elapsedMs) {
+  /// Display-safe preview of the first scalar argument (path/command/…).
+  /// Full args never enter records (may contain file contents / secrets).
+  static String _argsPreview(Map<String, dynamic> args) {
+    try {
+      for (final key in ['path', 'file_path', 'command', 'query', 'url']) {
+        final v = args[key];
+        if (v is String && v.trim().isNotEmpty) {
+          final s = v.trim().replaceAll('\n', ' ');
+          return s.length > 120 ? '${s.substring(0, 120)}…' : s;
+        }
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  /// Tail of the tool output for transcript cards (never full contents).
+  static String _outputPreview(String output) {
+    if (output.length <= 2000) return output;
+    return '${output.substring(0, 2000)}…';
+  }
+
+  void _emit(String name, bool success, int outputChars, int elapsedMs,
+      {String argsPreview = '', String output = ''}) {
     try {
       if (!_execController.isClosed) {
         _execController.add(ToolExecutionRecord(
           toolName: name,
+          argsPreview: argsPreview,
+          outputPreview: _outputPreview(output),
           success: success,
           outputChars: outputChars,
           elapsedMs: elapsedMs,

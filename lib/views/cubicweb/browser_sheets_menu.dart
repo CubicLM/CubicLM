@@ -50,9 +50,9 @@ extension _BrowserSheetsMenu on _BrowserViewState {
         Get.back();
         Get.to(() => const BrowserFilesView());
       }),
-      _buildMenuItem('AI Notes', LucideIcons.bookMarked, () {
+      _buildMenuItem('CubicAi Helper', LucideIcons.sparkles, () {
         Get.back();
-        _scaffoldKey.currentState?.openEndDrawer();
+        _openCubicAiHelper();
       }),
       _buildMenuItem('Offline', LucideIcons.cloudOff, () {
         Get.back();

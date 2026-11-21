@@ -28,6 +28,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../controllers/browser_controller.dart';
 import '../../controllers/chat_controller.dart';
+import '../../controllers/cubic_ai_helper_controller.dart';
 import '../../controllers/home_controller.dart';
 import '../../controllers/settings_controller.dart';
 import '../../services/browser/adblock_service.dart';
@@ -39,8 +40,10 @@ import '../../services/tts_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../utils/browser_utils.dart';
 import '../../utils/export_file.dart';
+import '../../widgets/site_favicon.dart';
 import '../../widgets/voice_overlay.dart';
 import 'browser_files_view.dart';
+import 'cubic_ai_helper_view.dart';
 import 'qr_scanner_view.dart';
 
 part 'browser_sheets_menu.dart';
@@ -80,8 +83,6 @@ class _BrowserViewState extends State<BrowserView> {
   SettingsController get _settings => Get.find<SettingsController>();
   String? _pipUrl;
   Offset _pipPos = const Offset(20, 100);
-
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   final _urlCtrl = TextEditingController();
   final _findCtrl = TextEditingController();
@@ -144,6 +145,9 @@ class _BrowserViewState extends State<BrowserView> {
     _suggestFocus.addListener(() {
       if (!_suggestFocus.hasFocus) _suggestions.clear();
     });
+    // The helper (full page or split pane) reads this closure for every
+    // message, so its context follows whichever tab is currently active.
+    CubicAiHelperController.bind(_currentPageSnapshot);
     _syncUrl();
     _checkClipboard();
     Get.find<NewsService>().fetchNews();
@@ -181,20 +185,10 @@ class _BrowserViewState extends State<BrowserView> {
   }
 
   Future<void> _triggerAiSearchInsight(String query) async {
-    if (!Get.isRegistered<ChatController>()) return;
-    final chat = Get.find<ChatController>();
-
-    _toast('AI Insight', 'Analyzing search query...');
-    
-    if (_settings.browserSplitEnabled.value) {
-      // If split is on, we don't need to open sidebar, it might be already open.
-    } else {
-      _scaffoldKey.currentState?.openEndDrawer();
-    }
-    
-    await chat.askInNewChat(
-      'Give me a brief 2-sentence expert overview of this search topic: "$query".',
-    );  }
+    await _openCubicAiHelper(
+      prompt: 'Give me a brief 2-sentence expert overview of this search topic: "$query".',
+    );
+  }
 
   void _showClipboardSnackbar(String url) {
     Get.snackbar(
@@ -332,6 +326,7 @@ class _BrowserViewState extends State<BrowserView> {
 
   Future<void> _loadUrl(WebTab tab, String url) async {
     tab.url.value = url;
+    tab.faviconUrl.value = '';
     if (_browser.currentTab == tab) _urlCtrl.text = url;
     try {
       final headers = <String, String>{};
@@ -369,6 +364,7 @@ class _BrowserViewState extends State<BrowserView> {
       }
     }
     tab.url.value = u;
+    tab.faviconUrl.value = '';
     if (_browser.currentTab == tab) _urlCtrl.text = u;
     tab.historyNav = false;
   }
@@ -517,16 +513,63 @@ class _BrowserViewState extends State<BrowserView> {
     _toast('Added to chat', 'Page text is in the composer.');
   }
 
-  Future<void> _askAiAboutPage(WebTab tab) async {
-    final page = await _extractPage(tab);
-    if (page == null) {
-      _toast('Empty page', 'No readable text found.');
-      return;
+  /// A fresh snapshot of whichever tab is active *at call time* — the helper
+  /// re-reads it for every message so switching tabs changes its context.
+  Future<Map<String, String>?> _currentPageSnapshot() async {
+    final tab = _browser.currentTab;
+    if (tab == null ||
+        tab.url.value.isEmpty ||
+        tab.url.value == 'about:blank') {
+      return null;
     }
-    if (!Get.isRegistered<ChatController>()) return;
-    Get.find<ChatController>().insertBrowserExtract(
-        page['title']!, tab.url.value, '${page['text']!}\n\nMy question: ');
-    _toast('Added to chat', 'Page added — type your question.');
+    // Read the live DOM directly (bigger budget than the 12k quick extract)
+    // so the helper can reason about long articles too.
+    try {
+      final raw = await tab.webController?.evaluateJavascript(
+        source:
+            '(function(){return JSON.stringify({title:(document.title||"").slice(0,200),'
+            'text:(document.body?document.body.innerText:"")});})()',
+      );
+      String title = '';
+      String text = '';
+      if (raw is Map) {
+        title = '${raw['title'] ?? ''}';
+        text = '${raw['text'] ?? ''}';
+      } else if (raw is String && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          title = '${decoded['title'] ?? ''}';
+          text = '${decoded['text'] ?? ''}';
+        }
+      }
+      if (text.trim().isNotEmpty) {
+        return {
+          'title': title.trim().isEmpty ? tab.title.value : title.trim(),
+          'url': tab.url.value,
+          'text': text.trim().length > 30000
+              ? text.trim().substring(0, 30000)
+              : text.trim(),
+        };
+      }
+    } catch (_) {}
+    // Fallback to the shared, bounded extractor.
+    final page = await _extractPage(tab);
+    if (page == null) return null;
+    return {
+      'title': (page['title'] ?? '').isEmpty ? tab.title.value : page['title']!,
+      'url': tab.url.value,
+      'text': page['text'] ?? '',
+    };
+  }
+
+  /// Opens the standalone CubicAi Helper chat page (never the old notes drawer).
+  Future<void> _openCubicAiHelper({String? prompt, String? extraContext}) async {
+    CubicAiHelperController.bind(
+      _currentPageSnapshot,
+      initialPrompt: prompt,
+      extraContext: extraContext,
+    );
+    await Get.to(() => const CubicAiHelperView());
   }
 
   Future<void> _autoFillIdentity(WebTab tab) async {
@@ -942,22 +985,16 @@ class _BrowserViewState extends State<BrowserView> {
       return Stack(
         children: [
           Scaffold(
-            key: _scaffoldKey,
             backgroundColor: bgColor,
-            endDrawer: _buildAiSidebar(context, isDark),
             body: SafeArea(
               child: Column(children: [
-                _buildTopBar(context, isDark),
                 Obx(() => _suggestions.isEmpty
                     ? const SizedBox.shrink()
                     : _buildSuggestBox(context, isDark)),
-                Obx(() {
-                  final url = _browser.currentTab?.url.value ?? '';
-                  if (url.isEmpty || url == 'about:blank') {
-                    return const SizedBox.shrink(); // Hide top bar on Home Page
-                  }
-                  return _buildTopBar(context, isDark);
-                }),
+                // Single top bar for both home and browsing — the extra
+                // unconditional copy below used to render a second
+                // identical address bar on every loaded page.
+                _buildTopBar(context, isDark),
                 if (_finding) _buildFindBar(context, isDark),
                 Expanded(
                   child: Obx(() {
@@ -1051,7 +1088,21 @@ class _BrowserViewState extends State<BrowserView> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(children: [
-              const SizedBox(width: 12),
+              Obx(() {
+                final u = tab?.url.value ?? '';
+                if (u.isEmpty || u == 'about:blank' || u.startsWith('file:')) {
+                  return const SizedBox(width: 4);
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: SiteFavicon(
+                    url: u,
+                    faviconUrl: tab?.faviconUrl.value,
+                    size: 16,
+                  ),
+                );
+              }),
+              const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: _urlCtrl,
@@ -1091,6 +1142,12 @@ class _BrowserViewState extends State<BrowserView> {
               }),
             ]),
           ),
+        ),
+        IconButton(
+          icon: const Icon(LucideIcons.sparkles,
+              size: 19, color: Dt.accent),
+          tooltip: 'CubicAi Helper',
+          onPressed: () => _openCubicAiHelper(),
         ),
         IconButton(
           icon: const Icon(LucideIcons.moreVertical, size: 20),
@@ -1392,6 +1449,15 @@ class _BrowserViewState extends State<BrowserView> {
                     source: AdblockService.darkModeJs);
               } catch (_) {}
             }
+            // Resolve the site's own icon so tabs / history / speed dial show
+            // the real favicon instead of a generic placeholder.
+            try {
+              final href = await tab.webController
+                  ?.evaluateJavascript(source: AdblockService.faviconJs);
+              if (href is String && href.trim().isNotEmpty) {
+                tab.faviconUrl.value = href.trim();
+              }
+            } catch (_) {}
             try {
               final vids = await tab.webController
                   ?.evaluateJavascript(source: AdblockService.videoDetectJs);
@@ -1652,6 +1718,12 @@ class _BrowserViewState extends State<BrowserView> {
           icon: Icon(LucideIcons.list, color: finalIconColor),
           onPressed: tab == null ? null : () => _summarizePage(tab),
         );
+      case 'helper':
+        return IconButton(
+          icon: Icon(LucideIcons.sparkles, color: finalIconColor),
+          tooltip: 'CubicAi Helper',
+          onPressed: () => _openCubicAiHelper(),
+        );
       case 'split':
         return Obx(() => IconButton(
               icon: Icon(LucideIcons.columns,
@@ -1905,9 +1977,11 @@ class _BrowserViewState extends State<BrowserView> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(LucideIcons.globe,
-                                  size: 18,
-                                  color: Dt.accent.withValues(alpha: 0.4)),
+                              SiteFavicon(
+                                url: closed.url,
+                                size: 18,
+                                fallbackColor: Dt.accent.withValues(alpha: 0.4),
+                              ),
                               const SizedBox(height: 4),
                               Text(closed.title,
                                   maxLines: 1,
@@ -1982,351 +2056,6 @@ class _BrowserViewState extends State<BrowserView> {
     
     await Future.delayed(const Duration(seconds: 1));
     _toast('Cubic Booster', 'Optimization complete.');
-  }
-
-  Widget _buildAiSidebar(BuildContext context, bool isDark) {
-    return Drawer(
-      width: 320,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
-            decoration: BoxDecoration(
-              color: isDark ? Dt.cardDark : Dt.card,
-              border: Border(bottom: BorderSide(color: Dt.borderColor(isDark))),
-            ),
-            child: Row(
-              children: [
-                const Icon(LucideIcons.sparkles, color: Dt.accent, size: 20),
-                const SizedBox(width: 12),
-                Text(
-                  'AI Companion',
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(LucideIcons.x, size: 20),
-                  onPressed: () => Get.back(),
-                ),
-              ],
-            ),
-          ),
-          _buildAiSidebarShortcuts(isDark),
-          const Divider(height: 1),
-          _buildAiSidebarShortcuts(isDark),
-          const Divider(height: 1),
-          Expanded(
-            child: DefaultTabController(
-              length: 2,
-              child: Column(
-                children: [
-                  TabBar(
-                    tabs: const [
-                      Tab(text: 'Chat'),
-                      Tab(text: 'Notebook'),
-                    ],
-                    labelStyle: GoogleFonts.plusJakartaSans(
-                        fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                  Expanded(
-                    child: TabBarView(
-                      children: [
-                        _buildChatPlaceholder(context),
-                        _buildNotebookView(isDark),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          _buildAiActionButtons(isDark),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChatPlaceholder(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(LucideIcons.messageSquare,
-                size: 48, color: Dt.accent.withValues(alpha: 0.2)),
-            const SizedBox(height: 16),
-            Text(
-              'Chat with CubicLM while you browse.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14, color: Theme.of(context).hintColor),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                Get.back();
-                Get.find<HomeController>().changeTab(0);
-              },
-              child: const Text('Open Full Chat'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNotebookView(bool isDark) {
-    return Obx(() {
-      if (_settings.browserAiNotes.isEmpty) {
-        return Center(
-          child: Text('No notes saved yet.\nSelect text on a page to save.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.plusJakartaSans(color: Colors.grey)),
-        );
-      }
-      return ListView.builder(
-        itemCount: _settings.browserAiNotes.length,
-        itemBuilder: (context, i) {
-          final note = _settings.browserAiNotes[i];
-          return ListTile(
-            title: Text(note['title'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: Text(note['content'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis),
-            trailing: IconButton(
-              icon: const Icon(LucideIcons.trash2, size: 16),
-              onPressed: () => _settings.removeAiNote(i),
-            ),
-            onTap: () {
-              // Open note details or chat about it
-              _toast('Note', 'Chatting with this snippet...');
-              _scaffoldKey.currentState?.closeEndDrawer();
-              Get.find<HomeController>().changeTab(0);
-              Get.find<ChatController>().askInNewChat(
-                  'Let\'s discuss this snippet:\n\n${note['content']}');
-            },
-          );
-        },
-      );
-    });
-  }
-
-  void _showTextSelectionSheet(
-      BuildContext context, bool isDark, WebTab tab, String text) {
-    Get.bottomSheet(
-      Container(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        decoration: _sheetDecor(isDark),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _sheetHandle(),
-            Row(
-              children: [
-                const Icon(LucideIcons.sparkles, color: Dt.accent, size: 16),
-                const SizedBox(width: 8),
-                Text('AI Contextual Tools',
-                    style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.05)
-                    : Colors.black.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(text,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _aiToolBtn('Explain', LucideIcons.helpCircle, () {
-                  Get.back();
-                  _triggerAssistantAction(text, 'Explain');
-                }),
-                _aiToolBtn('Summarize', LucideIcons.list, () {
-                  Get.back();
-                  _triggerAssistantAction(text, 'Summarize');
-                }),
-                _aiToolBtn('Rewrite', LucideIcons.pencil, () {
-                  Get.back();
-                  _triggerAssistantAction(text, 'Rewrite');
-                }),
-                _aiToolBtn('Translate', LucideIcons.languages, () {
-                  Get.back();
-                  _triggerAssistantAction(text, 'Translate');
-                }),
-              ],
-            ),
-            const Divider(height: 32),
-            ListTile(
-              leading: const Icon(LucideIcons.bookMarked),
-              title: const Text('Save to AI Notes'),
-              onTap: () {
-                _settings.addAiNote(tab.title.value, text, tab.url.value);
-                Get.back();
-                _toast('Saved', 'Added to Notebook.');
-              },
-            ),
-            ListTile(
-              leading: const Icon(LucideIcons.copy),
-              title: const Text('Copy to Clipboard'),
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: text));
-                Get.back();
-                _toast('Copied', 'Text copied.');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _aiToolBtn(String label, IconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 70,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          children: [
-            Icon(icon, size: 20, color: Dt.accent),
-            const SizedBox(height: 4),
-            Text(label, style: const TextStyle(fontSize: 10)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAiSidebarShortcuts(bool isDark) {
-    return Obx(() {
-      if (_settings.browserSidebarShortcuts.isEmpty) {
-        return const SizedBox.shrink();
-      }
-      return Container(
-        height: 80,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        color: isDark ? Colors.black12 : Colors.black.withValues(alpha: 0.02),
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: _settings.browserSidebarShortcuts.length,
-          itemBuilder: (context, i) {
-            final s = _settings.browserSidebarShortcuts[i];
-            final url = s['url'] ?? '';
-            final title = s['title'] ?? '';
-            final host = Uri.tryParse(url)?.host ?? '';
-            return Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: GestureDetector(
-                onTap: () {
-                  Get.back();
-                  _go(url);
-                },
-                onLongPress: () => _settings.removeBrowserSidebarShortcut(url),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: isDark ? Dt.cardDark : Dt.card,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Dt.borderColor(isDark)),
-                      ),
-                      child: const Center(
-                        child: Icon(LucideIcons.globe, size: 20, color: Dt.accent),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    SizedBox(
-                      width: 50,
-                      child: Text(
-                        host.isNotEmpty ? host : title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 9),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    });
-  }
-
-  Widget _buildAiActionButtons(bool isDark) {
-    final tab = _browser.currentTab;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? Dt.cardDark : Dt.card,
-        border: Border(top: BorderSide(color: Dt.borderColor(isDark))),
-      ),
-      child: Column(
-        children: [
-          ListTile(
-            leading: const Icon(LucideIcons.camera, size: 18),
-            title: const Text('AI Snapshot'),
-            subtitle: const Text('Analyze visible area'),
-            onTap: tab == null ? null : () {
-              Get.back();
-              _aiSnapshot(tab);
-            },
-          ),
-          ListTile(
-            leading: const Icon(LucideIcons.penTool, size: 18),
-            title: const Text('AI Writing Assistant'),
-            subtitle: const Text('Improve or simplify text'),
-            onTap: tab == null ? null : () {
-              Get.back();
-              _showWritingAssistant();
-            },
-          ),
-          ListTile(
-            leading: const Icon(LucideIcons.list, size: 18),
-            title: const Text('Summarize Page'),
-            onTap: tab == null ? null : () {
-              Get.back();
-              _summarizePage(tab);
-            },
-          ),
-          ListTile(
-            leading: const Icon(LucideIcons.eye, size: 18),
-            title: const Text('AI Skim (Highlight Key points)'),
-            onTap: tab == null ? null : () {
-              Get.back();
-              _skimPage(tab);
-            },
-          ),
-          ListTile(
-            leading: const Icon(LucideIcons.helpCircle, size: 18),
-            title: const Text('Ask about this page'),
-            onTap: tab == null ? null : () {
-              Get.back();
-              _askAiAboutPage(tab);
-            },
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _summarizePage(WebTab tab) async {
@@ -2499,13 +2228,15 @@ class _BrowserViewState extends State<BrowserView> {
                 child: Stack(
                   children: [
                     Center(
-                      child: Obx(() => Icon(
-                          t.isIncognito.value
-                              ? LucideIcons.shieldAlert
-                              : LucideIcons.globe,
-                          size: 24,
-                          color: (t.isIncognito.value ? Colors.purple : Dt.accent)
-                              .withValues(alpha: 0.15))),
+                      child: Obx(() => t.isIncognito.value
+                          ? const Icon(LucideIcons.shieldAlert,
+                              size: 24, color: Colors.purple)
+                          : SiteFavicon(
+                              url: t.url.value,
+                              faviconUrl: t.faviconUrl.value,
+                              size: 26,
+                              fallbackColor: Dt.accent.withValues(alpha: 0.3),
+                            )),
                     ),
                     Positioned(
                       bottom: 0,
@@ -2549,13 +2280,114 @@ class _BrowserViewState extends State<BrowserView> {
     );
   }
 
+  void _showTextSelectionSheet(
+      BuildContext context, bool isDark, WebTab tab, String text) {
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        decoration: _sheetDecor(isDark),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _sheetHandle(),
+            Row(
+              children: [
+                const Icon(LucideIcons.sparkles, color: Dt.accent, size: 16),
+                const SizedBox(width: 8),
+                Text('AI Contextual Tools',
+                    style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(text,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                _aiToolBtn('Explain', LucideIcons.helpCircle, () {
+                  Get.back();
+                  _triggerAssistantAction(text, 'Explain');
+                }),
+                _aiToolBtn('Summarize', LucideIcons.list, () {
+                  Get.back();
+                  _triggerAssistantAction(text, 'Summarize');
+                }),
+                _aiToolBtn('Rewrite', LucideIcons.pencil, () {
+                  Get.back();
+                  _triggerAssistantAction(text, 'Rewrite');
+                }),
+                _aiToolBtn('Translate', LucideIcons.languages, () {
+                  Get.back();
+                  _triggerAssistantAction(text, 'Translate');
+                }),
+              ],
+            ),
+            const Divider(height: 32),
+            ListTile(
+              leading: const Icon(LucideIcons.sparkles, color: Dt.accent),
+              title: const Text('Ask CubicAi Helper'),
+              subtitle: const Text('Discuss this text with the page in context'),
+              onTap: () {
+                Get.back();
+                _openCubicAiHelper(
+                  prompt: 'Explain this text from the page.',
+                  extraContext: text,
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(LucideIcons.copy),
+              title: const Text('Copy to Clipboard'),
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: text));
+                Get.back();
+                _toast('Copied', 'Text copied.');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _aiToolBtn(String label, IconData icon, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 70,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          children: [
+            Icon(icon, size: 20, color: Dt.accent),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(fontSize: 10)),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSplitWindow(BuildContext context, bool isDark) {
-    // For now, split view shows the AI Sidebar content in the split pane
-    // This turns the sidebar into a persistent panel.
+    // Persistent CubicAi Helper pane next to the live page.
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
             color: isDark ? Dt.cardDark : Dt.card,
             border: Border(bottom: BorderSide(color: Dt.borderColor(isDark))),
@@ -2564,18 +2396,24 @@ class _BrowserViewState extends State<BrowserView> {
             children: [
               const Icon(LucideIcons.sparkles, color: Dt.accent, size: 14),
               const SizedBox(width: 8),
-              Text('Cubic AI',
+              Text('CubicAi Helper',
                   style: GoogleFonts.plusJakartaSans(
                       fontSize: 12, fontWeight: FontWeight.bold)),
               const Spacer(),
               IconButton(
+                icon: const Icon(LucideIcons.externalLink, size: 14),
+                tooltip: 'Open full page',
+                onPressed: () => _openCubicAiHelper(),
+              ),
+              IconButton(
                 icon: const Icon(LucideIcons.maximize2, size: 14),
+                tooltip: 'Close split',
                 onPressed: () => _settings.browserSplitEnabled.value = false,
               ),
             ],
           ),
         ),
-        Expanded(child: _buildNotebookView(isDark)),
+        const Expanded(child: CubicAiHelperPanel(compact: true)),
       ],
     );
   }

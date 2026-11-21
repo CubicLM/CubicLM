@@ -104,6 +104,19 @@ class AdblockService {
 })();
 ''';
 
+  /// Resolves the page's declared favicon to an absolute URL. Injected after
+  /// load so the browser can show the real site icon instead of a placeholder.
+  static const String faviconJs = r'''
+(function(){
+  try {
+    var link = document.querySelector("link[rel~='icon']") ||
+               document.querySelector("link[rel='shortcut icon']");
+    if (!link) return '';
+    return link.href || link.getAttribute('href') || '';
+  } catch (e) { return ''; }
+})();
+''';
+
   /// Reader Mode JS: tries to extract main article and strip clutter.
   static const String readerJs = r'''
 (function(){

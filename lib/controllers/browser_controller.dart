@@ -37,6 +37,11 @@ class WebTab {
   /// Last main-frame load failure, or '' when healthy.
   final RxString errorDesc = ''.obs;
 
+  /// Favicon URL declared by the live page (`<link rel="icon">`). Used by
+  /// the tab switcher / history / speed dial so real site icons replace the
+  /// generic placeholder. Empty until discovered after a page load.
+  final RxString faviconUrl = ''.obs;
+
   /// Desktop user-agent override for this tab.
   final RxBool desktopMode = false.obs;
 
@@ -85,6 +90,7 @@ class WebTab {
     isHibernated.value = false;
     lastAccessedAt = DateTime.now();
     errorDesc.value = '';
+    faviconUrl.value = '';
     desktopMode.value = false;
     findActive.value = 0;
     findTotal.value = 0;

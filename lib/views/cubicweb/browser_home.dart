@@ -120,12 +120,9 @@ extension BrowserHome on _BrowserViewState {
               const SizedBox(height: 60),
             ],
           ),
-          // Floating Booster
-          Positioned(
-            right: 16,
-            bottom: 80,
-            child: _buildResourceMonitor(isDark),
-          ),
+          // (The floating resource monitor was a duplicate of the one in
+          // the bottom navigation bar — removed. The bottom-bar chip keeps
+          // the same Cubic Booster tap.)
         ],
       );
     });
@@ -227,20 +224,20 @@ extension BrowserHome on _BrowserViewState {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('AI CORNER',
+                Text('CUBICAI HELPER',
                     style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         fontWeight: FontWeight.w900,
                         color: Dt.accentGx)),
-                Text('Explore new models and skills.',
+                Text('Chat with AI about the page you are viewing.',
                     style: TextStyle(
                         fontSize: 11, color: Theme.of(context).hintColor)),
               ],
             ),
           ),
           TextButton(
-            onPressed: () => Get.find<HomeController>().changeTab(1),
-            child: const Text('VISIT'),
+            onPressed: () => _openCubicAiHelper(),
+            child: const Text('OPEN'),
           ),
         ],
       ),
@@ -387,7 +384,14 @@ extension BrowserHome on _BrowserViewState {
                 ),
               ],
             ),
-            child: Icon(icon, size: 24, color: Dt.accent),
+            child: (url.startsWith('http://') || url.startsWith('https://'))
+                ? SiteFavicon(
+                    url: url,
+                    size: 24,
+                    fallbackIcon: icon,
+                    fallbackColor: Dt.accent,
+                  )
+                : Icon(icon, size: 24, color: Dt.accent),
           ),
           const SizedBox(height: 8),
           Text(

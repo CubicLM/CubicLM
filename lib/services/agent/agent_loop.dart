@@ -114,6 +114,8 @@ class AgentLoop {
         );
         yield AgentEvent.toolCompleted(
           call.name,
+          argsPreview: _argsPreview(call.args),
+          output: _outputPreview(outcome.output),
           success: outcome.success,
           outputChars: outcome.output.length,
           modifiedFiles: outcome.modifiedFiles,
@@ -132,4 +134,20 @@ class AgentLoop {
     if (parts.isEmpty) return null;
     return parts.join('\n\n');
   }
+
+  /// Display-safe first argument (path/command/query) for tool cards.
+  static String _argsPreview(Map<String, dynamic> args) {
+    for (final key in ['path', 'file_path', 'command', 'query', 'url']) {
+      final v = args[key];
+      if (v is String && v.trim().isNotEmpty) {
+        final s = v.trim().replaceAll('\n', ' ');
+        return s.length > 120 ? '${s.substring(0, 120)}…' : s;
+      }
+    }
+    return '';
+  }
+
+  /// Truncated tool output for transcript cards (full text goes to memory).
+  static String _outputPreview(String output) =>
+      output.length <= 4000 ? output : '${output.substring(0, 4000)}…';
 }

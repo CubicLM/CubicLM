@@ -1,63 +1,19 @@
 /// Writing assistant, AI theme generator, listening mode.
 ///
 /// Split from `browser_sheets.dart` (part of `browser_view.dart`) - behavior is unchanged.
-/// Contains: _showWritingAssistant(), _triggerAssistantAction(), _showAiThemeGenerator(), _generateAiTheme()
+/// Contains: _triggerAssistantAction(), _showAiThemeGenerator(), _generateAiTheme()
 ///   _toggleListeningMode()
 part of 'browser_view.dart';
 
 extension _BrowserSheetsAi on _BrowserViewState {
-  void _showWritingAssistant() {
-    final ctrl = TextEditingController();
-    Get.bottomSheet(
-      Container(
-        padding: const EdgeInsets.all(20),
-        decoration: _sheetDecor(Theme.of(context).brightness == Brightness.dark),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _sheetHandle(),
-            Text('Writing Assistant', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                hintText: 'Enter text to improve...',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton(
-                  onPressed: () {
-                    Get.back();
-                    _triggerAssistantAction(ctrl.text, 'Improve');
-                  },
-                  child: const Text('Improve'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Get.back();
-                    _triggerAssistantAction(ctrl.text, 'Simplify');
-                  },
-                  child: const Text('Simplify'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
+  /// Hands a text-selection action to CubicAi Helper with the selected text
+  /// as extra context on top of the current page.
   Future<void> _triggerAssistantAction(String text, String action) async {
     if (text.trim().isEmpty) return;
-    final chat = Get.find<ChatController>();
-    _toast('AI Assistant', 'Processing text...');
-    Get.find<HomeController>().changeTab(0);
-    await chat.askInNewChat('$action this text for me:\n\n$text');
+    await _openCubicAiHelper(
+      prompt: '$action this text from the page.',
+      extraContext: text,
+    );
   }
 
   void _showAiThemeGenerator() {

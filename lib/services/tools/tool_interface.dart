@@ -137,6 +137,14 @@ Map<String, dynamic> toolToAnthropic(Tool tool) => {
 /// are intentionally NOT included (may contain file contents / secrets).
 class ToolExecutionRecord {
   final String toolName;
+
+  /// First argument, truncated for display (e.g. the file path a tool
+  /// touched). Full args never enter the record — secrets stay out.
+  final String argsPreview;
+
+  /// Truncated tail of the tool output for transcript cards (the full
+  /// output goes to the LLM; the UI shows only this preview).
+  final String outputPreview;
   final bool success;
   final int outputChars;
   final int elapsedMs;
@@ -144,6 +152,8 @@ class ToolExecutionRecord {
 
   const ToolExecutionRecord({
     required this.toolName,
+    this.argsPreview = '',
+    this.outputPreview = '',
     required this.success,
     required this.outputChars,
     required this.elapsedMs,

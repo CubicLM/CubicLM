@@ -45,7 +45,7 @@ List<_ToolSpec> _toolSpecs() => [
         icon: LucideIcons.bot,
         title: 'Agent Workspace',
         description:
-            'General coding agent: describe any task — explore, edit, test, commit — with tool approvals, per-file undo and checkpoint rollback. Cloud or on-device.',
+            'OpenCode-style coding agent for any imported project: chat transcript with tool cards, file tree + viewer, jailed terminal, @-file mentions, checkpoints and per-file undo. Cloud or on-device.',
         open: () => const AgentWorkspaceView(),
       ),
       _ToolSpec(

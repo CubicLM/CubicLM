@@ -317,7 +317,7 @@ extension _BrowserSheetsLibrary on _BrowserViewState {
                   final v = _browser.visits[i];
                   return ListTile(
                     dense: true,
-                    leading: const Icon(LucideIcons.globe, size: 18),
+                    leading: SiteFavicon(url: v.url, size: 18),
                     title: Text(v.title,
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                     subtitle: Text(v.url,
@@ -375,8 +375,11 @@ extension _BrowserSheetsLibrary on _BrowserViewState {
                   final url = b['url'] ?? '';
                   return ListTile(
                     dense: true,
-                    leading:
-                        const Icon(LucideIcons.bookmark, size: 18),
+                    leading: SiteFavicon(
+                      url: url,
+                      size: 18,
+                      fallbackIcon: LucideIcons.bookmark,
+                    ),
                     title: Text(title,
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                     subtitle: Text(url,
@@ -771,6 +774,7 @@ extension _BrowserSheetsLibrary on _BrowserViewState {
       'tabs',
       'menu',
       'qr',
+      'helper',
       'snapshot',
       'summarize',
       'translate',

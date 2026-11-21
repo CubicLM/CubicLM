@@ -195,7 +195,10 @@ class AgentRunner extends GetxService {
               {'role': 'system', 'content': system},
               ...context,
             ];
-      reply = await cloud.sendMessage(messages: messages);
+      reply = await cloud.sendMessage(
+        messages: messages,
+        imageBase64: config.imageBase64,
+      );
     } catch (e) {
       await sub.cancel();
       yield AgentEvent.error('Cloud call failed: $e');
@@ -213,6 +216,8 @@ class AgentRunner extends GetxService {
       yield AgentEvent.toolStarted(rec.toolName);
       yield AgentEvent.toolCompleted(
         rec.toolName,
+        argsPreview: rec.argsPreview,
+        output: rec.outputPreview,
         success: rec.success,
         outputChars: rec.outputChars,
       );

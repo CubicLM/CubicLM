@@ -74,6 +74,11 @@ class AgentConfig {
   /// Approve/Reject dialog before any tool runs (plan mode).
   final bool planMode;
 
+  /// Base64 image attached from the composer (chat-composer parity).
+  /// Cloud providers render it into the first request; the on-device
+  /// text engine ignores it.
+  final String? imageBase64;
+
   const AgentConfig({
     this.maxIterations = 12,
     this.maxCharsPerToolResult = 12000,
@@ -82,6 +87,7 @@ class AgentConfig {
     this.projectId,
     this.systemPrompt,
     this.planMode = false,
+    this.imageBase64,
   });
 }
 
@@ -102,6 +108,12 @@ class AgentEvent {
   final AgentEventKind kind;
   final String text;
   final String toolName;
+
+  /// Display-safe first argument (path/command/query) for tool cards.
+  final String argsPreview;
+
+  /// Truncated tool output shown in expandable transcript cards.
+  final String output;
   final bool success;
   final int outputChars;
   final List<String> modifiedFiles;
@@ -113,6 +125,8 @@ class AgentEvent {
     required this.kind,
     this.text = '',
     this.toolName = '',
+    this.argsPreview = '',
+    this.output = '',
     this.success = true,
     this.outputChars = 0,
     this.modifiedFiles = const [],
@@ -141,6 +155,8 @@ class AgentEvent {
 
   factory AgentEvent.toolCompleted(
     String toolName, {
+    String argsPreview = '',
+    String output = '',
     bool success = true,
     int outputChars = 0,
     List<String> modifiedFiles = const [],
@@ -148,6 +164,8 @@ class AgentEvent {
       AgentEvent(
         kind: AgentEventKind.toolCompleted,
         toolName: toolName,
+        argsPreview: argsPreview,
+        output: output,
         success: success,
         outputChars: outputChars,
         modifiedFiles: modifiedFiles,

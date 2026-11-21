@@ -14,6 +14,7 @@ import 'controllers/settings_controller.dart';
 import 'controllers/profile_controller.dart';
 import 'controllers/chat_controller.dart';
 import 'controllers/browser_controller.dart';
+import 'controllers/cubic_ai_helper_controller.dart';
 import 'controllers/cloud_model_controller.dart';
 import 'controllers/server_controller.dart';
 import 'controllers/model_controller.dart';
@@ -291,6 +292,8 @@ void main() {
       unawaited(
           Get.find<CubicWebLogger>().init().then((_) {}, onError: (_) {}));
       Get.put(BrowserController());
+      // Page-aware browser chat (shared by the full page and split pane).
+      Get.put(CubicAiHelperController());
       Get.put(NewsService());
       Get.put(BrowserDownloadService());
       Get.put(BrowserSoundService());

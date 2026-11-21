@@ -5,6 +5,15 @@ All notable changes to CubicLM are documented here. This is the **single source 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Agent Workspace — IDE upgrade (OpenCode/Claude Code parity)** - adaptive Chat/Files/Terminal layout (two-pane on desktop ≥840px), chat-style transcript with expandable tool cards showing tool output, collapsed reasoning blocks, @-file mention suggestions in the composer, plan/local mode chips, project file tree with viewer + rename/delete/mention, changed-file diff cards with per-file accept/undo, checkpoint browser with restore/delete, and a project-jailed terminal pane routed through the same risk-classified `run_command` tool the agent uses.
+- **Agent Workspace composer — chat-composer parity** - model-switcher pill (same `Switch Model` sheet as chat, local/cloud follows the global mode), `+` Add-to-prompt sheet (camera/photo/file with text extraction; images ride to cloud models as vision input), voice-input mic (STT), Plan/Build chip, and attachment + listening previews above the box.
+- **Browser fixes** - removed the duplicated second address bar that appeared on every loaded page (single top bar for home + browsing) and the floating resource-monitor badge that duplicated the one in the bottom navigation bar (bottom-bar chip keeps the Cubic Booster tap).
+- **Tool output in the trace** - `AgentEvent.toolCompleted` and `ToolExecutionRecord` now carry a display-safe args preview + truncated output (local loop 4 KB cap, registry 2 KB cap); cloud runs surface per-tool outputs too.
+- **Runtime & Toolchains — three new stacks published** at `runtime-2026.09` (ARM64): C/C++ suite (GCC 9.3.0, Clang 10.0.0, Make 4.2.1, CMake 3.16.3, GDB 9.1, pkg-config — 139 Ubuntu focal debs), PHP runtime (PHP 7.4.3 CLI + Composer 2.2 — 41 debs + phar), Android & JVM (Temurin JDK 17.0.21.1+2 + Gradle 8.7 + android.jar API 34 + static ARM64 aapt2/aapt/zipalign/aidl + d8/apksigner jars — full on-device APK build chain). All stacks flipped `available: true`; full provenance + rebuild recipe in `docs/runtime-bundles.md`, builder at `scripts/build_runtime_bundles.py`, guard validator at `scripts/validate_runtime_bundle.py` (all three bundles verified 0 blocked members).
+
 ## [1.18.0+28] - 2026-09-26
 
 ### Added
