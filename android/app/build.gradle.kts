@@ -65,6 +65,12 @@ android {
     // so excluding them from every build is pure size win.
     packaging {
         jniLibs {
+            // PRoot and its loader are executables shipped as lib*.so.
+            // They must be extracted to nativeLibraryDir: Android 10+
+            // forbids execve() from app-private storage (W^X). The
+            // uncompressed/lib-loading path would leave no executable
+            // files on disk.
+            useLegacyPackaging = true
             excludes += "**/libVkLayer_*.so"
         }
     }

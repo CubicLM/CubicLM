@@ -17,19 +17,33 @@
 /// MUST go through the manager so the switch is automatic.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'sandbox_backend.dart';
 
 /// PRoot Ubuntu backend. Unavailable until the native runtime ships.
 class ProotBackend implements SandboxBackend {
-  static const MethodChannel _channel =
-      MethodChannel('com.cubiclm.app/proot');
+  static const MethodChannel _channel = MethodChannel('com.cubiclm.app/proot');
 
   bool? _cachedAvailable;
 
   @override
   String get name => 'PRoot Ubuntu 20.04';
+
+  /// Android's read-only `nativeLibraryDir`. PRoot and its loader are
+  /// packaged there as `lib*.so` because app-private storage is not
+  /// executable for apps targeting API 29+ (W^X). Null elsewhere.
+  static Future<String?> nativeLibraryDir() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return null;
+    }
+    try {
+      return await _channel.invokeMethod<String>('nativeLibDir');
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   Future<bool> isAvailable() async {
@@ -70,15 +84,15 @@ class ProotBackend implements SandboxBackend {
         'cwd': workDir ?? '',
         'timeoutMs': timeout.inMilliseconds,
       }).timeout(timeout + const Duration(seconds: 5));
-      final map = raw == null ? <String, dynamic>{} : Map<String, dynamic>.from(raw);
+      final map =
+          raw == null ? <String, dynamic>{} : Map<String, dynamic>.from(raw);
       return SandboxResult(
         stdout: (map['stdout'] ?? '').toString(),
         stderr: (map['stderr'] ?? '').toString(),
         exitCode: (map['exitCode'] as num?)?.toInt() ?? -1,
       );
     } catch (e) {
-      return SandboxResult(
-          stderr: 'PRoot exec failed: $e', exitCode: -1);
+      return SandboxResult(stderr: 'PRoot exec failed: $e', exitCode: -1);
     }
   }
 }

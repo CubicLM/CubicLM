@@ -2971,6 +2971,7 @@ class MainActivity : FlutterFragmentActivity() {
                         mainHandler.post { result.success(ok) }
                     }
                 }
+                "nativeLibDir" -> result.success(applicationInfo.nativeLibraryDir)
                 "exec" -> {
                     val command = call.argument<String>("command") ?: ""
                     val cwd = call.argument<String>("cwd") ?: ""
@@ -3158,10 +3159,27 @@ class MainActivity : FlutterFragmentActivity() {
         return candidates.firstOrNull { it.isDirectory }
     }
 
+    /// PRoot executable. Prefer the copy packaged in nativeLibraryDir:
+    /// Android 10+ denies execve() of app-private files for targetSdk 29+,
+    /// while APK native libraries stay executable. The runtime copy is a
+    /// fallback for older builds / non-Android targetSDK configurations.
     private fun prootBinary(): File? {
+        val native = File(applicationInfo.nativeLibraryDir, "libproot.so")
+        if (native.isFile) return native
         val root = runtimeRoot() ?: return null
         val bin = File(root, "bin/proot")
         return if (bin.isFile && bin.canExecute()) bin else null
+    }
+
+    /// PRoot's guest-exec loader. It must also live in nativeLibraryDir;
+    /// PRoot maps guest ELFs through it instead of calling execve() on
+    /// files under app-private storage.
+    private fun prootLoader(): File? {
+        val native = File(applicationInfo.nativeLibraryDir, "libproot_loader.so")
+        if (native.isFile) return native
+        val root = runtimeRoot() ?: return null
+        val loader = File(root, "libexec/proot/loader")
+        return if (loader.isFile) loader else null
     }
 
     /// True when the Core toolchain can execute: rootfs bash + ready
@@ -3170,7 +3188,7 @@ class MainActivity : FlutterFragmentActivity() {
         val root = runtimeRoot() ?: return false
         if (!File(root, ".ready-core").isFile) return false
         if (!File(root, "ubuntu/usr/bin/bash").isFile) return false
-        if (!File(root, "libexec/proot/loader").isFile) return false
+        if (prootLoader() == null) return false
         return prootBinary() != null
     }
 
@@ -3189,6 +3207,8 @@ class MainActivity : FlutterFragmentActivity() {
             ?: return mapOf("stdout" to "", "stderr" to "Runtime not installed.", "exitCode" to -1)
         val proot = prootBinary()
             ?: return mapOf("stdout" to "", "stderr" to "PRoot binary missing.", "exitCode" to -1)
+        val loader = prootLoader()
+            ?: return mapOf("stdout" to "", "stderr" to "PRoot loader missing.", "exitCode" to -1)
         val rootfs = File(root, "ubuntu")
 
         val hostDir = when {
@@ -3204,15 +3224,24 @@ class MainActivity : FlutterFragmentActivity() {
         }
         if (!hostDir.isDirectory) hostDir.mkdirs()
         val tmpDir = File(cacheDir, "proot-tmp").apply { mkdirs() }
-        // Device-verified on Redmi (PRoot 5.1.107.92): the loader is found
-        // via PROOT_LOADER (never rely on Termux-prefix fallbacks), and the
-        // bundled libtalloc/libandroid-shmem via LD_LIBRARY_PATH.
-        val libDir = File(root, "lib")
-        val loaderDir = File(root, "libexec/proot")
+        // The native library copy carries libtalloc/libandroid-shmem next
+        // to libproot.so and is the only executable location on Android
+        // 10+. Older runtimes keep the libs under <root>/lib.
+        val nativeLibs = File(applicationInfo.nativeLibraryDir, "libtalloc.so")
+        val libDir = if (nativeLibs.isFile) {
+            File(applicationInfo.nativeLibraryDir)
+        } else {
+            File(root, "lib")
+        }
+        val loader32 = File(applicationInfo.nativeLibraryDir, "libproot_loader32.so")
+            .takeIf { it.isFile }
+            ?: File(root, "libexec/proot/loader32").takeIf { it.isFile }
+            ?: loader
 
         val argv = listOf(
             proot.absolutePath,
             "--link2symlink",
+            "--kill-on-exit",
             "-0",
             "-r", rootfs.absolutePath,
             "-b", "/dev",
@@ -3229,9 +3258,12 @@ class MainActivity : FlutterFragmentActivity() {
             "TERM" to "xterm-256color",
             "PROOT_NO_SECCOMP" to "1",
             "PROOT_TMP_DIR" to tmpDir.absolutePath,
-            "PROOT_LOADER" to File(loaderDir, "loader").absolutePath,
-            "PROOT_LOADER_32" to File(loaderDir, "loader32").absolutePath,
-            "LD_LIBRARY_PATH" to libDir.absolutePath,
+            "PROOT_LOADER" to loader.absolutePath,
+            "PROOT_LOADER_32" to loader32.absolutePath,
+            "LD_LIBRARY_PATH" to
+                listOf(libDir.absolutePath, File(root, "lib").absolutePath)
+                    .distinct()
+                    .joinToString(":"),
         )
         return try {
             val proc = ProcessBuilder(argv)

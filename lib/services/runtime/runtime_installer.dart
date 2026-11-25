@@ -106,6 +106,18 @@ class RuntimeInstaller extends GetxService {
     return _root;
   }
 
+  /// Public probe for shell sessions: the runtime root when the core
+  /// stack is installed and runnable, else null. Never throws.
+  Future<String?> runtimeRootPath() async {
+    try {
+      final root = await _runtimeRoot;
+      final ok = await _isStackReady(ToolchainId.core);
+      return ok ? root : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Directory> get _cacheDir async =>
       Directory('${await _runtimeRoot}/cache')..createSync(recursive: true);
 

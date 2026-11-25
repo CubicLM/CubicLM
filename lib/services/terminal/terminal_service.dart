@@ -11,10 +11,17 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:get/get.dart';
+import 'package:path_provider/path_provider.dart';
 
+import 'shell_session.dart';
+import 'terminal_emulator.dart';
+import 'ansi_parser.dart';
 import '../hive_service.dart';
 import '../app_log_service.dart';
+import '../runtime/runtime_installer.dart';
+import '../sandbox/proot_backend.dart';
 import '../sandbox/sandbox_manager.dart';
 import '../security/sandbox_service.dart';
 import '../../utils/preview_guard.dart';
@@ -23,14 +30,22 @@ import '../../utils/text_sanitize.dart';
 /// One terminal output line. Public for the view + tests.
 class TerminalLine {
   final String text;
+
+  /// When true, [text] may contain ANSI escape codes — the persistent
+  /// session keeps them so the view renders colored output (Termux
+  /// parity). One-shot runs stay sanitized.
   final bool isError;
   final bool isCommand;
+  final bool keepAnsi;
 
   const TerminalLine(this.text,
-      {this.isError = false, this.isCommand = false});
+      {this.isError = false, this.isCommand = false, this.keepAnsi = false});
+
+  /// Display text (ANSI stripped for persistence/search).
+  String get plainText => keepAnsi ? stripAnsi(text) : text;
 
   Map<String, dynamic> toMap() =>
-      {'t': text, 'e': isError, 'c': isCommand};
+      {'t': plainText, 'e': isError, 'c': isCommand};
 
   static TerminalLine? fromMap(dynamic raw) {
     if (raw is! Map) return null;
@@ -40,6 +55,24 @@ class TerminalLine {
       isCommand: raw['c'] == true,
     );
   }
+}
+
+/// Result of [TerminalService.submitCommand].
+enum SubmitVerdict {
+  /// Empty line — nothing sent.
+  empty,
+
+  /// Persistent shell is live and the line was delivered.
+  sent,
+
+  /// Persistent shell unavailable — caller uses the one-shot runner.
+  fallback,
+
+  /// Catastrophic command — refused outright.
+  blocked,
+
+  /// High-risk command — deliver after the user confirms.
+  needsConfirm,
 }
 
 /// Split a command into shell + args for the current platform.
@@ -66,8 +99,7 @@ String compactPromptPath(String cwd, {String? home}) {
 
 /// POSIX single-quote a shell word (Mobile-Harness `shellQuote` parity).
 /// Pure for unit tests.
-String shellQuote(String value) =>
-    "'${value.replaceAll("'", "'\\''")}'";
+String shellQuote(String value) => "'${value.replaceAll("'", "'\\''")}'";
 
 /// Marker prefix for CWD tracking (random suffix per run, like the
 /// reference app's `__POCKETDEV_CWD_<uuid>__`, so command output can
@@ -190,6 +222,27 @@ class TerminalService extends GetxService {
   /// servers print `http://localhost:PORT`). Null when none this run.
   final previewUrl = RxnString();
 
+  /// Persistent interactive shell (Termux parity) for the active
+  /// session. Null until [enablePersistentShell] succeeds.
+  final persistentMode = false.obs;
+  final sessionBackendLabel = ''.obs;
+  ShellSession? _shell;
+  String? _shellSessionId;
+
+  /// The emulator to paint. Kept after the shell exits so the final
+  /// screen (and any error) stays visible until a restart.
+  TerminalEmulator? _lastEmulator;
+
+  Worker? _titleWorker;
+
+  TerminalEmulator? get emulator => _shell?.emulator ?? _lastEmulator;
+
+  /// True when the current shell owns a real PTY.
+  bool get isPty => _shell?.isPty ?? false;
+
+  /// Latest shell-reported window title (OSC 0/2).
+  final shellTitle = ''.obs;
+
   final Map<String, _SessionState> _sessions = {};
   Process? _process;
 
@@ -202,6 +255,17 @@ class TerminalService extends GetxService {
     return this;
   }
 
+  @override
+  void onClose() {
+    _titleWorker?.dispose();
+    _titleWorker = null;
+    unawaited(_shell?.stop());
+    _shell = null;
+    _shellSessionId = null;
+    _lastEmulator = null;
+    super.onClose();
+  }
+
   HiveService? get _hive =>
       Get.isRegistered<HiveService>() ? Get.find<HiveService>() : null;
 
@@ -211,7 +275,7 @@ class TerminalService extends GetxService {
       _sessions.putIfAbsent(id, () => _SessionState());
 
   /// Switch to another session (persists the current one first).
-  void switchSession(String id) {
+  Future<void> switchSession(String id) async {
     final target = id.isEmpty ? defaultSessionId : id;
     if (target == activeSessionId.value && _sessions.containsKey(target)) {
       return;
@@ -222,6 +286,9 @@ class TerminalService extends GetxService {
     _mirror(target);
     // Detection is per-run, not persisted.
     previewUrl.value = null;
+    // Persistent shell is per-session: the old one dies with the switch;
+    // the view re-enables for the new session's cwd.
+    await disablePersistentShell();
   }
 
   void _stashActive() {
@@ -252,8 +319,7 @@ class TerminalService extends GetxService {
     if (hive == null) return;
     try {
       st.workingDir =
-          hive.getSetting<String>('terminal_cwd_$id', defaultValue: '') ??
-              '';
+          hive.getSetting<String>('terminal_cwd_$id', defaultValue: '') ?? '';
       final rawLines = hive.getSetting<List>('terminal_transcript_$id');
       if (rawLines != null) {
         st.lines
@@ -308,6 +374,198 @@ class TerminalService extends GetxService {
     }
   }
 
+  // ── Persistent session (Termux parity) ─────────────────────────
+
+  /// Try to upgrade the active session to a persistent interactive
+  /// shell. Returns true when live. Android prefers the PRoot guest
+  /// (same argv/env as the native one-shot runner); desktop uses the
+  /// host shell. Never throws — on failure the session stays one-shot.
+  Future<bool> enablePersistentShell({
+    String? cwd,
+    int cols = 80,
+    int rows = 24,
+  }) async {
+    try {
+      final sessionId = activeSessionId.value;
+      final base = cwd ?? workingDir.value;
+      final dir = base.isNotEmpty ? base : await _defaultCwd();
+      String? prootRoot;
+      String? prootTmp;
+      String? nativeLibDir;
+      if (!kIsWeb && Platform.isAndroid) {
+        prootRoot = await _prootRoot();
+        if (prootRoot == null) return false;
+        nativeLibDir = await ProotBackend.nativeLibraryDir();
+        try {
+          final tmp = await getTemporaryDirectory();
+          prootTmp = tmp.path;
+        } catch (_) {}
+      }
+      final shell = ShellSession();
+      shell.onExit.add(() {
+        if (identical(_shell, shell)) {
+          _shellSessionId = null;
+          persistentMode.value = false;
+          sessionBackendLabel.value = '';
+          shellTitle.value = '';
+          _titleWorker?.dispose();
+          _titleWorker = null;
+          _lastEmulator = shell.emulator;
+          // Keep the transcript available to export/persistence.
+          _adoptEmulatorTranscript(shell.emulator, sessionId);
+        }
+      });
+      final ok = await shell.start(
+        cwd: dir,
+        prootRoot: prootRoot,
+        prootTmpDir: prootTmp,
+        nativeLibDir: nativeLibDir,
+        cols: cols,
+        rows: rows,
+      );
+      if (!ok) {
+        return false;
+      }
+      final old = _shell;
+      final oldId = _shellSessionId;
+      _shell = null;
+      _shellSessionId = null;
+      if (old != null && oldId != null) {
+        _adoptEmulatorTranscript(old.emulator, oldId);
+      }
+      await old?.stop();
+      _shell = shell;
+      _shellSessionId = sessionId;
+      _lastEmulator = shell.emulator;
+      shellTitle.value = shell.title.value;
+      _titleWorker?.dispose();
+      _titleWorker = ever<String>(shell.title, (t) => shellTitle.value = t);
+      persistentMode.value = shell.isAlive;
+      sessionBackendLabel.value = shell.isAlive
+          ? '${shell.backend.value == ShellSessionBackend.prootUbuntu ? 'PRoot Ubuntu' : 'Host shell'}'
+              '${shell.isPty ? ' · PTY' : ''}'
+          : '';
+      return shell.isAlive;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Mirror the emulator's visible output into the persisted line list
+  /// (used by export and the legacy fallback view). [sessionId] is the
+  /// session that owned the shell — never the session active *now*, which
+  /// may have changed while the old shell was shutting down.
+  void _adoptEmulatorTranscript(TerminalEmulator emu, String sessionId) {
+    try {
+      final text = emu.plainText(maxLines: maxLines);
+      if (text.isEmpty) return;
+      final parsed = const LineSplitter()
+          .convert(text)
+          .map((l) => TerminalLine(l, keepAnsi: false))
+          .toList();
+      final st = _stateFor(sessionId);
+      st.lines
+        ..clear()
+        ..addAll(parsed);
+      if (sessionId == activeSessionId.value) {
+        lines.assignAll(parsed);
+      }
+      _persist(sessionId, st);
+    } catch (_) {}
+  }
+
+  /// Resize the live terminal grid (orientation change, keyboard show).
+  void resizeTerminal(int cols, int rows) {
+    _shell?.resize(cols, rows);
+  }
+
+  Future<String> _defaultCwd() async {
+    try {
+      final docs = await getApplicationDocumentsDirectory();
+      return docs.path;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Future<String?> _prootRoot() async {
+    try {
+      if (!Get.isRegistered<RuntimeInstaller>()) return null;
+      return await Get.find<RuntimeInstaller>().runtimeRootPath();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Submit one command line. Blocked commands never reach the shell;
+  /// high-risk ones return [SubmitVerdict.needsConfirm] so the view can
+  /// ask once (the shell itself is NOT gated per-command). Pass
+  /// [confirmed] after the user approves a high-risk line.
+  SubmitVerdict submitCommand(String cmd, {bool confirmed = false}) {
+    final raw = cmd.trim();
+    if (raw.isEmpty) return SubmitVerdict.empty;
+    if (!_persistentAvailable) return SubmitVerdict.fallback;
+    final blocked = SandboxService.isCommandBlocked(raw);
+    if (blocked != null) {
+      lines.add(TerminalLine('Blocked: $blocked', isError: true));
+      AppLogService.trailAction('terminal blocked ($blocked)');
+      return SubmitVerdict.blocked;
+    }
+    if (!confirmed &&
+        SandboxService.classifyCommand(raw).risk == CommandRisk.high) {
+      return SubmitVerdict.needsConfirm;
+    }
+    _append(TerminalLine(raw, isCommand: true));
+    _pushHistory(raw);
+    previewUrl.value =
+        findServerUrlFromCommand(withAutoConfirm(raw)) ?? previewUrl.value;
+    // A pipe-backed shell has no tty echo; show the typed line in the
+    // emulator ourselves. A PTY shell echoes it natively.
+    if (_shell != null && !_shell!.isPty) {
+      _shell!.emulator.feed('$raw\r\n');
+    }
+    _shell?.submitLine(withAutoConfirm(raw));
+    return SubmitVerdict.sent;
+  }
+
+  bool get _persistentAvailable =>
+      persistentMode.value && _shell?.isAlive == true;
+
+  /// Raw stdin writes for key handling (TAB/arrows/CTRL/ALT). Only in
+  /// persistent mode; one-shot sessions ignore them.
+  void writeRaw(String s) {
+    if (_persistentAvailable) _shell?.write(s);
+  }
+
+  void sendCtrlKey(int letter) {
+    if (_persistentAvailable) _shell?.sendCtrl(letter);
+  }
+
+  /// Kill the foreground process (^C) in persistent mode.
+  void sendInterrupt() {
+    if (_persistentAvailable) _shell?.sendCtrl('c'.codeUnitAt(0));
+  }
+
+  /// Tear down the persistent shell (one-shot mode resumes). With
+  /// [keepScreen] the final grid stays visible behind a "shell ended"
+  /// bar; without it the emulator is dropped for a clean restart/switch.
+  Future<void> disablePersistentShell({bool keepScreen = false}) async {
+    _titleWorker?.dispose();
+    _titleWorker = null;
+    final old = _shell;
+    final oldId = _shellSessionId;
+    _shell = null;
+    _shellSessionId = null;
+    await old?.stop();
+    if (old != null && oldId != null) {
+      _adoptEmulatorTranscript(old.emulator, oldId);
+    }
+    _lastEmulator = keepScreen ? old?.emulator : null;
+    persistentMode.value = false;
+    sessionBackendLabel.value = '';
+    shellTitle.value = '';
+  }
+
   /// Run [command], streaming output into [lines]. Blocked commands are
   /// rejected without spawning a process. Returns the exit code.
   ///
@@ -348,7 +606,8 @@ class TerminalService extends GetxService {
       if (newDir != null) {
         final ok = await setWorkingDir(newDir);
         if (!ok) {
-          _append(TerminalLine('cd: no such directory: $newDir', isError: true));
+          _append(
+              TerminalLine('cd: no such directory: $newDir', isError: true));
           lastExitCode.value = 1;
         } else {
           _append(TerminalLine('\$ $cmd', isCommand: true));
@@ -394,8 +653,8 @@ class TerminalService extends GetxService {
         for (final line in const LineSplitter().convert(parsedErr.clean)) {
           if (line.isEmpty) continue;
           shownChars += line.length;
-          _append(TerminalLine(SandboxService.redactSecrets(line),
-              isError: true));
+          _append(
+              TerminalLine(SandboxService.redactSecrets(line), isError: true));
         }
         if (result.timedOut) {
           _append(const TerminalLine('(timed out)', isError: true));
@@ -417,13 +676,13 @@ class TerminalService extends GetxService {
       lastExitCode.value = exitCode;
       // Terminal lane: first token only, secrets scrubbed — never the
       // full command line.
-      final head = SandboxService.redactSecrets(
-          cmd.split(RegExp(r'\s+')).firstWhere((t) => t.isNotEmpty,
-              orElse: () => 'cmd'));
+      final head = SandboxService.redactSecrets(cmd
+          .split(RegExp(r'\s+'))
+          .firstWhere((t) => t.isNotEmpty, orElse: () => 'cmd'));
       AppLogService.trailAction('terminal $head exit $exitCode');
       if (shownChars == 0 && exitCode != 0) {
-        _append(TerminalLine('Process exited with code $exitCode',
-            isError: true));
+        _append(
+            TerminalLine('Process exited with code $exitCode', isError: true));
       }
       _append(TerminalLine('[exit $exitCode]', isError: exitCode != 0));
       return exitCode;
@@ -435,14 +694,17 @@ class TerminalService extends GetxService {
 
   /// Export the current session transcript as plain text.
   String exportTranscript() {
+    final emu = emulator;
+    final body = emu != null
+        ? emu.plainText(maxLines: 5000)
+        : lines.map((l) => l.text).join('\n');
     final buf = StringBuffer();
     buf.writeln('CubicLM Terminal — Session: ${activeSessionId.value}');
     buf.writeln('Working directory: ${workingDir.value}');
     buf.writeln('Exported: ${DateTime.now()}');
     buf.writeln('─' * 50);
-    for (final l in lines) {
-      buf.writeln(l.text);
-    }
+    buf.write(body);
+    buf.writeln();
     return buf.toString();
   }
 
@@ -531,8 +793,8 @@ class TerminalService extends GetxService {
       if (tracked && marker.isNotEmpty && line.startsWith(marker)) return;
       if (line.isEmpty) return;
       shownChars += line.length;
-      _append(TerminalLine(SandboxService.redactSecrets(line),
-          isError: isError));
+      _append(
+          TerminalLine(SandboxService.redactSecrets(line), isError: isError));
       if (watchConfirm && !autoConfirmed) {
         tail = '$tail\n$line';
         if (tail.length > 500) tail = tail.substring(tail.length - 500);
@@ -549,8 +811,7 @@ class TerminalService extends GetxService {
       _process = await Process.start(
         parts[0],
         parts.sublist(1),
-        workingDirectory:
-            workingDir.value.isEmpty ? null : workingDir.value,
+        workingDirectory: workingDir.value.isEmpty ? null : workingDir.value,
         runInShell: false,
       );
       final proc = _process!;
@@ -633,6 +894,21 @@ class TerminalService extends GetxService {
   void clear() {
     if (isRunning.value) return;
     lines.clear();
+    final emu = emulator;
+    if (emu != null) {
+      final wasAlt = emu.inAltScreen;
+      emu.clear();
+      // Redraw the live prompt if a shell is attached. Never inject
+      // Ctrl+L into a full-screen app. A pipe-backed shell has no
+      // readline, so nudge it with an empty line instead.
+      if (_persistentAvailable && !wasAlt) {
+        if (isPty) {
+          writeRaw('\x0c');
+        } else {
+          _shell?.write('\n');
+        }
+      }
+    }
     previewUrl.value = null;
     _stashActive();
   }
@@ -648,6 +924,18 @@ class TerminalService extends GetxService {
         entry.value.lines.clear();
       }
       lines.clear();
+      final emu = emulator;
+      if (emu != null) {
+        final wasAlt = emu.inAltScreen;
+        emu.clear();
+        if (_persistentAvailable && !wasAlt) {
+          if (isPty) {
+            writeRaw('\x0c');
+          } else {
+            _shell?.write('\n');
+          }
+        }
+      }
       previewUrl.value = null;
       _stashActive();
     } catch (_) {}
@@ -657,7 +945,7 @@ class TerminalService extends GetxService {
     // Strip ANSI escapes + control chars first (reference-app parity):
     // colored output must never render as raw glyph soup. The sniff
     // below then sees clean text.
-    final clean = line.isCommand
+    final clean = line.isCommand || line.keepAnsi
         ? line
         : TerminalLine(sanitizeAnsi(line.text),
             isError: line.isError, isCommand: false);
